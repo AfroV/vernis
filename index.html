@@ -1,0 +1,2134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Vernis • View Art</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <link rel="stylesheet" href="" id="supersize-css">
+  <script>
+    // Load supersize and scrollbar settings early
+    (function () {
+      let supersize = localStorage.getItem('vernis-supersize');
+
+      if (supersize && supersize !== 'normal') {
+        document.getElementById('supersize-css').href = 'vernis-supersize-' + supersize + '.css';
+      }
+      const scrollbarWidth = localStorage.getItem('vernis-scrollbar-width');
+      if (scrollbarWidth) {
+        const style = document.createElement('style');
+        style.id = 'scrollbar-width-style';
+        style.textContent = 'html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar { width: ' + scrollbarWidth + 'px !important; height: ' + scrollbarWidth + 'px !important; } html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb, *::-webkit-scrollbar-thumb { border-radius: ' + Math.floor(scrollbarWidth / 2) + 'px !important; }';
+        document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(style); });
+      }
+    })();
+  </script>
+  <style>
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Scrollbar colors - width controlled by supersize CSS or settings */
+    ::-webkit-scrollbar-track {
+      background: #1a1a1a;
+      background: var(--bg-tertiary, #1a1a1a);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #00ffff;
+      background: var(--accent-primary, #00ffff);
+      border: 3px solid #1a1a1a;
+      border-color: var(--bg-tertiary, #1a1a1a);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #ff00ff;
+      background: var(--accent-secondary, #ff00ff);
+    }
+
+    .main {
+      padding: 130px 50px 80px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 80px;
+    }
+
+    .hero h1 {
+      font-family: 'Playfair Display', 'Georgia', serif;
+      font-size: 80px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+      letter-spacing: 0.15em;
+      text-shadow: none;
+    }
+
+    .hero p {
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+      font-size: 22px;
+      color: #d4cfc4;
+      max-width: 750px;
+      margin: 0 auto;
+      line-height: 1.8;
+      font-weight: 300;
+      letter-spacing: 0.3em;
+      opacity: 0.9;
+    }
+
+    /* Decorative elements from vernis-nft.svg */
+    .hero-diamond {
+      width: 10px; height: 10px; margin: 0 auto 10px;
+      border: 1px solid var(--accent-primary); transform: rotate(45deg); opacity: 0.7;
+      position: relative;
+    }
+    .hero-diamond::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 4px; height: 4px; background: var(--accent-primary);
+    }
+    .hero-line-top {
+      width: 300px; height: 1.5px; margin: 0 auto 36px;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), var(--accent-secondary), var(--accent-primary), transparent);
+      opacity: 0.6;
+    }
+    .hero-line-below {
+      width: 220px; height: 1.5px; margin: 8px auto 24px;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), var(--accent-secondary), var(--accent-primary), transparent);
+      opacity: 0.6; position: relative;
+    }
+    .hero-line-below::before,
+    .hero-line-below::after {
+      content: ''; position: absolute; top: -2px;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--accent-primary); opacity: 0.5;
+    }
+    .hero-line-below::before { left: -8px; }
+    .hero-line-below::after { right: -8px; }
+    .hero-separator {
+      width: 180px; height: 0.8px; margin: 12px auto 0;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+      opacity: 0.3;
+    }
+
+    /* Decorative edge frame (corners + border) */
+    .main-frame {
+      position: fixed; inset: 0; pointer-events: none; z-index: 1001;
+    }
+    .main-frame-border {
+      position: absolute; inset: 16px;
+      border: 1px solid var(--accent-primary); border-radius: 4px; opacity: 0.45;
+    }
+    .main-frame-border-inner {
+      position: absolute; inset: 26px;
+      border: 0.5px solid var(--accent-primary); border-radius: 2px; opacity: 0.2;
+    }
+    /* Corner ornaments */
+    .corner-ornament {
+      position: absolute; width: 50px; height: 50px;
+    }
+    .corner-ornament::before, .corner-ornament::after {
+      content: ''; position: absolute; background: var(--accent-primary); opacity: 0.6;
+    }
+    .corner-ornament::before { width: 50px; height: 1px; }
+    .corner-ornament::after { width: 1px; height: 50px; }
+    .corner-tl { top: 16px; left: 16px; }
+    .corner-tl::before { top: 50px; left: 0; }
+    .corner-tl::after { top: 0; left: 50px; }
+    .corner-tr { top: 16px; right: 16px; }
+    .corner-tr::before { top: 50px; right: 0; }
+    .corner-tr::after { top: 0; right: 50px; }
+    .corner-bl { bottom: 16px; left: 16px; }
+    .corner-bl::before { bottom: 50px; left: 0; }
+    .corner-bl::after { bottom: 0; left: 50px; }
+    .corner-br { bottom: 16px; right: 16px; }
+    .corner-br::before { bottom: 50px; right: 0; }
+    .corner-br::after { bottom: 0; right: 50px; }
+    /* Side decorative lines */
+    .side-line {
+      position: absolute; width: 1px; opacity: 0.18;
+      background: linear-gradient(180deg, transparent 0%, var(--accent-primary) 20%, var(--accent-primary) 80%, transparent 100%);
+    }
+    .side-line-l { left: 40px; top: 15%; bottom: 15%; }
+    .side-line-r { right: 40px; top: 15%; bottom: 15%; }
+    /* Vignette overlay */
+    .main-frame-vignette {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.25) 100%);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 28px;
+      margin-top: 60px;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 42px 36px;
+      text-align: center;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    /* Only hover on non-touch devices */
+    @media (hover: hover) and (pointer: fine) {
+      .card {
+        pointer-events: auto;
+      }
+
+      .card:hover {
+        transform: translateY(-8px);
+        border-color: var(--accent-primary);
+      }
+
+      .card:hover::before {
+        opacity: 1;
+      }
+    }
+
+    /* Disable animations on Pi (localhost) - added via JS */
+    .no-animations .card,
+    .no-animations .card::before {
+      transition: none !important;
+    }
+
+    .no-animations .card:hover {
+      transform: none !important;
+    }
+
+    .card h3 {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .card p {
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 32px;
+      font-size: 15px;
+      flex: 1;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main {
+        padding: 110px 25px 60px;
+      }
+
+      .hero h1 {
+        font-size: 48px;
+        letter-spacing: 0.1em;
+      }
+
+      .hero p {
+        font-size: 16px;
+        letter-spacing: 0.2em;
+      }
+
+      .hero-line-top { width: 200px; }
+      .hero-line-below { width: 150px; }
+      .hero-separator { width: 120px; }
+
+      .main-frame-border { inset: 8px; }
+      .main-frame-border-inner { inset: 16px; }
+      .corner-ornament { width: 30px; height: 30px; }
+      .corner-ornament::before { width: 30px; }
+      .corner-ornament::after { height: 30px; }
+      .corner-tl { top: 8px; left: 8px; }
+      .corner-tl::before { top: 30px; }
+      .corner-tl::after { left: 30px; }
+      .corner-tr { top: 8px; right: 8px; }
+      .corner-tr::before { top: 30px; }
+      .corner-tr::after { right: 30px; }
+      .corner-bl { bottom: 8px; left: 8px; }
+      .corner-bl::before { bottom: 30px; }
+      .corner-bl::after { left: 30px; }
+      .corner-br { bottom: 8px; right: 8px; }
+      .corner-br::before { bottom: 30px; }
+      .corner-br::after { right: 30px; }
+      .side-line-l { left: 24px; }
+      .side-line-r { right: 24px; }
+
+      .cards {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+    }
+
+    /* Portrait orientation (vertical screen) */
+    @media (orientation: portrait) {
+      .main {
+        padding: 100px 30px 100px;
+        max-width: 100%;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+
+      .card {
+        padding: 32px 28px;
+      }
+
+      .card h3 {
+        font-size: 22px;
+      }
+
+      .card p {
+        font-size: 14px;
+        margin-bottom: 24px;
+      }
+
+      .header {
+        padding: 15px 20px;
+      }
+
+      .header .nav {
+        gap: 15px;
+      }
+
+      .header .nav a {
+        font-size: 13px;
+      }
+
+      .status {
+        bottom: 20px;
+        padding: 12px 24px;
+        font-size: 13px;
+      }
+    }
+
+    /* Portrait on larger screens (rotated monitor) */
+    @media (orientation: portrait) and (min-height: 1400px) {
+      .main {
+        padding: 120px 60px 120px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+        gap: 30px;
+        max-width: 800px;
+        margin: 60px auto 0;
+      }
+
+      .card {
+        padding: 40px 36px;
+      }
+
+      .card h3 {
+        font-size: 28px;
+      }
+
+      .card p {
+        font-size: 16px;
+      }
+    }
+
+    /* === KIOSK MODE (Pi local display) === */
+    .kiosk .header,
+    .kiosk .main,
+    .kiosk .status-bar,
+    .kiosk #welcome-overlay,
+    .kiosk .menu-toggle,
+    .kiosk .mobile-menu,
+    .kiosk .menu-scrollbar-track,
+    .kiosk #custom-scrollbar,
+    .kiosk footer { display: none !important; }
+
+    .kiosk-start { display: none; }
+    .kiosk .kiosk-start {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; padding: 40px 32px; text-align: center;
+    }
+    .kiosk-logo {
+      font-family: 'Playfair Display', serif; font-size: 69px; font-weight: 900;
+      letter-spacing: 0.15em;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 10px;
+    }
+    .kiosk-diamond {
+      width: 10px; height: 10px; margin: 0 auto 10px;
+      background: var(--accent-primary); transform: rotate(45deg); opacity: 0.6;
+    }
+    .kiosk-line {
+      width: 220px; height: 1px; margin: 0 auto 48px;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), transparent); opacity: 0.5;
+    }
+    .kiosk-buttons { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 400px; }
+    .kiosk-btn {
+      display: flex; align-items: center; justify-content: center; gap: 14px;
+      width: 100%; height: 88px; border: none; border-radius: 18px;
+      font-size: 27px; font-weight: 600; cursor: pointer;
+      font-family: var(--font-body); transition: opacity 0.2s;
+      text-decoration: none; color: #fff;
+    }
+    .kiosk-btn:active { opacity: 0.8; }
+    .kiosk-btn svg { width: 32px; height: 32px; flex-shrink: 0; }
+    .kiosk-btn-gallery {
+      background: var(--accent-primary);
+      box-shadow: 0 4px 20px rgba(var(--accent-primary-rgb, 99,102,241), 0.3);
+    }
+    .kiosk-btn-connect {
+      background: var(--bg-tertiary); color: var(--text-primary);
+      border: 1px solid var(--border-light);
+    }
+    .kiosk-btn-wifi {
+      background: var(--bg-tertiary); color: var(--text-primary);
+      border: 1px solid var(--border-light);
+    }
+    .kiosk-wifi, .kiosk-screenoff { display: none !important; }
+    .kiosk-power {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 100;
+      display: none; align-items: center; gap: 8px;
+      padding: 10px 20px; border: none; border-radius: 12px;
+      background: transparent; color: var(--text-secondary);
+      font-size: 15px; font-weight: 500; font-family: var(--font-body);
+      cursor: pointer; opacity: 0.4; transition: opacity 0.3s ease;
+    }
+    .kiosk-power:active { opacity: 0.8; }
+    .kiosk .kiosk-power { display: flex; }
+    .kiosk-power svg { width: 18px; height: 18px; }
+
+    /* Kiosk connect overlay */
+    .kiosk-connect-overlay {
+      position: fixed; inset: 0; z-index: 10000;
+      background: var(--bg-primary);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      padding: 40px 32px; text-align: center;
+    }
+    .kiosk-back-btn {
+      position: absolute; top: 24px; left: 24px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 4px; border: none;
+      background: transparent; color: var(--text-secondary);
+      font-size: 18px; font-weight: 500; cursor: pointer;
+      font-family: var(--font-body); opacity: 0.9; transition: opacity 0.3s ease;
+      color: #fff;
+    }
+    .kiosk-back-btn:active { opacity: 1; }
+    .kiosk-back-btn svg { width: 18px; height: 18px; }
+    .kiosk-connect-qr {
+      width: 260px; height: 260px; margin: 0 auto 24px;
+      border-radius: 16px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    /* QR fullscreen overlay */
+    .qr-fs-overlay {
+      display: none; position: fixed; inset: 0; z-index: 10001;
+      background: var(--bg-primary, #0f0e0c);
+      flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .qr-fs-overlay.active { display: flex; }
+    .qr-fs-overlay img {
+      width: min(80vw, 80vh); height: min(80vw, 80vh); border-radius: 16px;
+    }
+    .qr-fs-url {
+      margin-top: 24px; font-size: 32px; font-weight: 700;
+      font-family: 'Playfair Display', 'Georgia', serif;
+      color: var(--accent-primary); letter-spacing: 0.05em;
+    }
+    .qr-fs-hint {
+      margin-top: 12px; font-size: 18px; color: var(--text-muted);
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+    }
+    .kiosk-connect-url {
+      font-size: 32px; font-weight: 700; font-family: monospace;
+      color: var(--accent-primary); word-break: break-all; margin-bottom: 16px;
+    }
+    .kiosk-connect-hint {
+      color: var(--text-secondary); font-size: 21px; line-height: 1.6; max-width: 400px;
+    }
+    /* Kiosk WiFi overlay */
+    .kiosk-wifi-overlay {
+      position: fixed; inset: 0; z-index: 10000;
+      background: var(--bg-primary);
+      display: none; flex-direction: column;
+      padding: 80px 24px 24px;
+    }
+    /* WiFi close uses .kiosk-back-btn */
+    .kiosk-wifi-title {
+      font-family: var(--font-display); font-size: 37px; font-weight: 700;
+      color: var(--text-primary); margin-bottom: 20px;
+    }
+    .kiosk-wifi-current {
+      padding: 14px 18px; border-radius: 12px; margin-bottom: 16px;
+      background: var(--bg-secondary); color: var(--text-secondary); font-size: 20px;
+    }
+    .kiosk-wifi-list-wrap {
+      flex: 1; display: flex; flex-direction: column; margin-bottom: 16px;
+      min-height: 0;
+    }
+    .kiosk-wifi-scroll-btn {
+      width: 100%; padding: 8px; border: none; border-radius: 8px;
+      background: var(--bg-secondary); color: var(--text-muted);
+      font-size: 20px; cursor: pointer; display: none;
+      text-align: center; flex-shrink: 0;
+    }
+    .kiosk-wifi-scroll-btn:active { background: var(--bg-tertiary); color: var(--text-primary); }
+    .kiosk-wifi-scroll-btn.visible { display: block; }
+    .kiosk-wifi-list {
+      flex: 1; overflow-y: auto; border-radius: 12px;
+      border: 1px solid var(--border-light); min-height: 0;
+    }
+    .kiosk-wifi-item {
+      padding: 16px 18px; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border-light);
+      color: var(--text-primary); font-size: 21px;
+    }
+    .kiosk-wifi-item:active { background: var(--bg-tertiary); }
+    .kiosk-wifi-item:last-child { border-bottom: none; }
+    .kiosk-wifi-signal { color: var(--text-muted); font-size: 16px; letter-spacing: 1px; }
+    .kiosk-wifi-form {
+      background: var(--bg-secondary); border-radius: 12px; padding: 18px;
+      display: none; margin-bottom: 16px;
+    }
+    .kiosk-wifi-form label {
+      display: block; color: var(--text-secondary); font-size: 17px;
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .kiosk-wifi-form input {
+      width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--border-light);
+      background: var(--bg-primary); color: var(--text-primary); font-size: 21px;
+      margin-bottom: 14px; box-sizing: border-box;
+    }
+    .kiosk-wifi-form .kw-btns { display: flex; gap: 12px; }
+    .kiosk-wifi-form .kw-btn {
+      flex: 1; padding: 14px; border: none; border-radius: 10px;
+      font-size: 21px; font-weight: 600; cursor: pointer;
+    }
+    .kiosk-wifi-form .kw-btn-connect {
+      background: var(--accent-primary); color: #fff;
+    }
+    .kiosk-wifi-form .kw-btn-cancel {
+      background: var(--bg-tertiary); color: var(--text-primary);
+    }
+    .kiosk-wifi-scan-btn {
+      width: 100%; padding: 16px; border: none; border-radius: 12px;
+      background: var(--bg-secondary); color: var(--text-primary);
+      font-size: 21px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border-light);
+    }
+    .kiosk-wifi-scan-btn:active { background: var(--bg-tertiary); }
+    .kiosk-wifi-status {
+      padding: 14px 18px; border-radius: 10px; margin-bottom: 12px;
+      text-align: center; font-size: 20px; display: none;
+      overflow: hidden; text-overflow: ellipsis;
+      max-height: 80px; word-wrap: break-word;
+    }
+  </style>
+  <script>
+    // Apply saved UI scale immediately (default 120% for small screens)
+    (function () {
+      let scale = localStorage.getItem('vernis-ui-scale');
+      if (!scale) {
+        const isSmallScreen = window.innerWidth <= 720 || window.innerHeight <= 720;
+        scale = isSmallScreen ? '120' : '100';
+        localStorage.setItem('vernis-ui-scale', scale);
+      }
+      if (scale !== '100') document.documentElement.style.fontSize = (scale / 100) * 16 + 'px';
+    })();
+  </script>
+</head>
+
+<body>
+  <script>
+    // Detect kiosk mode (Pi accesses via localhost, remote devices via IP)
+    var _isKiosk = (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+    if (_isKiosk) {
+      document.documentElement.classList.add('kiosk');
+      document.body.classList.add('no-animations');
+    }
+  </script>
+
+  <!-- Decorative edge frame (vernis-nft.svg inspired) -->
+  <div class="main-frame" id="main-frame">
+    <div class="main-frame-vignette"></div>
+    <div class="main-frame-border"></div>
+    <div class="main-frame-border-inner"></div>
+    <div class="corner-ornament corner-tl"></div>
+    <div class="corner-ornament corner-tr"></div>
+    <div class="corner-ornament corner-bl"></div>
+    <div class="corner-ornament corner-br"></div>
+    <div class="side-line side-line-l"></div>
+    <div class="side-line side-line-r"></div>
+  </div>
+
+  <!-- Kiosk start screen (Pi local display only) -->
+  <div class="kiosk-start">
+    <div class="kiosk-logo">VERNIS</div>
+    <div class="kiosk-diamond"></div>
+    <div class="kiosk-line"></div>
+    <div class="kiosk-buttons">
+      <a href="gallery.html" class="kiosk-btn kiosk-btn-gallery">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        View Art
+      </a>
+      <button class="kiosk-btn kiosk-btn-connect" onclick="openKioskConnect()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Connect PC/Phone
+      </button>
+      <button class="kiosk-btn kiosk-btn-wifi" onclick="openKioskWifi()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>
+        Wi-Fi
+      </button>
+    </div>
+  </div>
+
+  <!-- Kiosk Screen Off button (bottom center) -->
+  <button class="kiosk-power" onclick="kioskScreenOff()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+    Screen Off
+  </button>
+
+  <!-- Kiosk WiFi overlay -->
+  <div id="kiosk-wifi-overlay" class="kiosk-wifi-overlay">
+    <div class="main-frame" style="z-index:0;">
+      <div class="main-frame-vignette"></div>
+      <div class="main-frame-border"></div>
+      <div class="main-frame-border-inner"></div>
+      <div class="corner-ornament corner-tl"></div>
+      <div class="corner-ornament corner-tr"></div>
+      <div class="corner-ornament corner-bl"></div>
+      <div class="corner-ornament corner-br"></div>
+      <div class="side-line side-line-l"></div>
+      <div class="side-line side-line-r"></div>
+    </div>
+    <button class="kiosk-back-btn" onclick="closeKioskWifi()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Back</button>
+    <div class="kiosk-wifi-title">Wi-Fi</div>
+    <div class="kiosk-wifi-current" id="kw-current">Checking connection...</div>
+    <div class="kiosk-wifi-status" id="kw-status"></div>
+    <div class="kiosk-wifi-form" id="kw-form">
+      <label>Network</label>
+      <input type="text" id="kw-ssid" placeholder="Network name" readonly>
+      <label>Password</label>
+      <input type="text" id="kw-pass" placeholder="Tap to enter password" readonly>
+      <div class="kw-btns">
+        <button class="kw-btn kw-btn-cancel" onclick="closeKioskWifiForm()">Cancel</button>
+        <button class="kw-btn kw-btn-connect" id="kw-connect-btn" onclick="kioskWifiConnect()">Connect</button>
+      </div>
+    </div>
+    <div class="kiosk-wifi-list-wrap">
+      <button class="kiosk-wifi-scroll-btn" id="kw-scroll-up" onclick="kioskWifiScroll(-1)">&#9650; Up</button>
+      <div class="kiosk-wifi-list" id="kw-list">
+        <div style="padding: 20px; text-align: center; color: var(--text-muted);">Tap Scan to find networks</div>
+      </div>
+      <button class="kiosk-wifi-scroll-btn" id="kw-scroll-down" onclick="kioskWifiScroll(1)">&#9660; Down</button>
+    </div>
+    <button class="kiosk-wifi-scan-btn" id="kw-scan-btn" onclick="kioskWifiScan()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:6px;"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>Scan for Networks
+    </button>
+  </div>
+
+  <!-- Kiosk connect overlay -->
+  <div id="kiosk-connect" class="kiosk-connect-overlay">
+    <div class="main-frame" style="z-index:0;">
+      <div class="main-frame-vignette"></div>
+      <div class="main-frame-border"></div>
+      <div class="main-frame-border-inner"></div>
+      <div class="corner-ornament corner-tl"></div>
+      <div class="corner-ornament corner-tr"></div>
+      <div class="corner-ornament corner-bl"></div>
+      <div class="corner-ornament corner-br"></div>
+      <div class="side-line side-line-l"></div>
+      <div class="side-line side-line-r"></div>
+    </div>
+    <button class="kiosk-back-btn" onclick="closeKioskConnect()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Back</button>
+    <div class="kiosk-connect-qr" id="kiosk-qr" onclick="openQrFullscreen()">
+      <span style="color: var(--text-muted); font-size: 14px;">Loading...</span>
+    </div>
+    <div class="kiosk-connect-url" id="kiosk-url"></div>
+    <div class="kiosk-connect-hint">Open this link on your phone or computer to manage your Vernis</div>
+    <a href="connect.html" style="display:block;text-align:center;margin-top:16px;color:var(--accent-primary);font-size:13px;text-decoration:none;opacity:0.7;">More connection options (Bluetooth)</a>
+  </div>
+
+  <!-- QR fullscreen overlay -->
+  <div class="qr-fs-overlay" id="qr-fs-overlay" onclick="this.className='qr-fs-overlay'">
+    <img id="qr-fs-img" alt="QR Code">
+    <div class="qr-fs-url" id="qr-fs-url"></div>
+    <div class="qr-fs-hint">Tap anywhere to close</div>
+  </div>
+
+  <!-- Custom scrollbar - only shown when enabled in settings (for touch screens) -->
+  <div id="custom-scrollbar" class="custom-scrollbar-track">
+    <div id="custom-scrollbar-thumb" class="custom-scrollbar-thumb"></div>
+  </div>
+  <script>
+    // Check if thick scrollbar is enabled (per-instance setting)
+    // Auto-enable on Pi (localhost) for touch navigation
+    (function() {
+      const setting = localStorage.getItem('vernis-thick-scrollbar');
+      // If not set and on localhost (Pi), enable by default
+      if (setting === null && window.location.hostname === 'localhost') {
+        localStorage.setItem('vernis-thick-scrollbar', 'true');
+      }
+      const enabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+      if (!enabled) {
+        document.getElementById('custom-scrollbar').style.display = 'none';
+      }
+    })();
+  </script>
+  <style>
+    .custom-scrollbar-track {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: var(--scrollbar-track, rgba(128,128,128,0.2));
+      z-index: 9999;
+      pointer-events: none; /* Allow clicks to pass through to elements beneath */
+    }
+    .custom-scrollbar-thumb {
+      position: absolute;
+      right: 4px;
+      width: 32px;
+      background: var(--scrollbar-thumb, var(--accent-primary, rgba(150,150,150,0.8)));
+      border-radius: 16px;
+      min-height: 80px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      pointer-events: auto; /* Thumb itself is still draggable */
+    }
+    .custom-scrollbar-thumb:hover,
+    .custom-scrollbar-thumb:active {
+      background: var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)));
+    }
+    /* Menu scrollbar styles */
+    .menu-scrollbar-track {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: var(--scrollbar-track, rgba(128,128,128,0.2));
+      z-index: 10000;
+      display: none;
+      pointer-events: none; /* Allow clicks to pass through */
+    }
+    .menu-scrollbar-thumb {
+      position: absolute;
+      right: 4px;
+      width: 32px;
+      background: var(--scrollbar-thumb, var(--accent-primary, rgba(150,150,150,0.8)));
+      border-radius: 16px;
+      min-height: 60px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      pointer-events: auto; /* Thumb itself is still draggable */
+    }
+    .menu-scrollbar-thumb:hover,
+    .menu-scrollbar-thumb:active {
+      background: var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)));
+    }
+  </style>
+  <script>
+    (function() {
+      // === TWO-FINGER SCROLL ===
+      let twoFingerActive = false;
+      let twoFingerLastY = 0;
+
+      document.addEventListener('touchstart', function(e) {
+        if (e.touches.length >= 2) {
+          twoFingerActive = true;
+          twoFingerLastY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        }
+      }, { passive: true });
+
+      document.addEventListener('touchmove', function(e) {
+        if (twoFingerActive && e.touches.length >= 2) {
+          const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          const delta = twoFingerLastY - currentY;
+          window.scrollBy(0, delta * 1.5);
+          twoFingerLastY = currentY;
+        }
+      }, { passive: true });
+
+      document.addEventListener('touchend', function() {
+        twoFingerActive = false;
+      });
+
+      // === CUSTOM SCROLLBAR ===
+      const scrollbar = document.getElementById('custom-scrollbar');
+      const thumb = document.getElementById('custom-scrollbar-thumb');
+      if (!scrollbar || !thumb) return;
+
+      function updateThumb() {
+        // Only show scrollbar if thick scrollbar is enabled
+        const thickScrollbarEnabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+        if (!thickScrollbarEnabled) {
+          scrollbar.style.display = 'none';
+          return;
+        }
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        if (docHeight <= winHeight) {
+          scrollbar.style.display = 'none';
+          return;
+        }
+        scrollbar.style.display = 'block';
+        const scrollable = docHeight - winHeight;
+        const thumbH = Math.max(80, (winHeight / docHeight) * winHeight);
+        const thumbY = (window.scrollY / scrollable) * (winHeight - thumbH);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top = Math.max(0, thumbY) + 'px';
+      }
+
+      window.addEventListener('scroll', updateThumb);
+      window.addEventListener('resize', updateThumb);
+      setTimeout(updateThumb, 100);
+
+      // Drag thumb
+      let dragging = false, dragStartY = 0, dragStartScroll = 0;
+
+      thumb.addEventListener('touchstart', function(e) {
+        dragging = true;
+        dragStartY = e.touches[0].clientY;
+        dragStartScroll = window.scrollY;
+        e.stopPropagation();
+      }, { passive: true });
+
+      thumb.addEventListener('mousedown', function(e) {
+        dragging = true;
+        dragStartY = e.clientY;
+        dragStartScroll = window.scrollY;
+      });
+
+      document.addEventListener('touchmove', function(e) {
+        if (dragging && e.touches.length === 1) {
+          const delta = e.touches[0].clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      }, { passive: true });
+
+      document.addEventListener('mousemove', function(e) {
+        if (dragging) {
+          const delta = e.clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      });
+
+      document.addEventListener('touchend', function() { dragging = false; });
+      document.addEventListener('mouseup', function() { dragging = false; });
+
+      // Tap track to jump
+      scrollbar.addEventListener('click', function(e) {
+        if (e.target === scrollbar) {
+          const ratio = e.clientY / window.innerHeight;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo({ top: ratio * scrollable, behavior: 'smooth' });
+        }
+      });
+    })();
+  </script>
+
+  <div class="header">
+    <a href="index.html" class="logo">Vernis</a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="add.html">Add Art</a>
+      <a href="library.html">Library</a>
+      <a href="manage.html">Manage Art</a>
+      <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
+    <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
+    <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
+    <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
+    <a href="settings.html" class="settings-parent"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</a>
+    <div class="settings-submenu">
+    <div class="menu-divider">Appearance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-theme'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Theme</div>
+    <div class="menu-divider">Display</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-display'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Display Settings</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-screensaver'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Screen Timeout</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-orientation'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Orientation</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-hue'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg> Ambient Light</div>
+    <div class="menu-divider">Content</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-github'" style="display:none;"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg> GitHub Library</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ethereum'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 3 12 12 22 21 12"/></svg> Ethereum RPC</div>
+    <div class="menu-divider">Storage</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ipfs'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> IPFS Pinning</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-external'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M6 14h2"/></svg> External Drive</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-backup'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Backup</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-storage'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Storage Health</div>
+    <div class="menu-divider">System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-wifi'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> Wi-Fi</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-performance'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Performance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-system'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.6 15H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 6.6V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-about'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About</div>
+    </div>
+  </div>
+  <!-- Custom scrollbar for mobile menu (outside menu for proper fixed positioning) -->
+  <div id="menu-scrollbar" class="menu-scrollbar-track">
+    <div id="menu-scrollbar-thumb" class="menu-scrollbar-thumb"></div>
+  </div>
+
+  <script>
+    // === MOBILE MENU TOGGLE ===
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const toggle = document.querySelector('.menu-toggle');
+      const mainScrollbar = document.getElementById('custom-scrollbar');
+      const menuScrollbar = document.getElementById('menu-scrollbar');
+      const thickScrollbarEnabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+
+      menu.classList.toggle('active');
+      toggle.classList.toggle('active');
+
+      const isOpen = menu.classList.contains('active');
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      var mc = document.querySelector('.main');
+      if (mc) mc.style.visibility = isOpen ? 'hidden' : '';
+      if (!isOpen) void document.body.offsetHeight; // force reflow for Chromium/Wayland touch scroll
+
+      // Toggle scrollbars only if thick scrollbar is enabled
+      if (thickScrollbarEnabled) {
+        if (mainScrollbar) mainScrollbar.style.display = isOpen ? 'none' : 'block';
+        if (menuScrollbar) {
+          if (isOpen) {
+            setTimeout(function() {
+              updateMenuScrollbar();
+              menuScrollbar.style.display = 'block';
+            }, 50);
+          } else {
+            menuScrollbar.style.display = 'none';
+          }
+        }
+      }
+    }
+
+    // === MENU SCROLLBAR ===
+    (function() {
+      const menu = document.getElementById('mobileMenu');
+      const scrollbar = document.getElementById('menu-scrollbar');
+      const thumb = document.getElementById('menu-scrollbar-thumb');
+      if (!menu || !scrollbar || !thumb) return;
+
+      let menuDragging = false;
+      let menuDragStartY = 0;
+      let menuDragStartScroll = 0;
+
+      // Update thumb position based on scroll
+      window.updateMenuScrollbar = function() {
+        const scrollH = menu.scrollHeight;
+        const clientH = menu.clientHeight;
+
+        if (scrollH <= clientH + 10) {
+          scrollbar.style.display = 'none';
+          return;
+        }
+
+        const thumbH = Math.max(60, (clientH / scrollH) * clientH);
+        const scrollable = scrollH - clientH;
+        const thumbY = scrollable > 0 ? (menu.scrollTop / scrollable) * (clientH - thumbH) : 0;
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top = Math.max(0, thumbY) + 'px';
+      };
+
+      // Listen to menu scroll
+      menu.addEventListener('scroll', updateMenuScrollbar);
+
+      // Drag thumb - touch
+      thumb.addEventListener('touchstart', function(e) {
+        menuDragging = true;
+        menuDragStartY = e.touches[0].clientY;
+        menuDragStartScroll = menu.scrollTop;
+        thumb.style.background = 'var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)))';
+        e.preventDefault();
+        e.stopPropagation();
+      }, { passive: false });
+
+      // Drag thumb - mouse
+      thumb.addEventListener('mousedown', function(e) {
+        menuDragging = true;
+        menuDragStartY = e.clientY;
+        menuDragStartScroll = menu.scrollTop;
+        thumb.style.background = 'var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)))';
+        e.preventDefault();
+      });
+
+      // Handle drag move
+      function handleMenuDrag(clientY) {
+        if (!menuDragging) return;
+        const delta = clientY - menuDragStartY;
+        const scrollable = menu.scrollHeight - menu.clientHeight;
+        const thumbH = parseFloat(thumb.style.height) || 60;
+        const trackH = menu.clientHeight - thumbH;
+        if (trackH > 0) {
+          menu.scrollTop = menuDragStartScroll + (delta / trackH) * scrollable;
+        }
+      }
+
+      document.addEventListener('touchmove', function(e) {
+        if (menuDragging && e.touches.length === 1) {
+          handleMenuDrag(e.touches[0].clientY);
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      document.addEventListener('mousemove', function(e) {
+        if (menuDragging) {
+          handleMenuDrag(e.clientY);
+        }
+      });
+
+      // End drag
+      function endMenuDrag() {
+        if (menuDragging) {
+          menuDragging = false;
+          thumb.style.background = '';
+        }
+      }
+      document.addEventListener('touchend', endMenuDrag);
+      document.addEventListener('mouseup', endMenuDrag);
+
+      // Tap track to jump
+      scrollbar.addEventListener('click', function(e) {
+        if (e.target === scrollbar) {
+          const scrollable = menu.scrollHeight - menu.clientHeight;
+          const thumbH = parseFloat(thumb.style.height) || 60;
+          const clickY = e.clientY;
+          const ratio = clickY / menu.clientHeight;
+          menu.scrollTo({ top: ratio * scrollable, behavior: 'smooth' });
+        }
+      });
+    })();
+
+    // Touch scroll helper - prevents cards from capturing scroll gestures
+    (function () {
+      let startY = 0;
+      let startX = 0;
+
+      document.addEventListener('touchstart', function (e) {
+        startY = e.touches[0].clientY;
+        startX = e.touches[0].clientX;
+      }, { passive: true });
+
+      document.addEventListener('touchmove', function (e) {
+        // Skip when mobile menu is open — let the menu handle its own scroll
+        var menu = document.getElementById('mobileMenu');
+        if (menu && menu.classList.contains('active')) return;
+
+        const deltaY = Math.abs(e.touches[0].clientY - startY);
+        const deltaX = Math.abs(e.touches[0].clientX - startX);
+
+        // If vertical scroll is dominant, ensure body scrolls
+        if (deltaY > deltaX && deltaY > 10) {
+          document.body.style.touchAction = 'pan-y';
+        }
+      }, { passive: true });
+    })();
+  </script>
+
+  <div class="main">
+    <!-- Storage Warning Banner -->
+    <div id="storage-warning"
+      style="display: none; background: linear-gradient(135deg, #ff6b35, #f7931e); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 20px rgba(255, 107, 53, 0.3);">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">⚠️</span>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 16px;" id="storage-warning-title">Storage Almost Full</div>
+          <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;" id="storage-warning-message">
+            Free up space by backing up and deleting collections, or connect an external drive.
+          </div>
+        </div>
+        <a href="settings.html"
+          style="background: white; color: #ff6b35; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; text-decoration: none;">Manage
+          Storage</a>
+      </div>
+    </div>
+
+    <!-- WiFi Disconnected Banner -->
+    <div id="wifi-warning"
+      style="display: none; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">📡</span>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 16px;">No Network Connection</div>
+          <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">
+            Your gallery still works offline. Connect to WiFi to download new collections or access remotely.
+          </div>
+        </div>
+        <a href="settings.html#wifi"
+          style="background: white; color: #6366f1; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; text-decoration: none; white-space: nowrap;">Set Up WiFi</a>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-diamond"></div>
+      <div class="hero-line-top"></div>
+      <h1>VERNIS</h1>
+      <div class="hero-line-below"></div>
+      <p>YOUR FOREVER GALLERY</p>
+      <div class="hero-separator"></div>
+    </div>
+
+
+
+    <div class="cards">
+      <div class="card glass-card">
+        <h3>View Art</h3>
+        <p>Let your Vernis become a living digital frame. Beautifully cycles through everything you own.</p>
+        <a href="gallery.html" class="btn">View Art</a>
+      </div>
+
+      <div class="card glass-card" id="connect-card">
+        <h3>Connect</h3>
+        <p>Access Vernis from your phone or computer. Scan the QR code or use the link below.</p>
+        <div id="qr-code"
+          style="margin: 20px auto; width: 180px; height: 180px; background: transparent; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px var(--shadow-md); overflow: hidden;">
+          <span style="color: var(--text-muted); font-size: 12px;">Loading...</span>
+        </div>
+        <div id="connect-url"
+          style="font-size: 14px; color: var(--text-secondary); word-break: break-all; text-align: center; min-height: 20px; margin-top: 15px;">
+          <span style="color: var(--text-muted);">Loading URL...</span>
+        </div>
+      </div>
+
+      <div class="card glass-card">
+        <h3>Remote Control</h3>
+        <p>Control your gallery from any device. Navigate through artworks, pause, or play from your phone.</p>
+        <a href="remote.html" class="btn">Open Remote</a>
+      </div>
+
+      <div class="card glass-card">
+        <h3>CSV Library</h3>
+        <p>Browse curated NFT collections. Download CSV lists or install and pin them directly to your device.</p>
+        <a href="library.html" class="btn">Browse Library</a>
+      </div>
+
+      <div class="card glass-card">
+        <h3>Manage Collection</h3>
+        <p>Curate which NFTs appear in your gallery. Hide unwanted pieces or delete files completely.</p>
+        <a href="manage.html" class="btn">Manage Art</a>
+      </div>
+
+      <div class="card glass-card" id="lab-card" style="display:none;">
+        <h3>Atelier</h3>
+        <p>Experimental features, generative art and on-chain viewers.</p>
+        <a href="lab.html" class="btn">Enter Atelier</a>
+      </div>
+      <script>
+      (function(){
+        var el = document.getElementById('lab-card');
+        function showAtelier(){
+          el.style.display='';
+          document.querySelectorAll('.atelier-nav').forEach(function(n){n.style.display='';});
+        }
+        if(localStorage.getItem('vernis-moon-unlocked')==='true' || localStorage.getItem('vernis-pixels-unlocked')==='true' || localStorage.getItem('vernis-doom-unlocked')==='true' || localStorage.getItem('vernis-burner-unlocked')==='true') showAtelier();
+        fetch('/api/easter-egg').then(function(r){return r.json();}).then(function(s){
+          if(s.moon || s.pixels || s.doom || s.burner) showAtelier();
+        }).catch(function(){});
+      })();
+      </script>
+    </div>
+  </div>
+
+  <!-- Expandable Status Bar -->
+  <div class="status-bar" id="status-bar" style="display:none !important;">
+    <div class="status-main" onclick="toggleStatusBar()">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">...</span>
+      <svg class="status-chevron" id="status-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2">
+        <polyline points="18 15 12 9 6 15"></polyline>
+      </svg>
+    </div>
+    <div class="status-expanded" id="status-expanded">
+      <div class="status-storage-info" id="status-storage-info">
+        <span class="storage-icon">💾</span>
+        <span id="storage-detail-text">Loading...</span>
+      </div>
+      <div id="battery-info" style="display:none; padding:8px 0; font-size:13px; color:var(--text-secondary);">
+        <span>🔋</span>
+        <span id="battery-text"></span>
+      </div>
+      <button class="status-action" id="screen-off-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        <span>Screen Off</span>
+      </button>
+      <button class="status-action status-action-danger" id="power-off-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+          <line x1="12" y1="2" x2="12" y2="12"></line>
+        </svg>
+        <span>Shutdown</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Power Confirmation Modal -->
+  <div class="power-modal" id="power-modal">
+    <div class="power-modal-content">
+      <div class="power-modal-icon" id="modal-icon"></div>
+      <h3 id="modal-title">Shutdown?</h3>
+      <p id="modal-message">Are you sure you want to shut down the device?</p>
+      <div class="power-modal-buttons">
+        <button class="btn btn-secondary" onclick="closePowerModal()">Cancel</button>
+        <button class="btn btn-danger" id="modal-confirm">Shutdown</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .status-bar {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-secondary);
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      box-shadow: 0 4px 20px var(--shadow-md);
+      backdrop-filter: blur(20px);
+      z-index: 100;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .status-bar.expanded {
+      border-radius: 16px;
+    }
+
+    .status-main {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: background 0.2s ease;
+    }
+
+    .status-main:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .status-chevron {
+      margin-left: 4px;
+      opacity: 0.5;
+      transition: transform 0.3s ease;
+    }
+
+    .status-bar.expanded .status-chevron {
+      transform: rotate(180deg);
+    }
+
+    .status-expanded {
+      display: none;
+      padding: 8px 12px 12px;
+      border-top: 1px solid var(--border-light);
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .status-bar.expanded .status-expanded {
+      display: flex;
+    }
+
+    .status-storage-info {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .storage-icon {
+      font-size: 16px;
+    }
+
+    .status-action {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .status-action:hover {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .status-action-danger:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .power-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .power-modal.active {
+      display: flex;
+    }
+
+    .power-modal-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      max-width: 320px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .power-modal-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .power-modal-content h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      color: var(--text-primary);
+    }
+
+    .power-modal-content p {
+      margin: 0 0 24px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .power-modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+  </style>
+
+  <footer style="text-align: center; padding: 20px; font-size: 12px; color: var(--text-muted);">
+    © 2025-2026 AfroViking
+  </footer>
+
+  <script>
+    // HTML escape utility
+    function escHTML(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // Auth token for protected endpoints
+    var _vernisToken = '';
+    fetch('/api/auth-token').then(function(r) { return r.json(); }).then(function(d) { if (d.token) _vernisToken = d.token; }).catch(function(){});
+    function authHeaders() { return _vernisToken ? { 'X-Vernis-Token': _vernisToken } : {}; }
+
+    // Load theme (local first, then sync from server)
+    (function () {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      if (mode === 'auto') { var h = new Date().getHours(); mode = (h >= 20 || h < 7) ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+    })();
+    function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}
+    _syncTheme(); setInterval(_syncTheme, 5000);
+
+    // Load cached status first for instant display
+    (function loadCachedStatus() {
+      const cached = localStorage.getItem('vernis-home-status');
+      if (cached) {
+        try {
+          const d = JSON.parse(cached);
+          document.getElementById('status-text').textContent = d.statusText || '...';
+          document.getElementById('status-dot').style.background = d.dotColor || '#4ade80';
+        } catch (e) { }
+      }
+    })();
+
+    // Load fresh status
+    fetch('/api/status').then(r => r.json()).then(d => {
+      // Show status based on IPFS state
+      const isPinned = d.ipfs_running && d.ipfs_pinned > 0;
+      const count = isPinned ? d.ipfs_pinned : d.pinned;
+      const label = isPinned ? 'Pinned' : 'Downloaded';
+      const dotColor = isPinned ? '#4ade80' : '#facc15'; // green if pinned, yellow if just downloaded
+      const statusText = `${count} ${label} • ${d.ssid}`;
+      document.getElementById('status-text').textContent = statusText;
+      document.getElementById('status-dot').style.background = dotColor;
+
+      // Hide Connect card if no WiFi (can't scan QR without network)
+      if (d.ssid === 'Not connected') {
+        var cc = document.getElementById('connect-card');
+        if (cc) cc.style.display = 'none';
+      }
+
+      // Update storage info in expanded panel
+      if (d.storage) {
+        const parseSize = (str) => parseFloat(str) || 0;
+        const used = parseSize(d.storage.used);
+        const total = parseSize(d.storage.total);
+        const pctFree = total > 0 ? Math.round(((total - used) / total) * 100) : 0;
+
+        // Update expanded storage details
+        document.getElementById('storage-detail-text').textContent =
+          `${d.storage.free} free of ${d.storage.total} (${pctFree}% available)`;
+      }
+
+      // Cache for next page load
+      localStorage.setItem('vernis-home-status', JSON.stringify({ statusText, dotColor, ip: d.ip_address, storage: d.storage }));
+
+      // Show setup card if not dismissed
+      if (!localStorage.getItem('vernis-setup-dismissed')) {
+        fetch('/api/setup/status').then(function(r){return r.json();}).then(function(s){
+          _showSetupCard(s);
+        }).catch(function(){
+          _showSetupCard({});
+        });
+      }
+
+      // Show storage warning if needed
+      if (d.storage_warning) {
+        const warningBanner = document.getElementById('storage-warning');
+        const warningTitle = document.getElementById('storage-warning-title');
+        const warningMsg = document.getElementById('storage-warning-message');
+
+        if (d.storage_warning === 'critical') {
+          warningBanner.style.background = 'linear-gradient(135deg, #dc2626, #ef4444)';
+          warningTitle.textContent = 'Storage Critical!';
+          warningMsg.textContent = `Only ${d.storage.free} free. Back up your collections and delete some to free space, or connect an external drive.`;
+        } else {
+          warningTitle.textContent = 'Storage Running Low';
+          warningMsg.textContent = `${d.storage.free} remaining. Consider backing up and removing unused collections.`;
+        }
+        warningBanner.style.display = 'block';
+      }
+    }).catch(() => {
+      document.getElementById('status-text').textContent = 'Offline';
+      document.getElementById('status-dot').style.background = '#666'; // gray
+      document.getElementById('wifi-warning').style.display = 'block';
+      var cc = document.getElementById('connect-card');
+      if (cc) cc.style.display = 'none';
+    });
+
+    // Download/pinning progress polling
+    var _dlPrevActive = false;
+    function checkDownloadProgress() {
+      if (document.visibilityState === 'hidden') return;
+      fetch('/api/download-progress').then(r => r.json()).then(p => {
+        var dot = document.getElementById('status-dot');
+        var txt = document.getElementById('status-text');
+        if (p.active && p.status !== 'No active download') {
+          _dlPrevActive = true;
+          if (p.status === 'Initializing') {
+            txt.textContent = 'Initializing download...';
+            dot.style.background = '#3b82f6';
+          } else if (p.status === 'Downloading') {
+            txt.textContent = 'Downloading ' + p.completed + '/' + p.total + (p.speed_str ? ' (' + p.speed_str + ')' : '');
+            dot.style.background = '#3b82f6';
+          }
+        } else if (_dlPrevActive) {
+          // Download just finished, refresh status count
+          _dlPrevActive = false;
+          fetch('/api/status').then(r => r.json()).then(d => {
+            var isPinned = d.ipfs_running && d.ipfs_pinned > 0;
+            var count = isPinned ? d.ipfs_pinned : d.pinned;
+            var label = isPinned ? 'Pinned' : 'Downloaded';
+            var dotColor = isPinned ? '#4ade80' : '#facc15';
+            var statusText = count + ' ' + label + ' \u2022 ' + d.ssid;
+            txt.textContent = statusText;
+            dot.style.background = dotColor;
+            localStorage.setItem('vernis-home-status', JSON.stringify({ statusText: statusText, dotColor: dotColor }));
+          }).catch(function(){});
+        }
+      }).catch(function(){});
+    }
+    setInterval(checkDownloadProgress, 5000);
+    checkDownloadProgress();
+
+    // Battery/UPS indicator (only shows if battery detected)
+    fetch('/api/battery').then(function(r) { return r.json(); }).then(function(data) {
+      if (data.available) {
+        var el = document.getElementById('battery-info');
+        var txt = document.getElementById('battery-text');
+        el.style.display = 'block';
+        var cap = data.capacity != null ? data.capacity + '%' : '?';
+        var status = data.status || '';
+        var icon = '🔋';
+        if (data.capacity != null && data.capacity <= 20) icon = '🪫';
+        if (status === 'Charging') icon = '⚡';
+        el.querySelector('span').textContent = icon;
+        txt.textContent = cap + (status ? ' (' + status + ')' : '');
+      }
+    }).catch(function(){});
+
+    // Load dynamic cards from GitHub
+    fetch('/api/cards').then(r => r.json()).then(data => {
+      if (data.cards && data.cards.length > 0) {
+        const cardsContainer = document.querySelector('.cards');
+        data.cards.forEach(card => {
+          const cardEl = document.createElement('div');
+          cardEl.className = 'card glass-card github-card';
+          var safeLink = card.link && /^https?:\/\//i.test(card.link) ? escHTML(card.link) : '';
+          cardEl.innerHTML = `
+            <h3>${escHTML(card.title || 'Untitled')}</h3>
+            <p>${escHTML(card.description || '')}</p>
+            ${safeLink ? `<a href="${safeLink}" class="btn">${escHTML(card.button || 'Learn More')}</a>` : ''}
+          `;
+          // Insert at the beginning
+          cardsContainer.insertBefore(cardEl, cardsContainer.firstChild);
+        });
+      }
+    }).catch(() => { });
+
+    // Generate QR code for connect card - use actual IP from API
+    (function () {
+      // Show cached IP first for instant display
+      const cached = localStorage.getItem('vernis-home-status');
+      if (cached) {
+        try {
+          const d = JSON.parse(cached);
+          if (d.ip) {
+            const url = `http://${d.ip}`;
+            document.getElementById('connect-url').innerHTML = `<a href="${url}" style="color: var(--accent-primary);">${url}</a>`;
+          }
+        } catch (e) { }
+      }
+
+      // Get fresh IP address from status API
+      fetch('/api/status').then(r => r.json()).then(data => {
+        const ip = data.ip_address || 'Unknown';
+        const url = `http://${ip}`;
+        document.getElementById('connect-url').innerHTML = `<a href="${url}" style="color: var(--accent-primary);">${url}</a>`;
+      }).catch(() => {
+        if (!cached) {
+          document.getElementById('connect-url').innerHTML = '<span style="color: var(--text-muted);">IP unavailable</span>';
+        }
+      });
+
+      // Load QR code from server API with current theme
+      const qrContainer = document.getElementById('qr-code');
+      const themeStyle = localStorage.getItem('vernis-theme-style') || 'gallery';
+
+      const img = document.createElement('img');
+      img.src = `/api/qrcode?theme=${themeStyle}`;
+      img.alt = 'QR Code';
+      img.style.cssText = 'width: 100%; height: 100%; object-fit: contain;';
+      img.onerror = function () {
+        qrContainer.innerHTML = '<div style="padding: 20px; font-size: 12px; color: var(--text-muted);">QR unavailable</div>';
+      };
+      qrContainer.innerHTML = '';
+      qrContainer.appendChild(img);
+    })();
+
+    // === KIOSK CONNECT OVERLAY ===
+    function kioskScreenOff() {
+      fetch('/api/screen/off', { method: 'POST' }).catch(function(){});
+    }
+
+    function openKioskConnect() {
+      // Check WiFi first — if not connected, open WiFi overlay instead
+      fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.ssid && !data.ip_address) {
+          openKioskWifi();
+        } else {
+          showConnectOverlay(data);
+        }
+      }).catch(function() {
+        openKioskWifi();
+      });
+    }
+
+    function showConnectOverlay(statusData) {
+      var overlay = document.getElementById('kiosk-connect');
+      overlay.style.display = 'flex';
+      var qr = document.getElementById('kiosk-qr');
+      var theme = localStorage.getItem('vernis-theme-style') || 'gallery';
+      var img = document.createElement('img');
+      img.src = '/api/qrcode?theme=' + theme;
+      img.alt = 'QR Code';
+      img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+      img.onerror = function() { qr.innerHTML = '<span style="color:var(--text-muted);">QR unavailable</span>'; };
+      qr.innerHTML = '';
+      qr.appendChild(img);
+
+      if (statusData) {
+        var ip = statusData.ip_address || 'Unknown';
+        document.getElementById('kiosk-url').textContent = 'http://' + ip;
+      } else {
+        fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
+          document.getElementById('kiosk-url').textContent = 'http://' + (data.ip_address || 'Unknown');
+        }).catch(function() {
+          document.getElementById('kiosk-url').textContent = '';
+        });
+      }
+    }
+    function closeKioskConnect() {
+      document.getElementById('kiosk-connect').style.display = 'none';
+    }
+    function openQrFullscreen() {
+      var qrImg = document.querySelector('#kiosk-qr img');
+      if (!qrImg) return;
+      document.getElementById('qr-fs-img').src = qrImg.src;
+      document.getElementById('qr-fs-url').textContent = document.getElementById('kiosk-url').textContent;
+      document.getElementById('qr-fs-overlay').className = 'qr-fs-overlay active';
+    }
+
+    // Show/hide WiFi button on kiosk start screen based on connection
+    // WiFi button always visible on kiosk - no polling needed
+
+    // Kiosk WiFi overlay
+    // Clean up sessionStorage from keyboard page (connect happens there now)
+    (function() {
+      sessionStorage.removeItem('vernis-wifi-password');
+      sessionStorage.removeItem('vernis-wifi-ssid');
+    })();
+
+    // Password field tap → open keyboard page
+    (function() {
+      var pw = document.getElementById('kw-pass');
+      function goKb(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var ssid = document.getElementById('kw-ssid').value.trim();
+        if (!ssid) { if (window.showError) showError('Select a network first'); return; }
+        sessionStorage.setItem('vernis-wifi-ssid', ssid);
+        window.location.href = 'wifi-keyboard.html?ssid=' + encodeURIComponent(ssid) + '&return=index.html';
+      }
+      pw.addEventListener('touchstart', goKb, { passive: false });
+      pw.addEventListener('click', goKb);
+    })();
+
+    function _updateKioskWifiStatus(retries) {
+      var cur = document.getElementById('kw-current');
+      fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ssid && data.ssid !== 'Not connected') {
+          cur.textContent = '';
+          var span = document.createElement('span');
+          span.style.cssText = 'color: var(--accent-primary); font-weight:600;';
+          span.textContent = 'Connected: ';
+          cur.appendChild(span);
+          cur.appendChild(document.createTextNode(data.ssid));
+          if (data.ip) {
+            var ipSpan = document.createElement('span');
+            ipSpan.style.opacity = '0.6';
+            ipSpan.textContent = ' (' + data.ip + ')';
+            cur.appendChild(ipSpan);
+          }
+        } else if (retries > 0) {
+          cur.textContent = 'Connecting...';
+          setTimeout(function() { _updateKioskWifiStatus(retries - 1); }, 2000);
+        } else {
+          cur.textContent = 'Not connected';
+        }
+      }).catch(function() {
+        if (retries > 0) {
+          cur.textContent = 'Connecting...';
+          setTimeout(function() { _updateKioskWifiStatus(retries - 1); }, 2000);
+        } else {
+          cur.textContent = 'Not connected';
+        }
+      });
+    }
+
+    function openKioskWifi() {
+      document.getElementById('kiosk-wifi-overlay').style.display = 'flex';
+      closeKioskWifiForm();
+      _updateKioskWifiStatus(3);
+      kioskWifiScan();
+    }
+
+    function closeKioskWifi() {
+      document.getElementById('kiosk-wifi-overlay').style.display = 'none';
+    }
+
+    function kioskWifiScan() {
+      var btn = document.getElementById('kw-scan-btn');
+      var list = document.getElementById('kw-list');
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+      list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">Scanning...</div>';
+
+      fetch('/api/wifi/scan').then(r => r.json()).then(data => {
+        if (!data.success || !data.networks || !data.networks.length) {
+          list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">No networks found</div>';
+          return;
+        }
+        list.innerHTML = data.networks.map(function(n) {
+          var bars = n.signal >= 70 ? '\u2582\u2584\u2586\u2588' : n.signal >= 50 ? '\u2582\u2584\u2586' : n.signal >= 30 ? '\u2582\u2584' : '\u2582';
+          var lock = n.security ? '\uD83D\uDD12 ' : '';
+          var conn = n.connected ? ' <span style="color:var(--accent-primary);font-weight:600;">(connected)</span>' : '';
+          var safe = escHTML(n.ssid).replace(/'/g, '&#39;');
+          return '<div class="kiosk-wifi-item" onclick="selectKioskWifi(\'' + safe + '\')">' +
+            '<span>' + lock + escHTML(n.ssid) + conn + '</span>' +
+            '<span class="kiosk-wifi-signal">' + bars + ' ' + n.signal + '%</span></div>';
+        }).join('');
+        setTimeout(kioskWifiUpdateScrollBtns, 100);
+      }).catch(function() {
+        list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted);">Scan failed</div>';
+      }).finally(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:6px;"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>Scan for Networks';
+      });
+    }
+
+    function kioskWifiScroll(dir) {
+      var list = document.getElementById('kw-list');
+      list.scrollBy({ top: dir * 150, behavior: 'smooth' });
+      setTimeout(kioskWifiUpdateScrollBtns, 300);
+    }
+
+    function kioskWifiUpdateScrollBtns() {
+      var list = document.getElementById('kw-list');
+      var upBtn = document.getElementById('kw-scroll-up');
+      var downBtn = document.getElementById('kw-scroll-down');
+      var canScroll = list.scrollHeight > list.clientHeight + 10;
+      upBtn.classList.toggle('visible', canScroll && list.scrollTop > 10);
+      downBtn.classList.toggle('visible', canScroll && list.scrollTop + list.clientHeight < list.scrollHeight - 10);
+    }
+
+    function selectKioskWifi(ssid) {
+      sessionStorage.setItem('vernis-wifi-ssid', ssid);
+      window.location.href = 'wifi-keyboard.html?ssid=' + encodeURIComponent(ssid) + '&return=index.html';
+    }
+
+    function closeKioskWifiForm() {
+      document.getElementById('kw-form').style.display = 'none';
+    }
+
+    function kioskWifiConnect() {
+      var ssid = document.getElementById('kw-ssid').value;
+      var pwEl = document.getElementById('kw-pass');
+      var pass = pwEl.dataset.realValue || pwEl.value;
+      var btn = document.getElementById('kw-connect-btn');
+      var status = document.getElementById('kw-status');
+
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      status.style.display = 'block';
+      status.style.background = 'var(--bg-tertiary)';
+      status.style.color = 'var(--text-secondary)';
+      status.innerHTML = 'Connecting to <strong>' + escHTML(ssid) + '</strong>...';
+
+      fetch('/api/wifi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ssid: ssid, psk: pass })
+      }).then(r => r.json()).then(data => {
+        if (data.status !== 'error') {
+          status.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+          status.style.color = '#fff';
+          status.innerHTML = '<strong>Connected to ' + escHTML(ssid) + '</strong>';
+          closeKioskWifiForm();
+          // Refresh current status after a delay
+          setTimeout(function() {
+            var cur = document.getElementById('kw-current');
+            fetch('/api/status').then(r => r.json()).then(d => {
+              if (d.ssid) cur.innerHTML = '<span style="color:var(--accent-primary);font-weight:600;">Connected:</span> ' + escHTML(d.ssid) + (d.ip ? ' <span style="opacity:0.6;">(' + d.ip + ')</span>' : '');
+            }).catch(function(){});
+          }, 3000);
+        } else {
+          throw new Error(data.message || 'Connection failed');
+        }
+      }).catch(function(err) {
+        status.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        status.style.color = '#fff';
+        var raw = err.message || '';
+        var msg;
+        if (raw.indexOf('fetch') >= 0) msg = 'Could not reach Vernis';
+        else if (raw.indexOf('psk') >= 0 || raw.indexOf('security') >= 0) msg = 'Incorrect password';
+        else if (raw.indexOf('not found') >= 0 || raw.indexOf('No network') >= 0) msg = 'Network not found';
+        else if (raw.indexOf('timeout') >= 0) msg = 'Connection timed out';
+        else msg = 'Connection failed';
+        status.textContent = msg;
+      }).finally(function() {
+        btn.disabled = false;
+        btn.textContent = 'Connect';
+      });
+    }
+
+    // Welcome overlay dismiss
+    function dismissWelcome() {
+      localStorage.setItem('vernis-welcome-done', 'true');
+      var overlay = document.getElementById('welcome-overlay');
+      overlay.style.opacity = '0';
+      overlay.style.transition = 'opacity 0.3s ease';
+      setTimeout(function() { overlay.style.display = 'none'; }, 300);
+    }
+
+    // === Setup Card Logic ===
+    var _setupStatus = {};
+
+    function _showSetupCard(status) {
+      _setupStatus = status || {};
+      var card = document.getElementById('setup-card');
+      if (!card) return;
+      // Mark completed steps
+      if (_setupStatus.password_changed) {
+        var icon = document.getElementById('setup-pw-icon');
+        if (icon) { icon.textContent = '✓'; icon.style.background = '#22c55e'; }
+        var title = document.getElementById('setup-pw-title');
+        if (title) title.style.color = 'var(--text-muted)';
+        // Show current password field since password was already changed
+        var cpWrap = document.getElementById('setup-current-pw-wrap');
+        if (cpWrap) cpWrap.style.display = 'block';
+      }
+      if (_setupStatus.has_art) {
+        var icon2 = document.getElementById('setup-art-icon');
+        if (icon2) { icon2.textContent = '✓'; icon2.style.background = '#22c55e'; }
+        var title2 = document.getElementById('setup-art-title');
+        if (title2) title2.style.color = 'var(--text-muted)';
+      }
+      card.style.display = 'block';
+    }
+
+    function toggleSetupSection(section) {
+      var body = document.getElementById('setup-' + section + '-body');
+      var chevron = document.getElementById('setup-' + section + '-chevron');
+      if (!body) return;
+      var isOpen = body.style.display !== 'none';
+      // Close all sections first
+      ['pw', 'art'].forEach(function(s) {
+        var b = document.getElementById('setup-' + s + '-body');
+        var c = document.getElementById('setup-' + s + '-chevron');
+        if (b) b.style.display = 'none';
+        if (c) c.style.transform = '';
+      });
+      if (!isOpen) {
+        body.style.display = 'block';
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    function setupSetPassword() {
+      var pw = document.getElementById('setup-new-pw').value;
+      var confirmPw = document.getElementById('setup-confirm-pw').value;
+      var currentPw = document.getElementById('setup-current-pw').value;
+      var msg = document.getElementById('setup-pw-msg');
+      if (!pw || pw.length < 8) { msg.style.color = '#ef4444'; msg.textContent = 'Password must be at least 8 characters'; return; }
+      if (pw !== confirmPw) { msg.style.color = '#ef4444'; msg.textContent = 'Passwords do not match'; return; }
+      msg.style.color = 'var(--text-muted)'; msg.textContent = 'Setting password...';
+      var body = { password: pw };
+      if (currentPw) body.current_password = currentPw;
+      fetch('/api/setup/change-password', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+        body: JSON.stringify(body)
+      }).then(function(r) {
+        return r.json().then(function(d) { d._status = r.status; return d; });
+      }).then(function(d) {
+        if (d.needs_current) {
+          // Password was already set — show current password field
+          document.getElementById('setup-current-pw-wrap').style.display = 'block';
+          msg.style.color = '#ef4444'; msg.textContent = 'Password already set. Enter your current password above.';
+          return;
+        }
+        if (d._status === 403) { msg.style.color = '#ef4444'; msg.textContent = 'Wrong password'; return; }
+        if (d.error) { msg.style.color = '#ef4444'; msg.textContent = d.error; return; }
+        msg.style.color = '#22c55e'; msg.textContent = 'Password set!';
+        var icon = document.getElementById('setup-pw-icon');
+        if (icon) { icon.textContent = '✓'; icon.style.background = '#22c55e'; }
+        var title = document.getElementById('setup-pw-title');
+        if (title) title.style.color = 'var(--text-muted)';
+        setTimeout(function() { toggleSetupSection('pw'); }, 1000);
+      }).catch(function(e) { msg.style.color = '#ef4444'; msg.textContent = 'Could not connect to device'; });
+    }
+
+    var _setupPollTimer = null;
+    function setupImportArt() {
+      var wallet = document.getElementById('setup-wallet').value.trim();
+      var msg = document.getElementById('setup-art-msg');
+      var btn = document.getElementById('setup-import-btn');
+      if (!wallet) { msg.style.color = '#ef4444'; msg.textContent = 'Enter a wallet address or ENS name'; return; }
+      // Gather selected chains
+      var chains = [];
+      document.querySelectorAll('#setup-chains .setup-chain.active').forEach(function(el) {
+        chains.push(el.getAttribute('data-chain'));
+      });
+      if (chains.length === 0) { msg.style.color = '#ef4444'; msg.textContent = 'Select at least one chain'; return; }
+      msg.style.color = 'var(--text-muted)'; msg.textContent = 'Fetching NFTs...';
+      btn.disabled = true; btn.textContent = 'Importing...';
+      document.getElementById('setup-art-progress').style.display = 'block';
+      fetch('/api/setup/quick-import', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+        body: JSON.stringify({ wallet: wallet, chains: chains })
+      }).then(function(r) {
+        if (!r.ok) return r.json().catch(function() { return { error: 'Server error (' + r.status + ')' }; });
+        return r.json();
+      }).then(function(d) {
+        if (d.error) { msg.style.color = '#ef4444'; msg.textContent = d.error; btn.disabled = false; btn.textContent = 'Fetch & Install NFTs'; return; }
+        var found = d.total || d.found || 0;
+        msg.style.color = '#22c55e'; msg.textContent = 'Found ' + found + ' NFTs. Downloading...';
+        // Poll download progress
+        _setupPollTimer = setInterval(function() {
+          fetch('/api/download-progress').then(function(r){return r.json();}).then(function(p) {
+            var fill = document.getElementById('setup-art-fill');
+            var detail = document.getElementById('setup-art-detail');
+            if (p.active && p.percent !== undefined) {
+              fill.style.width = p.percent + '%';
+              detail.textContent = (p.current || 0) + ' / ' + (p.total || '?') + ' — ' + Math.round(p.percent) + '%';
+            }
+            if (!p.active || p.percent >= 100) {
+              clearInterval(_setupPollTimer);
+              fill.style.width = '100%';
+              detail.textContent = 'Done!';
+              msg.style.color = '#22c55e'; msg.textContent = 'Art imported successfully!';
+              btn.disabled = false; btn.textContent = 'Fetch & Install NFTs';
+              var icon = document.getElementById('setup-art-icon');
+              if (icon) { icon.textContent = '✓'; icon.style.background = '#22c55e'; }
+              // Mark setup complete
+              fetch('/api/setup/complete', { method: 'POST', headers: authHeaders() }).catch(function(){});
+            }
+          }).catch(function(){});
+        }, 2000);
+      }).catch(function() {
+        msg.style.color = '#ef4444'; msg.textContent = 'Connection error';
+        btn.disabled = false; btn.textContent = 'Fetch & Install NFTs';
+      });
+    }
+
+    function dismissSetup() {
+      localStorage.setItem('vernis-setup-dismissed', 'true');
+      var card = document.getElementById('setup-card');
+      if (card) {
+        card.style.transition = 'opacity 0.3s ease';
+        card.style.opacity = '0';
+        setTimeout(function() { card.style.display = 'none'; }, 300);
+      }
+      if (_setupPollTimer) clearInterval(_setupPollTimer);
+    }
+
+    // Chain toggle click handlers
+    document.querySelectorAll('#setup-chains .setup-chain').forEach(function(el) {
+      el.addEventListener('click', function() {
+        el.classList.toggle('active');
+        if (el.classList.contains('active')) {
+          el.style.borderColor = 'var(--accent-primary)';
+          el.style.color = 'var(--text-primary)';
+        } else {
+          el.style.borderColor = 'var(--border-light)';
+          el.style.color = 'var(--text-secondary)';
+        }
+      });
+    });
+
+    // Status Bar Toggle
+    function toggleStatusBar() {
+      document.getElementById('status-bar').classList.toggle('expanded');
+    }
+
+    // Close status bar when clicking outside
+    document.addEventListener('click', function (e) {
+      const statusBar = document.getElementById('status-bar');
+      if (!statusBar.contains(e.target) && statusBar.classList.contains('expanded')) {
+        statusBar.classList.remove('expanded');
+      }
+    });
+
+    // Power Controls
+    let pendingAction = null;
+
+    document.getElementById('screen-off-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      // Instant screen off - no prompt needed
+      fetch('/api/screen/off', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+          document.getElementById('status-bar').classList.remove('expanded');
+        })
+        .catch(() => showError('Screen off failed'));
+    });
+
+    document.getElementById('power-off-btn').addEventListener('click', function (e) {
+      e.stopPropagation();
+      showPowerModal('shutdown');
+    });
+
+    function showPowerModal(action) {
+      pendingAction = action;
+      document.getElementById('status-bar').classList.remove('expanded');
+      const modal = document.getElementById('power-modal');
+      const icon = document.getElementById('modal-icon');
+      const title = document.getElementById('modal-title');
+      const message = document.getElementById('modal-message');
+      const confirmBtn = document.getElementById('modal-confirm');
+
+      if (action === 'screen') {
+        icon.textContent = '🖥️';
+        title.textContent = 'Turn Off Screen?';
+        message.textContent = 'The display will turn off. Touch the screen or press any key to wake it.';
+        confirmBtn.textContent = 'Turn Off';
+        confirmBtn.className = 'btn';
+      } else {
+        icon.textContent = '⏻';
+        title.textContent = 'Shutdown Device?';
+        message.textContent = 'The device will shut down completely. You will need physical access to turn it back on.';
+        confirmBtn.textContent = 'Shutdown';
+        confirmBtn.className = 'btn btn-danger';
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closePowerModal() {
+      document.getElementById('power-modal').classList.remove('active');
+      pendingAction = null;
+    }
+
+    document.getElementById('modal-confirm').addEventListener('click', function () {
+      if (pendingAction === 'screen') {
+        fetch('/api/screen/off', { method: 'POST' })
+          .then(r => r.json())
+          .then(data => {
+            closePowerModal();
+          })
+          .catch(() => {
+            showError('Failed to turn off screen');
+          });
+      } else if (pendingAction === 'shutdown') {
+        fetch('/api/shutdown', { headers: authHeaders() })
+          .then(r => r.json())
+          .then(data => {
+            closePowerModal();
+            document.body.innerHTML = `
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:var(--bg-primary);color:var(--text-secondary);">
+                <div style="width:60px;height:60px;border:4px solid var(--border-light);border-top-color:var(--accent-primary);border-radius:50%;animation:shutdown-spin 1s linear infinite;margin-bottom:30px;"></div>
+                <div style="font-size:24px;font-weight:600;margin-bottom:10px;">Shutting Down</div>
+                <div style="font-size:14px;color:var(--text-muted);">Please wait for the device to power off completely</div>
+                <div style="margin-top:30px;font-size:13px;color:var(--text-muted);opacity:0.7;">It is safe to unplug once the screen goes dark</div>
+              </div>
+              <style>@keyframes shutdown-spin{to{transform:rotate(360deg)}}</style>
+            `;
+          })
+          .catch(() => {
+            showError('Shutdown failed');
+          });
+      }
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('power-modal').addEventListener('click', function (e) {
+      if (e.target === this) closePowerModal();
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closePowerModal();
+    });
+
+    // Screen saver activity tracker — only real user touch resets idle timer
+    (function() {
+      var lastReport = 0;
+      function reportActivity() {
+        var now = Date.now();
+        if (now - lastReport < 30000) return;
+        lastReport = now;
+        fetch('/api/screen/activity', { method: 'POST' }).catch(function(){});
+      }
+      document.addEventListener('touchstart', reportActivity, { passive: true });
+    })();
+
+    // What's New popup removed — update info via GitHub
+  </script>
+  <script src="vernis-keyboard.js"></script>
+</body>
+
+</html>

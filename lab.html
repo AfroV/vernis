@@ -1,0 +1,5481 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Atelier • Vernis</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <link rel="stylesheet" href="vernis-themes.css" />
+    <link rel="stylesheet" href="" id="supersize-css" />
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js" async></script>
+    <script>
+      // Load supersize settings early
+      (function () {
+        const supersize = localStorage.getItem("vernis-supersize");
+        if (supersize && supersize !== "normal") {
+          document.getElementById("supersize-css").href =
+            "vernis-supersize-" + supersize + ".css";
+        }
+      })();
+    </script>
+    <style>
+      body {
+        min-height: 100vh;
+        overflow-x: hidden;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Scrollbar colors - width controlled by supersize CSS or settings */
+      ::-webkit-scrollbar-track {
+        background: #1a1a1a;
+        background: var(--bg-tertiary, #1a1a1a);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #00ffff;
+        background: var(--accent-primary, #00ffff);
+        border: 3px solid #1a1a1a;
+        border-color: var(--bg-tertiary, #1a1a1a);
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #ff00ff;
+        background: var(--accent-secondary, #ff00ff);
+      }
+
+      .main {
+        padding: 130px 50px 80px;
+        max-width: 480px;
+        margin: 0 auto;
+      }
+
+      /* Lab Section Header */
+      .lab-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(
+          135deg,
+          rgba(139, 92, 246, 0.15),
+          rgba(236, 72, 153, 0.15)
+        );
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #a78bfa;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-bottom: 24px;
+      }
+
+      .lab-badge::before {
+        content: "";
+        font-size: 16px;
+      }
+
+      .project-header {
+        text-align: center;
+        margin-bottom: 12px;
+      }
+
+      .project-header h1 {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 4px;
+        letter-spacing: -0.02em;
+      }
+
+      .project-header .subtitle {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-weight: 400;
+      }
+
+      .project-header .subtitle a {
+        color: var(--accent-primary);
+        text-decoration: none;
+      }
+
+      .project-header .subtitle a:hover {
+        text-decoration: underline;
+      }
+
+      /* Settings Input */
+      .gazer-settings {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .gazer-settings .touch-numpad {
+        flex-basis: 100%;
+      }
+
+      .gazer-settings label {
+        font-size: 13px;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      .gazer-input {
+        width: 80px;
+        padding: 8px 10px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        color: var(--text-primary);
+        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .gazer-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+      }
+
+      .gazer-input::-webkit-inner-spin-button,
+      .gazer-input::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+
+      /* Display Card */
+      .gazer-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3),
+          0 0 60px rgba(96, 165, 250, 0.1);
+        transition: box-shadow 0.3s ease;
+      }
+
+      .gazer-card:hover {
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4),
+          0 0 80px rgba(96, 165, 250, 0.15);
+      }
+
+      .gazer-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--border-light);
+        background: var(--bg-tertiary);
+      }
+
+      .gazer-card-title {
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .gazer-card-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .card-action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .card-action-btn:hover {
+        background: var(--bg-primary);
+        color: var(--accent-primary);
+        border-color: var(--accent-primary);
+      }
+
+      .gazer-display {
+        position: relative;
+        width: 100%;
+        padding-top: 56.25%; /* 16:9 aspect ratio */
+        background: #0a0a0f;
+      }
+
+      .gazer-placeholder {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        color: var(--text-muted);
+      }
+
+      .moon-icon {
+        font-size: 36px;
+        opacity: 0.5;
+      }
+
+      .placeholder-text {
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .gazer-preview {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: none;
+      }
+      .gazer-preview.loaded {
+        display: block;
+      }
+
+      .gazer-iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: none;
+      }
+
+      .gazer-iframe.loaded {
+        display: block;
+      }
+
+      .gazer-loading {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: #0a0a0f;
+      }
+
+      .gazer-loading.active {
+        display: flex;
+      }
+
+      .loading-spinner {
+        width: 48px;
+        height: 48px;
+        border: 3px solid var(--border-light);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes eggFadeIn {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+
+      .gazer-card-footer {
+        padding: 16px 20px;
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .display-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        border: none;
+        border-radius: 10px;
+        color: white;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+      }
+
+      .display-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 30px rgba(59, 130, 246, 0.4);
+      }
+
+      .display-btn:active {
+        transform: translateY(0);
+      }
+
+      .display-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      /* Keyboard Shortcuts */
+      .keyboard-hints {
+        margin-top: 32px;
+        padding: 20px 24px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+      }
+
+      .keyboard-hints h4 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+      }
+
+      .keyboard-hints p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.8;
+      }
+
+      .keyboard-hints kbd {
+        display: inline-block;
+        padding: 3px 8px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-light);
+        border-radius: 5px;
+        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+        font-size: 12px;
+        color: var(--text-primary);
+        margin: 0 2px;
+      }
+
+      /* Fullscreen Modal */
+      .fullscreen-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 10000;
+        cursor: none;
+      }
+
+      .fullscreen-modal.active {
+        display: block;
+      }
+
+      .fullscreen-modal.show-controls {
+        cursor: default;
+      }
+
+      .fullscreen-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        pointer-events: none; /* Prevent iframe from capturing events by default */
+      }
+
+      .fullscreen-touch-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 10000;
+        background: transparent;
+      }
+
+      .fullscreen-modal.show-controls .fullscreen-touch-overlay {
+        pointer-events: none; /* Disable overlay when controls visible */
+      }
+
+      .fullscreen-controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        gap: 12px;
+        z-index: 10001;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+
+      .fullscreen-modal.show-controls .fullscreen-controls {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .fullscreen-btn-control {
+        width: 52px;
+        height: 52px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1.5px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+
+      .fullscreen-btn-control:active {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .fullscreen-btn-control.active {
+        background: rgba(255, 180, 50, 0.4);
+        border-color: rgba(255, 180, 50, 0.6);
+        box-shadow: 0 0 12px rgba(255, 180, 50, 0.3);
+      }
+
+      .fullscreen-btn-control svg {
+        width: 22px;
+        height: 22px;
+        pointer-events: none;
+      }
+
+      /* Unified fullscreen button — used by Punk, Glyph, Gazer, PixelChain */
+      .fs-btn {
+        width: 52px;
+        height: 52px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1.5px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        z-index: 10001;
+        position: absolute;
+      }
+      .fs-btn svg {
+        width: 22px;
+        height: 22px;
+        pointer-events: none;
+      }
+      .fs-btn:active {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .fs-btn.hue-active {
+        background: rgba(255, 180, 50, 0.4);
+        border-color: rgba(255, 180, 50, 0.6);
+        box-shadow: 0 0 12px rgba(255, 180, 50, 0.3);
+      }
+      /* Light-bg variant for Autoglyphs */
+      .fs-btn.fs-btn-light {
+        background: rgba(255, 255, 255, 0.8);
+        border-color: rgba(0, 0, 0, 0.15);
+        color: #333;
+      }
+      .fs-btn.fs-btn-light:active {
+        background: rgba(0, 0, 0, 0.1);
+      }
+      .fs-btn.fs-btn-light.hue-active {
+        background: rgba(255, 180, 50, 0.3);
+        border-color: rgba(255, 180, 50, 0.5);
+        color: #b87a00;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .main {
+          padding: 80px 16px 50px;
+        }
+
+        .project-header h1 {
+          font-size: 24px;
+        }
+
+        .keyboard-hints {
+          display: none;
+        }
+      }
+
+      @media (max-width: 720px), (max-height: 720px) {
+        .main {
+          padding: 65px 10px 30px;
+        }
+        .project-header h1 {
+          font-size: 22px;
+        }
+        .project-header {
+          margin-bottom: 8px;
+        }
+        .lab-badge {
+          font-size: 12px;
+          padding: 5px 12px;
+          margin-bottom: 12px;
+        }
+      }
+
+      @media (orientation: portrait) and (min-height: 800px) {
+        .main {
+          padding: 80px 20px 60px;
+        }
+      }
+
+      /* Touch Numpad */
+      .touch-numpad {
+        display: none;
+        margin: 0 auto 16px;
+        max-width: 360px;
+        width: 100%;
+      }
+      .touch-numpad.active {
+        display: block;
+      }
+      .numpad-display {
+        text-align: center;
+        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--text-primary);
+        padding: 12px 16px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        margin-bottom: 10px;
+        min-height: 48px;
+        line-height: 48px;
+      }
+      .numpad-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .numpad-btn {
+        padding: 18px 0;
+        font-size: 24px;
+        font-weight: 600;
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: manipulation;
+        transition: background 0.15s;
+      }
+      .numpad-btn:active {
+        background: var(--bg-secondary);
+      }
+      .numpad-btn.numpad-del {
+        font-size: 20px;
+        color: var(--text-muted);
+      }
+      .numpad-btn.numpad-go {
+        background: var(--accent-primary);
+        color: #fff;
+        border-color: var(--accent-primary);
+      }
+      .numpad-btn.numpad-go:active {
+        opacity: 0.8;
+      }
+      @media (max-width: 720px), (max-height: 720px) {
+        .touch-numpad {
+          max-width: 220px;
+        }
+        .numpad-btn {
+          padding: 12px 0;
+          font-size: 20px;
+        }
+        .numpad-display {
+          font-size: 24px;
+          padding: 8px 12px;
+          min-height: 38px;
+          line-height: 38px;
+        }
+      }
+
+      /* PixelChain Card */
+      .pxc-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3),
+          0 0 60px rgba(0, 255, 128, 0.08);
+        transition: box-shadow 0.3s ease;
+      }
+      .pxc-card:hover {
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4),
+          0 0 80px rgba(0, 255, 128, 0.12);
+      }
+      .pxc-modes {
+        display: flex;
+        border-bottom: 1px solid var(--border-light);
+      }
+      .pxc-mode-btn {
+        flex: 1;
+        padding: 10px 0;
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+      .pxc-mode-btn:hover {
+        color: var(--text-primary);
+      }
+      .pxc-mode-btn.active {
+        color: #00ff88;
+        border-bottom-color: #00ff88;
+      }
+      .pxc-render-area {
+        position: relative;
+        width: 100%;
+        padding-top: 100%;
+        background: #050510;
+      }
+      .pxc-render-inner {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .pxc-canvas {
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        display: none;
+      }
+      .pxc-svg-container {
+        width: 100%;
+        height: 100%;
+        display: none;
+      }
+      .pxc-svg-container svg {
+        width: 100%;
+        height: 100%;
+      }
+      .pxc-ascii {
+        display: none;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0a0a0a;
+        box-sizing: border-box;
+        align-items: center;
+        justify-content: center;
+      }
+      .pxc-ascii pre {
+        margin: 0;
+        font-family: "Courier New", "Consolas", monospace;
+        line-height: 1;
+        color: #00ff88;
+        letter-spacing: 0.1em;
+        text-align: center;
+        white-space: pre;
+      }
+      .pxc-placeholder {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        color: var(--text-muted);
+      }
+      .pxc-placeholder-icon {
+        font-size: 28px;
+        opacity: 0.4;
+      }
+      .pxc-loading {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: #050510;
+        z-index: 2;
+      }
+      .pxc-loading.active {
+        display: flex;
+      }
+      .pxc-info {
+        padding: 12px 20px;
+        border-top: 1px solid var(--border-light);
+        display: none;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .pxc-info .pxc-name {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .pxc-info .pxc-author {
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      .pxc-error {
+        color: #f87171;
+        text-align: center;
+        padding: 12px;
+        font-size: 13px;
+        display: none;
+      }
+      .section-divider {
+        border: none;
+        border-top: 1px solid var(--border-light);
+        margin: 20px 0;
+        opacity: 0.5;
+      }
+
+      /* PixelChain Fullscreen */
+      .pxc-fullscreen {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      }
+      .pxc-fullscreen.active {
+        display: flex;
+      }
+      .pxc-fullscreen #pxc-fs-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: min(100vw, 100vh);
+        height: min(100vw, 100vh);
+      }
+      .pxc-fullscreen canvas {
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+      .pxc-fullscreen .pxc-fs-svg {
+        width: 100%;
+        height: 100%;
+      }
+      .pxc-fullscreen .pxc-fs-svg svg {
+        width: 100%;
+        height: 100%;
+      }
+      .pxc-fullscreen pre {
+        font-family: "Courier New", "Consolas", monospace;
+        line-height: 1;
+        color: #00ff88;
+        letter-spacing: 0.1em;
+        white-space: pre;
+      }
+      .pxc-fullscreen .pxc-fs-controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        gap: 12px;
+        z-index: 10001;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+      .pxc-fullscreen.show-controls .pxc-fs-controls {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .pxc-fs-controls .pxc-fs-btn {
+        width: 52px;
+        height: 52px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+      .pxc-fs-controls .pxc-fs-btn:active {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .pxc-fs-controls .pxc-fs-btn.hue-active {
+        background: rgba(255, 180, 50, 0.4);
+        border-color: rgba(255, 180, 50, 0.6);
+        box-shadow: 0 0 12px rgba(255, 180, 50, 0.3);
+      }
+      .pxc-fullscreen .pxc-fs-touch-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 10000;
+        background: transparent;
+      }
+      .pxc-fullscreen.show-controls .pxc-fs-touch-overlay {
+        pointer-events: none;
+      }
+
+      /* Burner Fullscreen */
+      #burner-fullscreen .burner-fs-touch-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 10000;
+        background: transparent;
+      }
+      #burner-fullscreen.show-controls .burner-fs-touch-overlay {
+        pointer-events: none;
+      }
+      #burner-fullscreen .burner-fs-controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        gap: 12px;
+        z-index: 10001;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+      #burner-fullscreen.show-controls .burner-fs-controls {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* Lab Hue Toggle */
+      .lab-hue-btn {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+        cursor: pointer;
+        z-index: 100;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+      }
+      .lab-hue-btn.hue-active {
+        background: rgba(255, 180, 50, 0.3);
+        border-color: rgba(255, 180, 50, 0.6);
+        box-shadow: 0 0 12px rgba(255, 180, 50, 0.3);
+      }
+      .lab-hue-btn.hue-active:hover {
+        background: rgba(255, 180, 50, 0.5);
+      }
+      .lab-hue-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      /* Auto-Cycle Toggle */
+      .auto-cycle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 24px;
+        padding: 16px 20px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+      }
+      .auto-cycle-label {
+        flex: 1;
+        margin-right: 16px;
+      }
+      .auto-cycle-label .acl-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
+      .auto-cycle-label .acl-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.4;
+      }
+    </style>
+    <script>
+      // Apply saved UI scale
+      (function () {
+        let scale = localStorage.getItem("vernis-ui-scale");
+        if (!scale) {
+          const isSmallScreen =
+            window.innerWidth <= 720 || window.innerHeight <= 720;
+          scale = isSmallScreen ? "120" : "100";
+          localStorage.setItem("vernis-ui-scale", scale);
+        }
+        if (scale !== "100")
+          document.documentElement.style.fontSize = (scale / 100) * 16 + "px";
+      })();
+    </script>
+  </head>
+
+  <body>
+    <!-- Custom scrollbar - only shown when enabled in settings (for touch screens) -->
+    <div id="custom-scrollbar" class="custom-scrollbar-track">
+      <div id="custom-scrollbar-thumb" class="custom-scrollbar-thumb"></div>
+    </div>
+    <script>
+      // Auto-enable thick scrollbar on localhost (Pi)
+      (function () {
+        const setting = localStorage.getItem("vernis-thick-scrollbar");
+        if (setting === null && window.location.hostname === "localhost") {
+          localStorage.setItem("vernis-thick-scrollbar", "true");
+        }
+        const enabled =
+          localStorage.getItem("vernis-thick-scrollbar") === "true";
+        if (!enabled) {
+          document.getElementById("custom-scrollbar").style.display = "none";
+        }
+      })();
+    </script>
+    <style>
+      .custom-scrollbar-track {
+        position: fixed;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 40px;
+        background: var(--scrollbar-track, rgba(128, 128, 128, 0.2));
+        z-index: 9999;
+        pointer-events: none;
+      }
+      .custom-scrollbar-thumb {
+        position: absolute;
+        right: 4px;
+        width: 32px;
+        background: var(
+          --scrollbar-thumb,
+          var(--accent-primary, rgba(150, 150, 150, 0.8))
+        );
+        border-radius: 16px;
+        min-height: 80px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        pointer-events: auto;
+      }
+      .custom-scrollbar-thumb:hover,
+      .custom-scrollbar-thumb:active {
+        background: var(
+          --scrollbar-thumb-hover,
+          var(--accent-secondary, rgba(180, 180, 180, 0.9))
+        );
+      }
+    </style>
+    <script>
+      (function () {
+        const scrollbar = document.getElementById("custom-scrollbar");
+        const thumb = document.getElementById("custom-scrollbar-thumb");
+        if (!scrollbar || !thumb) return;
+
+        function updateThumb() {
+          const thickScrollbarEnabled =
+            localStorage.getItem("vernis-thick-scrollbar") === "true";
+          if (!thickScrollbarEnabled) {
+            scrollbar.style.display = "none";
+            return;
+          }
+          const docHeight = document.documentElement.scrollHeight;
+          const winHeight = window.innerHeight;
+          if (docHeight <= winHeight) {
+            scrollbar.style.display = "none";
+            return;
+          }
+          scrollbar.style.display = "block";
+          const scrollable = docHeight - winHeight;
+          const thumbH = Math.max(80, (winHeight / docHeight) * winHeight);
+          const thumbY = (window.scrollY / scrollable) * (winHeight - thumbH);
+          thumb.style.height = thumbH + "px";
+          thumb.style.top = Math.max(0, thumbY) + "px";
+        }
+        window.addEventListener("scroll", updateThumb);
+        window.addEventListener("resize", updateThumb);
+        setTimeout(updateThumb, 100);
+
+        let dragging = false,
+          dragStartY = 0,
+          dragStartScroll = 0;
+        thumb.addEventListener(
+          "touchstart",
+          function (e) {
+            dragging = true;
+            dragStartY = e.touches[0].clientY;
+            dragStartScroll = window.scrollY;
+            e.stopPropagation();
+          },
+          { passive: true },
+        );
+        thumb.addEventListener("mousedown", function (e) {
+          dragging = true;
+          dragStartY = e.clientY;
+          dragStartScroll = window.scrollY;
+        });
+        document.addEventListener(
+          "touchmove",
+          function (e) {
+            if (dragging && e.touches.length === 1) {
+              const delta = e.touches[0].clientY - dragStartY;
+              const scrollable =
+                document.documentElement.scrollHeight - window.innerHeight;
+              window.scrollTo(
+                0,
+                dragStartScroll + (delta / window.innerHeight) * scrollable,
+              );
+            }
+          },
+          { passive: true },
+        );
+        document.addEventListener("mousemove", function (e) {
+          if (dragging) {
+            const delta = e.clientY - dragStartY;
+            const scrollable =
+              document.documentElement.scrollHeight - window.innerHeight;
+            window.scrollTo(
+              0,
+              dragStartScroll + (delta / window.innerHeight) * scrollable,
+            );
+          }
+        });
+        document.addEventListener("touchend", function () {
+          dragging = false;
+        });
+        document.addEventListener("mouseup", function () {
+          dragging = false;
+        });
+      })();
+    </script>
+
+    <div class="header">
+      <a href="index.html" class="logo">Vernis</a>
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="add.html">Add Art</a>
+        <a href="library.html">Library</a>
+        <a href="manage.html">Manage Art</a>
+        <a href="settings.html">Settings</a>
+      </nav>
+      <button
+        class="menu-toggle"
+        onclick="toggleMobileMenu()"
+        aria-label="Menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
+      <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+      <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
+      <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
+      <a href="lab.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
+      <a href="settings.html" class="settings-parent"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</a>
+      <div class="settings-submenu">
+      <div class="menu-divider">Appearance</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-theme'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Theme</div>
+      <div class="menu-divider">Display</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-display'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Display Settings</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-screensaver'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Screen Timeout</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-orientation'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Orientation</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-hue'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg> Ambient Light</div>
+      <div class="menu-divider">Content</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-github'" style="display:none;"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg> GitHub Library</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-ethereum'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 3 12 12 22 21 12"/></svg> Ethereum RPC</div>
+      <div class="menu-divider">Storage</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-ipfs'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> IPFS Pinning</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-external'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M6 14h2"/></svg> External Drive</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-backup'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Backup</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-storage'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Storage Health</div>
+      <div class="menu-divider">System</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-wifi'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> Wi-Fi</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-performance'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Performance</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-system'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.6 15H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 6.6V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> System</div>
+      <div class="menu-section-link" onclick="location.href='settings.html#section-about'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About</div>
+      </div>
+    </div>
+
+    <!-- FPS Overlay -->
+    <div id="fps-overlay"
+      style="display: none; position: fixed; top: 12px; left: 12px; z-index: 100000; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); padding: 10px 14px; border-radius: 8px; font-family: monospace; font-size: 13px; color: #fff; pointer-events: none;">
+      <div style="display: flex; gap: 16px;">
+        <div><span style="color: #4ade80;" id="fps-value">--</span> FPS</div>
+        <div><span style="color: #60a5fa;" id="fps-freq">--</span> MHz</div>
+        <div><span style="color: #f59e0b;" id="fps-temp">--</span>°C</div>
+      </div>
+    </div>
+
+    <script>
+      function toggleMobileMenu() {
+        const menu = document.getElementById("mobileMenu");
+        const toggle = document.querySelector(".menu-toggle");
+        menu.classList.toggle("active");
+        toggle.classList.toggle("active");
+        var isOpen = menu.classList.contains("active");
+        document.body.style.overflow = isOpen ? "hidden" : "";
+        var mc = document.querySelector(".main");
+        if (mc) mc.style.visibility = isOpen ? "hidden" : "";
+        if (!isOpen) void document.body.offsetHeight; // force reflow for Chromium/Wayland touch scroll
+      }
+    </script>
+
+    <button
+      class="lab-hue-btn"
+      id="lab-hue-btn"
+      onclick="toggleLabHue()"
+      title="Hue Color Sync"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="2"
+        style="width: 20px; height: 20px"
+      >
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </svg>
+    </button>
+
+    <div class="main">
+      <div style="text-align: center; margin-bottom: 24px">
+        <div class="lab-badge">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 3h6v8l4 7H5l4-7V3z" />
+            <line x1="9" y1="3" x2="15" y2="3" />
+          </svg>
+          Atelier
+        </div>
+      </div>
+
+      <!-- Empty state (shown when no experiments unlocked) -->
+      <div
+        id="lab-empty"
+        style="
+          text-align: center;
+          padding: 60px 20px;
+          color: var(--text-muted, #888);
+        "
+      >
+        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5">🔬</div>
+        <div
+          style="
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-secondary, #aaa);
+            margin-bottom: 8px;
+          "
+        >
+          Nothing here yet
+        </div>
+        <div
+          style="
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 320px;
+            margin: 0 auto;
+          "
+        >
+          Hidden experiments are waiting to be discovered. Explore the Library
+          for clues...
+        </div>
+      </div>
+
+      <!-- Gazer Section -->
+      <div id="gazer-section" style="display: none">
+        <div class="project-header">
+          <h1>Gazer</h1>
+          <p class="subtitle">
+            <a
+              href="https://www.artblocks.io/collections/curated/projects/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/215"
+              target="_blank"
+              >Matt Kane</a
+            >
+            — Art Blocks Curated #215
+          </p>
+        </div>
+
+        <div class="gazer-settings">
+          <label for="gazer-number">Gazer #</label>
+          <input
+            type="number"
+            id="gazer-number"
+            class="gazer-input"
+            min="0"
+            max="999"
+            value="0"
+            inputmode="numeric"
+            onfocus="openNumpad('gazer')"
+          />
+          <div class="touch-numpad" id="numpad-gazer"></div>
+          <button
+            class="display-btn"
+            id="display-btn"
+            style="display: none"
+          ></button>
+        </div>
+
+        <div class="gazer-card">
+          <div class="gazer-card-header">
+            <span class="gazer-card-title" id="card-title">Gazer #0</span>
+            <div class="gazer-card-actions">
+              <button
+                class="card-action-btn"
+                id="gazer-card-send-btn"
+                title="Send to Frame"
+                onclick="sendToFrame('gazer')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="gazer-card-save-btn"
+                title="Save to Gallery"
+                onclick="saveToGallery('gazer')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="fullscreen-btn"
+                title="Fullscreen"
+                disabled
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="gazer-display" id="gazer-display">
+            <div class="gazer-placeholder" id="gazer-placeholder">
+              <div class="moon-icon">&#x1F319;</div>
+              <div class="placeholder-text">Click "Display Gazer" to load</div>
+            </div>
+            <div class="gazer-loading" id="gazer-loading">
+              <div class="loading-spinner"></div>
+            </div>
+            <img class="gazer-preview" id="gazer-preview" alt="Gazer preview" />
+            <iframe
+              class="gazer-iframe"
+              id="gazer-iframe"
+              allow="accelerometer; autoplay; encrypted-media; gyroscope"
+            ></iframe>
+          </div>
+        </div>
+
+
+        <div class="auto-cycle-row">
+          <div class="auto-cycle-label">
+            <div class="acl-title">Auto-Cycle Gazers</div>
+            <div class="acl-desc">
+              Loads a random Gazer every
+              <span id="gazer-cycle-interval"></span> to prevent image retention
+            </div>
+          </div>
+          <div
+            class="toggle"
+            id="gazer-cycle-toggle"
+            onclick="toggleGazerCycle()"
+          ></div>
+        </div>
+      </div>
+
+      <!-- PixelChain Section -->
+      <div id="pixelchain-section" style="display: none">
+        <hr class="section-divider" id="pxc-divider" style="display: none" />
+        <div class="project-header">
+          <h1
+            style="
+              background: linear-gradient(135deg, #00ff88, #00ccff);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
+            "
+          >
+            PixelChain
+          </h1>
+          <p class="subtitle">
+            On-Chain Pixel Art —
+            <a href="https://pixelchain.art/" target="_blank"
+              >2,804 tokens on Ethereum</a
+            >
+          </p>
+        </div>
+
+        <div class="gazer-settings">
+          <label for="pxc-number">Token #</label>
+          <input
+            type="number"
+            id="pxc-number"
+            class="gazer-input"
+            min="0"
+            max="2803"
+            value="0"
+            style="border-color: rgba(0, 255, 136, 0.3)"
+            inputmode="numeric"
+            onfocus="openNumpad('pxc')"
+          />
+          <div class="touch-numpad" id="numpad-pxc"></div>
+          <button
+            class="display-btn"
+            id="pxc-load-btn"
+            style="display: none"
+          ></button>
+        </div>
+
+        <div class="pxc-card">
+          <div class="gazer-card-header">
+            <span class="gazer-card-title" id="pxc-title">PixelChain #0</span>
+            <div class="gazer-card-actions">
+              <button
+                class="card-action-btn"
+                id="pxc-card-send-btn"
+                title="Send to Frame"
+                onclick="sendToFrame('pixelchain')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="pxc-card-save-btn"
+                title="Save to Gallery"
+                onclick="saveToGallery('pixelchain')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="pxc-fullscreen-btn"
+                title="Fullscreen"
+                disabled
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="pxc-modes">
+            <button
+              class="pxc-mode-btn active"
+              onclick="switchPxcMode('pixel')"
+            >
+              Pixel
+            </button>
+            <button class="pxc-mode-btn" onclick="switchPxcMode('svg')">
+              SVG
+            </button>
+            <button class="pxc-mode-btn" onclick="switchPxcMode('ascii')">
+              ASCII
+            </button>
+            <button class="pxc-mode-btn" onclick="switchPxcMode('hex')">
+              Hex
+            </button>
+          </div>
+
+          <div class="pxc-render-area">
+            <div class="pxc-render-inner" id="pxc-render">
+              <div class="pxc-placeholder" id="pxc-placeholder">
+                <div class="pxc-placeholder-icon">&#x25A3;</div>
+                <div class="placeholder-text">Enter a number and tap GO</div>
+              </div>
+              <div class="pxc-loading" id="pxc-loading">
+                <div class="loading-spinner"></div>
+              </div>
+              <canvas class="pxc-canvas" id="pxc-canvas"></canvas>
+              <div class="pxc-svg-container" id="pxc-svg"></div>
+              <div class="pxc-ascii" id="pxc-ascii">
+                <pre id="pxc-ascii-pre"></pre>
+              </div>
+              <div class="pxc-ascii" id="pxc-hex">
+                <pre id="pxc-hex-pre"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="pxc-info" id="pxc-info">
+            <span class="pxc-name" id="pxc-info-name"></span><br />
+            <span class="pxc-author" id="pxc-info-author"></span>
+          </div>
+          <div class="pxc-error" id="pxc-error"></div>
+        </div>
+
+        <div class="auto-cycle-row">
+          <div class="auto-cycle-label">
+            <div class="acl-title">Auto-Cycle Tokens</div>
+            <div class="acl-desc">
+              Loads a random PixelChain every
+              <span id="pxc-cycle-interval"></span> to prevent image retention
+            </div>
+          </div>
+          <div
+            class="toggle"
+            id="pxc-cycle-toggle"
+            onclick="togglePxcCycle()"
+          ></div>
+        </div>
+      </div>
+
+      <!-- DOOM Party Section -->
+      <div id="doom-party-section" style="display: none">
+        <hr class="section-divider" id="doom-divider" style="display: none" />
+        <div class="project-header">
+          <h1
+            style="
+              background: linear-gradient(135deg, #ff2222, #ff00ff);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
+            "
+          >
+            AfroViking&rsquo;s DOOM Party
+          </h1>
+          <p class="subtitle">
+            Interactive XCOPY Puzzle —
+            <a
+              href="https://opensea.io/item/ethereum/0x23ff72bb719567b245e110e695ac773d59315b14/17"
+              target="_blank"
+              >by AfroViking</a
+            >
+          </p>
+        </div>
+
+        <div
+          class="doom-card"
+          style="
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            overflow: hidden;
+          "
+        >
+          <div class="gazer-card-header">
+            <span class="gazer-card-title">AfroViking&rsquo;s DOOM Party</span>
+            <div class="gazer-card-actions">
+              <button
+                class="card-action-btn"
+                id="doom-unlock-btn"
+                onclick="checkDoomSolutions()"
+                title="Check &amp; Reset"
+                style="
+                  opacity: 0.4;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  gap: 2px;
+                "
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <div style="display: flex; gap: 3px">
+                  <span
+                    id="doom-dot-1"
+                    style="
+                      width: 5px;
+                      height: 5px;
+                      border-radius: 50%;
+                      background: var(--border-medium);
+                      display: block;
+                    "
+                  ></span>
+                  <span
+                    id="doom-dot-2"
+                    style="
+                      width: 5px;
+                      height: 5px;
+                      border-radius: 50%;
+                      background: var(--border-medium);
+                      display: block;
+                    "
+                  ></span>
+                </div>
+              </button>
+              <button
+                class="card-action-btn"
+                id="doom-fullscreen-btn"
+                title="Fullscreen"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div
+            style="
+              position: relative;
+              width: 100%;
+              padding-top: 56.25%;
+              background: #000;
+            "
+          >
+            <iframe
+              id="doom-iframe"
+              src=""
+              style="
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                border: none;
+              "
+              allow="accelerometer; autoplay; encrypted-media; gyroscope"
+            ></iframe>
+            <div
+              class="doom-placeholder"
+              id="doom-placeholder"
+              style="
+                position: absolute;
+                inset: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #1a0000, #0a0a0a);
+                cursor: pointer;
+              "
+              onclick="loadDoomParty()"
+            >
+              <div style="font-size: 48px; margin-bottom: 12px">&#x1F480;</div>
+              <div style="color: var(--text-muted); font-size: 14px">
+                Tap to load the puzzle
+              </div>
+            </div>
+          </div>
+          <div style="padding: 16px; text-align: center">
+            <p
+              style="
+                color: var(--text-muted);
+                font-size: 13px;
+                line-height: 1.5;
+                margin: 0;
+              "
+            >
+              A remix of XCOPY's "Doomed" — solve the 3x3 puzzle to reveal two
+              hidden XCOPY artworks.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CryptoPunks Section (unlocked via DOOM Party solution 1) -->
+      <div id="punks-section" style="display: none">
+        <hr class="section-divider" id="punks-divider" style="display: none" />
+        <div class="project-header">
+          <h1
+            style="
+              background: linear-gradient(135deg, #e14b5a, #c83e9e);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
+            "
+          >
+            CryptoPunks
+          </h1>
+          <p class="subtitle">
+            On-Chain Pixel Art —
+            <a href="https://cryptopunks.app/" target="_blank"
+              >10,000 unique collectibles on Ethereum</a
+            >
+          </p>
+        </div>
+
+        <div class="gazer-settings">
+          <label for="punk-number">Punk #</label>
+          <input
+            type="number"
+            id="punk-number"
+            class="gazer-input"
+            min="0"
+            max="9999"
+            value="0"
+            style="border-color: rgba(225, 75, 90, 0.3)"
+            inputmode="numeric"
+            onfocus="openNumpad('punk')"
+          />
+          <div class="touch-numpad" id="numpad-punk"></div>
+          <button
+            class="display-btn"
+            id="punk-load-btn"
+            style="display: none"
+            onclick="loadPunk()"
+          ></button>
+        </div>
+
+        <div class="pxc-card" style="border-color: rgba(225, 75, 90, 0.2)">
+          <div class="gazer-card-header">
+            <span class="gazer-card-title" id="punk-title">CryptoPunk #0</span>
+            <div class="gazer-card-actions">
+              <button
+                class="card-action-btn"
+                id="punk-card-send-btn"
+                title="Send to Frame"
+                onclick="sendToFrame('punk')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="punk-card-save-btn"
+                title="Save to Gallery"
+                onclick="saveToGallery('punk')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="punk-fullscreen-btn"
+                title="Fullscreen"
+                disabled
+                onclick="openPunkFullscreen()"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="pxc-render-area" style="background: #638596">
+            <div class="pxc-render-inner" id="punk-render">
+              <div
+                class="pxc-placeholder"
+                id="punk-placeholder"
+                style="background: #050510"
+              >
+                <div class="pxc-placeholder-icon" style="color: #e14b5a">
+                  &#x25A3;
+                </div>
+                <div class="placeholder-text">Enter a number and tap GO</div>
+              </div>
+              <div
+                class="pxc-loading"
+                id="punk-loading"
+                style="display: none; background: #638596"
+              >
+                <div class="loading-spinner"></div>
+              </div>
+              <img
+                id="punk-image"
+                style="display: none; width: 100%; image-rendering: pixelated"
+                alt="CryptoPunk"
+              />
+            </div>
+          </div>
+          <div
+            class="pxc-error"
+            id="punk-error"
+            style="
+              display: none;
+              padding: 12px;
+              color: #e14b5a;
+              text-align: center;
+              font-size: 13px;
+            "
+          ></div>
+        </div>
+
+        <div class="auto-cycle-row">
+          <div class="auto-cycle-label">
+            <div class="acl-title">Auto-Cycle Punks</div>
+            <div class="acl-desc">
+              Loads a random CryptoPunk every
+              <span id="punk-cycle-interval"></span> to prevent image retention
+            </div>
+          </div>
+          <div
+            class="toggle"
+            id="punk-cycle-toggle"
+            onclick="togglePunkCycle()"
+          ></div>
+        </div>
+      </div>
+
+      <!-- Autoglyphs Section (unlocked via DOOM Party solution 2) -->
+      <div id="autoglyphs-section" style="display: none">
+        <hr
+          class="section-divider"
+          id="autoglyphs-divider"
+          style="display: none"
+        />
+        <div class="project-header">
+          <h1
+            style="
+              background: linear-gradient(135deg, #333, #666);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
+            "
+          >
+            Autoglyphs
+          </h1>
+          <p class="subtitle">
+            Fully On-Chain Generative Art —
+            <a href="https://www.larvalabs.com/autoglyphs" target="_blank"
+              >512 by Larva Labs</a
+            >
+          </p>
+        </div>
+
+        <div class="gazer-settings">
+          <label for="glyph-number">Glyph #</label>
+          <input
+            type="number"
+            id="glyph-number"
+            class="gazer-input"
+            min="1"
+            max="512"
+            value="1"
+            style="border-color: rgba(0, 0, 0, 0.2)"
+            inputmode="numeric"
+            onfocus="openNumpad('glyph')"
+          />
+          <div class="touch-numpad" id="numpad-glyph"></div>
+          <button
+            class="display-btn"
+            id="glyph-load-btn"
+            style="display: none"
+            onclick="loadGlyph()"
+          ></button>
+        </div>
+
+        <div class="pxc-card" style="border-color: rgba(0, 0, 0, 0.15)">
+          <div class="gazer-card-header">
+            <span class="gazer-card-title" id="glyph-title">Autoglyph #1</span>
+            <div class="gazer-card-actions">
+              <button
+                class="card-action-btn"
+                id="glyph-card-send-btn"
+                title="Send to Frame"
+                onclick="sendToFrame('glyph')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="glyph-card-save-btn"
+                title="Save to Gallery"
+                onclick="saveToGallery('glyph')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="glyph-fullscreen-btn"
+                title="Fullscreen"
+                disabled
+                onclick="openGlyphFullscreen()"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="pxc-render-area" style="background: #fff">
+            <div class="pxc-render-inner" id="glyph-render">
+              <div
+                class="pxc-placeholder"
+                id="glyph-placeholder"
+                style="background: #fff"
+              >
+                <div class="pxc-placeholder-icon" style="color: #222">
+                  &#x2593;
+                </div>
+                <div class="placeholder-text">Enter a number and tap GO</div>
+              </div>
+              <div class="pxc-loading" id="glyph-loading" style="display: none">
+                <div class="loading-spinner"></div>
+              </div>
+              <pre
+                id="glyph-art"
+                style="
+                  display: none;
+                  margin: 0;
+                  font-family: 'Courier New', 'Consolas', monospace;
+                  font-size: 5px;
+                  line-height: 1;
+                  font-weight: bold;
+                  color: #000;
+                  letter-spacing: 0.1em;
+                  white-space: pre;
+                  text-align: center;
+                "
+              ></pre>
+            </div>
+          </div>
+          <div
+            class="pxc-error"
+            id="glyph-error"
+            style="
+              display: none;
+              padding: 12px;
+              color: #c00;
+              text-align: center;
+              font-size: 13px;
+            "
+          ></div>
+        </div>
+
+        <div class="auto-cycle-row">
+          <div class="auto-cycle-label">
+            <div class="acl-title">Auto-Cycle Glyphs</div>
+            <div class="acl-desc">
+              Loads a random Autoglyph every
+              <span id="glyph-cycle-interval"></span> to prevent image retention
+            </div>
+          </div>
+          <div
+            class="toggle"
+            id="glyph-cycle-toggle"
+            onclick="toggleGlyphCycle()"
+          ></div>
+        </div>
+      </div>
+
+      <!-- BURNER Section -->
+      <div id="burner-section" style="display: none">
+        <hr class="section-divider" id="burner-divider" style="display: none" />
+        <div class="project-header">
+          <h1
+            style="
+              background: linear-gradient(135deg, #ff4500, #ff8c00, #ff0000);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
+            "
+          >
+            BURNER
+          </h1>
+          <p class="subtitle">
+            Dynamic NFT by
+            <a href="https://x.com/@jamesbloom_" target="_blank"
+              >crashblossom</a
+            >
+            — 256 pieces reacting to live Ethereum gas
+          </p>
+        </div>
+
+        <div class="gazer-settings">
+          <label for="burner-number">Burner #</label>
+          <input
+            type="number"
+            id="burner-number"
+            class="gazer-input"
+            min="0"
+            max="255"
+            value="0"
+            style="border-color: rgba(255, 69, 0, 0.3)"
+            inputmode="numeric"
+            onfocus="openNumpad('burner')"
+          />
+          <div class="touch-numpad" id="numpad-burner"></div>
+          <button
+            class="display-btn"
+            id="burner-load-btn"
+            style="display: none"
+            onclick="loadBurner()"
+          ></button>
+        </div>
+
+        <div class="gazer-card" style="border-color: rgba(255, 69, 0, 0.15)">
+          <div class="gazer-card-header">
+            <span class="gazer-card-title" id="burner-title">BURNER #0</span>
+            <div class="gazer-card-actions">
+              <button
+                class="card-action-btn"
+                id="burner-card-send-btn"
+                title="Send to Frame"
+                onclick="sendToFrame('burner')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="burner-card-save-btn"
+                title="Save to Gallery"
+                onclick="saveToGallery('burner')"
+                disabled
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                </svg>
+              </button>
+              <button
+                class="card-action-btn"
+                id="burner-fullscreen-btn"
+                title="Fullscreen"
+                disabled
+                onclick="openBurnerFullscreen()"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div
+            class="gazer-display"
+            id="burner-display"
+            style="background: #111"
+          >
+            <div
+              class="gazer-placeholder"
+              id="burner-placeholder"
+              style="background: #111"
+            >
+              <div class="moon-icon">&#x1F525;</div>
+              <div class="placeholder-text">Enter a number and tap GO</div>
+            </div>
+            <div class="gazer-loading" id="burner-loading">
+              <div class="loading-spinner"></div>
+            </div>
+            <iframe
+              class="gazer-iframe"
+              id="burner-iframe"
+              allow="accelerometer; autoplay; encrypted-media; gyroscope"
+            ></iframe>
+          </div>
+        </div>
+
+        <div class="auto-cycle-row">
+          <div class="auto-cycle-label">
+            <div class="acl-title">Auto-Cycle Burners</div>
+            <div class="acl-desc">
+              Loads a random Burner every
+              <span id="burner-cycle-interval"></span>
+            </div>
+          </div>
+          <div
+            class="toggle"
+            id="burner-cycle-toggle"
+            onclick="toggleBurnerCycle()"
+          ></div>
+        </div>
+
+        <div class="auto-cycle-row" id="burner-cache-row">
+          <div class="auto-cycle-label">
+            <div class="acl-title" id="burner-cache-title">
+              Cache Assets Locally
+            </div>
+            <div class="acl-desc" id="burner-cache-desc">
+              Download full-res art from Arweave for offline use
+            </div>
+          </div>
+          <button
+            class="display-btn"
+            id="burner-cache-btn"
+            onclick="startBurnerCache()"
+            style="min-width: 90px; font-size: 12px"
+          >
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOOM Party Fullscreen -->
+    <div
+      id="doom-fullscreen"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <button
+        id="doom-fs-unlock-btn"
+        onclick="checkDoomSolutions()"
+        title="Check &amp; Reset"
+        style="
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          background: rgba(0, 0, 0, 0.6);
+          color: white;
+          cursor: pointer;
+          z-index: 10001;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          opacity: 0.4;
+        "
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <div style="display:flex;gap:3px">
+          <span id="doom-fs-dot-1" style="width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.3);display:block"></span>
+          <span id="doom-fs-dot-2" style="width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,0.3);display:block"></span>
+        </div>
+      </button>
+      <button
+        onclick="closeDoomFullscreen()"
+        style="
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          background: rgba(0, 0, 0, 0.6);
+          color: white;
+          font-size: 20px;
+          cursor: pointer;
+          z-index: 10001;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        "
+      >
+        &#x2715;
+      </button>
+      <iframe
+        id="doom-fullscreen-iframe"
+        src=""
+        style="width: 100vw; height: 100vh; border: none"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope"
+      ></iframe>
+    </div>
+
+    <!-- CryptoPunk Fullscreen -->
+    <div
+      id="punk-fullscreen"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #638596;
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <button
+        class="fs-btn"
+        id="punk-fs-close"
+        onclick="closePunkFullscreen()"
+        style="top: 20px; right: 20px"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+      <button
+        class="fs-btn"
+        id="punk-fs-hue"
+        style="top: 20px; right: 80px; display: none"
+        title="Hue Color Sync"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" />
+          <line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      </button>
+      <button
+        class="fs-btn"
+        id="punk-fs-send"
+        onclick="sendToFrame('punk')"
+        style="top: 20px; left: 20px"
+        title="Send to Frame"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      </button>
+      <button
+        class="fs-btn"
+        id="punk-fs-save"
+        onclick="saveToGallery('punk')"
+        style="top: 20px; left: 80px"
+        title="Save to Gallery"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
+      <img
+        id="punk-fullscreen-img"
+        style="
+          max-width: 100vw;
+          max-height: 100vh;
+          image-rendering: pixelated;
+          object-fit: contain;
+        "
+        alt="CryptoPunk"
+      />
+    </div>
+
+    <!-- Autoglyph Fullscreen -->
+    <div
+      id="glyph-fullscreen"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <button
+        class="fs-btn fs-btn-light"
+        id="glyph-fs-close"
+        onclick="closeGlyphFullscreen()"
+        style="top: 20px; right: 20px"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+      <button
+        class="fs-btn fs-btn-light"
+        id="glyph-fs-hue"
+        style="top: 20px; right: 80px; display: none"
+        title="Hue Color Sync"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" />
+          <line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      </button>
+      <button
+        class="fs-btn fs-btn-light"
+        id="glyph-fs-send"
+        onclick="sendToFrame('glyph')"
+        style="top: 20px; left: 20px"
+        title="Send to Frame"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      </button>
+      <button
+        class="fs-btn fs-btn-light"
+        id="glyph-fs-save"
+        onclick="saveToGallery('glyph')"
+        style="top: 20px; left: 80px"
+        title="Save to Gallery"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
+      <pre
+        id="glyph-fullscreen-art"
+        style="
+          margin: 0;
+          font-family: 'Courier New', 'Consolas', monospace;
+          font-size: min(1.4vw, 1.4vh);
+          line-height: 1;
+          font-weight: bold;
+          color: #000;
+          letter-spacing: 0.1em;
+          white-space: pre;
+          text-align: center;
+        "
+      ></pre>
+    </div>
+
+    <!-- BURNER Fullscreen -->
+    <div
+      id="burner-fullscreen"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div class="burner-fs-touch-overlay" id="burner-fs-touch-overlay"></div>
+      <div class="burner-fs-controls" id="burner-fs-controls">
+        <button
+          class="fs-btn"
+          id="burner-fs-hue"
+          style="position: static; display: none"
+          title="Hue Color Sync"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+        </button>
+        <button
+          class="fs-btn"
+          id="burner-fs-send"
+          onclick="sendToFrame('burner'); startBurnerControlsTimer();"
+          style="position: static"
+          title="Send to Frame"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+        </button>
+        <button
+          class="fs-btn"
+          id="burner-fs-save"
+          title="Save to Gallery"
+          onclick="saveToGallery('burner'); startBurnerControlsTimer();"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+        <button
+          class="fs-btn"
+          id="burner-fs-close"
+          style="position: static"
+          title="Close"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <iframe
+        id="burner-fullscreen-iframe"
+        src=""
+        style="width: 100vw; height: 100vh; border: none"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope"
+      ></iframe>
+    </div>
+
+    <!-- Fullscreen Modal -->
+    <div class="fullscreen-modal" id="fullscreen-modal">
+      <div class="fullscreen-touch-overlay" id="fullscreen-touch-overlay"></div>
+      <div class="fullscreen-controls" id="fullscreen-controls">
+        <button
+          class="fullscreen-btn-control"
+          id="ambient-btn"
+          title="Hue Color Sync"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+        </button>
+        <button
+          class="fullscreen-btn-control"
+          id="gazer-fs-send"
+          title="Send to Frame"
+          onclick="sendToFrame('gazer')"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+        </button>
+        <button
+          class="fullscreen-btn-control"
+          id="gazer-fs-save"
+          title="Save to Gallery"
+          onclick="saveToGallery('gazer')"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+        <button
+          class="fullscreen-btn-control"
+          id="fullscreen-close"
+          title="Close"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <iframe
+        class="fullscreen-iframe"
+        id="fullscreen-iframe"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope"
+      ></iframe>
+    </div>
+
+    <!-- PixelChain Fullscreen -->
+    <div class="pxc-fullscreen" id="pxc-fullscreen">
+      <div class="pxc-fs-touch-overlay" id="pxc-fs-touch-overlay"></div>
+      <div class="pxc-fs-controls" id="pxc-fs-controls">
+        <button
+          class="pxc-fs-btn fs-btn"
+          id="pxc-fs-hue-btn"
+          title="Hue Color Sync"
+          style="position: static"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+        </button>
+        <button
+          class="pxc-fs-btn fs-btn"
+          id="pxc-fs-send-btn"
+          title="Send to Frame"
+          onclick="sendToFrame('pixelchain')"
+          style="position: static"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+        </button>
+        <button
+          class="pxc-fs-btn fs-btn"
+          id="pxc-fs-save-btn"
+          title="Save to Gallery"
+          onclick="saveToGallery('pixelchain')"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+        <button
+          class="pxc-fs-btn fs-btn"
+          id="pxc-fs-close-btn"
+          title="Close"
+          style="position: static"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div id="pxc-fs-content"></div>
+    </div>
+
+    <footer
+      style="
+        text-align: center;
+        padding: 20px;
+        font-size: 12px;
+        color: var(--text-muted);
+      "
+    >
+      &copy; 2025 AfroViking
+    </footer>
+
+    <script>
+      // Load theme
+      (function () {
+        const theme = localStorage.getItem("vernis-theme-style") || "walnut";
+        var mode = localStorage.getItem("vernis-theme-mode") || "dark";
+        if (mode === "auto") {
+          var _h = new Date().getHours();
+          mode = _h >= 20 || _h < 7 ? "dark" : "light";
+        }
+        document.documentElement.setAttribute("data-theme", `${theme}-${mode}`);
+        function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}_syncTheme();setInterval(_syncTheme,5000);
+      })();
+
+      // ===== Touch Numpad =====
+      var numpadConfigs = {
+        gazer: { input: "gazer-number", max: 999, btn: "display-btn" },
+        pxc: { input: "pxc-number", max: 2803, btn: "pxc-load-btn" },
+        punk: { input: "punk-number", max: 9999, btn: "punk-load-btn" },
+        glyph: { input: "glyph-number", max: 512, btn: "glyph-load-btn" },
+        burner: { input: "burner-number", max: 255, btn: "burner-load-btn" },
+      };
+      var activeNumpad = null;
+      var numpadValue = "";
+
+      function buildNumpadHTML(id) {
+        return (
+          '<div class="numpad-display" id="numpad-display-' +
+          id +
+          '">0</div>' +
+          '<div class="numpad-grid">' +
+          [1, 2, 3, 4, 5, 6, 7, 8, 9]
+            .map(function (n) {
+              return (
+                '<button class="numpad-btn" type="button" ontouchstart="numpadPress(\'' +
+                n +
+                "')\" onclick=\"numpadPress('" +
+                n +
+                "')\">" +
+                n +
+                "</button>"
+              );
+            })
+            .join("") +
+          '<button class="numpad-btn numpad-del" type="button" ontouchstart="numpadPress(\'del\')" onclick="numpadPress(\'del\')">&#x232B;</button>' +
+          '<button class="numpad-btn" type="button" ontouchstart="numpadPress(\'0\')" onclick="numpadPress(\'0\')">0</button>' +
+          '<button class="numpad-btn numpad-go" type="button" ontouchstart="numpadConfirm()" onclick="numpadConfirm()">GO</button>' +
+          "</div>"
+        );
+      }
+
+      // Init numpads
+      (function () {
+        for (var key in numpadConfigs) {
+          var el = document.getElementById("numpad-" + key);
+          if (el) el.innerHTML = buildNumpadHTML(key);
+          // Sync numpadValue when native keyboard changes the input directly
+          (function (id) {
+            var inp = document.getElementById(numpadConfigs[id].input);
+            if (inp)
+              inp.addEventListener("input", function () {
+                if (activeNumpad === id) {
+                  numpadValue = this.value || "0";
+                  var display = document.getElementById("numpad-display-" + id);
+                  if (display) display.textContent = numpadValue;
+                }
+              });
+          })(key);
+        }
+      })();
+
+      function openNumpad(id) {
+        // Close any open numpad
+        if (activeNumpad && activeNumpad !== id) {
+          var prev = document.getElementById("numpad-" + activeNumpad);
+          if (prev) prev.classList.remove("active");
+        }
+        activeNumpad = id;
+        var cfg = numpadConfigs[id];
+        numpadValue = document.getElementById(cfg.input).value || "0";
+        var pad = document.getElementById("numpad-" + id);
+        pad.classList.add("active");
+        var display = document.getElementById("numpad-display-" + id);
+        if (display) display.textContent = numpadValue;
+      }
+
+      function numpadPress(key) {
+        if (!activeNumpad) return;
+        var cfg = numpadConfigs[activeNumpad];
+        if (key === "del") {
+          numpadValue = numpadValue.slice(0, -1) || "";
+        } else {
+          var test = numpadValue === "0" ? key : numpadValue + key;
+          if (parseInt(test) <= cfg.max) {
+            numpadValue = test;
+          }
+        }
+        var display = document.getElementById("numpad-display-" + activeNumpad);
+        if (display) display.textContent = numpadValue || "0";
+      }
+
+      function numpadConfirm() {
+        if (!activeNumpad) return;
+        var cfg = numpadConfigs[activeNumpad];
+        var val = parseInt(numpadValue) || 0;
+        document.getElementById(cfg.input).value = val;
+        // Close numpad
+        var pad = document.getElementById("numpad-" + activeNumpad);
+        pad.classList.remove("active");
+        // Trigger the load button
+        document.getElementById(cfg.btn).click();
+        activeNumpad = null;
+      }
+
+      // Gazer Display Logic
+      const ART_BLOCKS_CONTRACT = "0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270";
+      const GAZER_PROJECT_ID = 215;
+      const BASE_TOKEN_ID = GAZER_PROJECT_ID * 1000000;
+
+      const gazerInput = document.getElementById("gazer-number");
+      const cardTitle = document.getElementById("card-title");
+      const displayBtn = document.getElementById("display-btn");
+      const fullscreenBtn = document.getElementById("fullscreen-btn");
+      const gazerCardSendBtn = document.getElementById("gazer-card-send-btn");
+      const gazerPlaceholder = document.getElementById("gazer-placeholder");
+      const gazerLoading = document.getElementById("gazer-loading");
+      const gazerIframe = document.getElementById("gazer-iframe");
+      const fullscreenModal = document.getElementById("fullscreen-modal");
+      const fullscreenClose = document.getElementById("fullscreen-close");
+      const fullscreenIframe = document.getElementById("fullscreen-iframe");
+
+      let currentGazerUrl = null;
+
+      // Update card title when input changes
+      gazerInput.addEventListener("input", function () {
+        let val = parseInt(this.value) || 0;
+        if (val < 0) val = 0;
+        if (val > 999) val = 999;
+        this.value = val;
+        // Don't update card title until display is clicked
+      });
+
+      const gazerPreview = document.getElementById("gazer-preview");
+
+      // Display Gazer button — load static preview image (not live generator)
+      displayBtn.addEventListener("click", function () {
+        const gazerNumber = parseInt(gazerInput.value) || 0;
+        const tokenId = BASE_TOKEN_ID + gazerNumber;
+        const liveUrl = `https://generator.artblocks.io/${ART_BLOCKS_CONTRACT}/${tokenId}`;
+        const imageUrl = `https://media.artblocks.io/${tokenId}.png`;
+
+        currentGazerUrl = liveUrl;
+        cardTitle.textContent = `Gazer #${gazerNumber}`;
+
+        // Show loading
+        gazerPlaceholder.style.display = "none";
+        gazerLoading.classList.add("active");
+        gazerPreview.classList.remove("loaded");
+        gazerIframe.classList.remove("loaded");
+        gazerIframe.src = "";
+
+        // Load static image preview
+        gazerPreview.src = imageUrl;
+      });
+
+      // Handle preview image load
+      gazerPreview.addEventListener("load", function () {
+        gazerLoading.classList.remove("active");
+        gazerPreview.classList.add("loaded");
+        fullscreenBtn.disabled = false;
+        gazerCardSendBtn.disabled = false;
+        document.getElementById("gazer-card-save-btn").disabled = false;
+        // If fullscreen is open (auto-cycle), update the live iframe
+        if (fullscreenModal.classList.contains("active") && currentGazerUrl) {
+          fullscreenIframe.src = currentGazerUrl;
+        }
+      });
+
+      gazerPreview.addEventListener("error", function () {
+        gazerLoading.classList.remove("active");
+        gazerPlaceholder.style.display = "";
+        document.querySelector(
+          "#gazer-placeholder .placeholder-text",
+        ).textContent = "Image not available for this Gazer";
+      });
+
+      // Fullscreen button
+      const ambientBtn = document.getElementById("ambient-btn");
+      const touchOverlay = document.getElementById("fullscreen-touch-overlay");
+      let controlsTimeout = null;
+      let ambientLightEnabled = false;
+      let ambientInterval = null;
+
+      fullscreenBtn.addEventListener("click", function () {
+        if (!currentGazerUrl) return;
+        fullscreenIframe.src = currentGazerUrl;
+        fullscreenModal.classList.add("active");
+        fullscreenModal.classList.add("show-controls");
+        document.body.style.overflow = "hidden";
+        startControlsTimer();
+      });
+
+      // Auto-hide controls
+      function startControlsTimer() {
+        clearTimeout(controlsTimeout);
+        controlsTimeout = setTimeout(() => {
+          fullscreenModal.classList.remove("show-controls");
+        }, 3000);
+      }
+
+      function showControls() {
+        fullscreenModal.classList.add("show-controls");
+        startControlsTimer();
+      }
+
+      // Touch overlay - tap to show controls
+      touchOverlay.addEventListener("click", showControls);
+      touchOverlay.addEventListener(
+        "touchstart",
+        function (e) {
+          e.preventDefault();
+          showControls();
+        },
+        { passive: false },
+      );
+
+      // Show controls on mouse move
+      // Requires >10px movement to filter out touch driver polling noise
+      var _lastMX = 0, _lastMY = 0;
+      fullscreenModal.addEventListener("mousemove", function (e) {
+        var dx = Math.abs(e.clientX - _lastMX), dy = Math.abs(e.clientY - _lastMY);
+        if (dx > 10 || dy > 10) {
+          _lastMX = e.clientX; _lastMY = e.clientY;
+          showControls();
+        }
+      });
+
+      // Prevent hiding when hovering over controls
+      document
+        .getElementById("fullscreen-controls")
+        .addEventListener("mouseenter", function () {
+          clearTimeout(controlsTimeout);
+        });
+      document
+        .getElementById("fullscreen-controls")
+        .addEventListener("mouseleave", function () {
+          startControlsTimer();
+        });
+
+      // Close fullscreen
+      function handleClose(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        closeFullscreen();
+      }
+      fullscreenClose.addEventListener("click", handleClose);
+      fullscreenClose.addEventListener("touchstart", handleClose, {
+        passive: false,
+      });
+
+      document.addEventListener("keydown", function (e) {
+        if (
+          e.key === "Escape" &&
+          fullscreenModal.classList.contains("active")
+        ) {
+          closeFullscreen();
+        }
+      });
+
+      function closeFullscreen() {
+        fullscreenModal.classList.remove("active");
+        fullscreenModal.classList.remove("show-controls");
+        fullscreenIframe.src = "";
+        document.body.style.overflow = "";
+        clearTimeout(controlsTimeout);
+        stopAmbientLight();
+        if (typeof _labReturnTo !== "undefined" && _labReturnTo)
+          window.location.href = _labReturnTo;
+      }
+
+      // Ambient Light Sync — uses Entertainment API via /api/hue/set-color + /api/screen-color
+      var _gazerHueBusy = false;
+      var _gazerHueBusySince = 0;
+      var _gazerHueLastColor = { r: 0, g: 0, b: 0 };
+
+      function toggleAmbientLight(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (ambientLightEnabled) {
+          stopAmbientLight();
+        } else {
+          startAmbientLight();
+        }
+      }
+      ambientBtn.addEventListener("click", toggleAmbientLight);
+      ambientBtn.addEventListener("touchstart", toggleAmbientLight, {
+        passive: false,
+      });
+
+      function startAmbientLight() {
+        ambientLightEnabled = true;
+        ambientBtn.classList.add("active");
+
+        // Sample actual screen colors via CDP screenshot and send to Entertainment API
+        syncGazerHueColor(); // immediate first sync
+        ambientInterval = setInterval(syncGazerHueColor, labHueSyncMs || 3000);
+      }
+
+      function syncGazerHueColor() {
+        if (!ambientLightEnabled) return;
+        // Safety reset: if busy for more than 5 seconds, force reset
+        if (_gazerHueBusy && Date.now() - _gazerHueBusySince > 5000) {
+          _gazerHueBusy = false;
+        }
+        if (_gazerHueBusy) return;
+        _gazerHueBusy = true;
+        _gazerHueBusySince = Date.now();
+
+        // Use fullscreen iframe rect for sampling
+        var iframe = document.getElementById("fullscreen-iframe");
+        var rect = iframe ? iframe.getBoundingClientRect() : null;
+        var url = "/api/screen-color";
+        if (rect && rect.width > 0) {
+          var dpr = window.devicePixelRatio || 1;
+          url +=
+            "?x=" +
+            Math.round(rect.left * dpr) +
+            "&y=" +
+            Math.round(rect.top * dpr) +
+            "&w=" +
+            Math.round(rect.width * dpr) +
+            "&h=" +
+            Math.round(rect.height * dpr);
+        }
+        fetch(url)
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (color) {
+            if (color.r === undefined) {
+              _gazerHueBusy = false;
+              return;
+            }
+            // Dedup: skip if color barely changed
+            var delta =
+              Math.abs(color.r - _gazerHueLastColor.r) +
+              Math.abs(color.g - _gazerHueLastColor.g) +
+              Math.abs(color.b - _gazerHueLastColor.b);
+            if (delta < 15) {
+              _gazerHueBusy = false;
+              return;
+            }
+            _gazerHueLastColor = { r: color.r, g: color.g, b: color.b };
+            // Send via /api/hue/set-color which auto-routes through Entertainment API
+            fetch("/api/hue/set-color", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(color),
+            })
+              .then(function () {
+                _gazerHueBusy = false;
+              })
+              .catch(function () {
+                _gazerHueBusy = false;
+              });
+          })
+          .catch(function () {
+            _gazerHueBusy = false;
+          });
+      }
+
+      function stopAmbientLight() {
+        ambientLightEnabled = false;
+        ambientBtn.classList.remove("active");
+        if (ambientInterval) {
+          clearInterval(ambientInterval);
+          ambientInterval = null;
+        }
+        // Stop Entertainment stream to release DTLS session (lights stay at last color)
+        fetch("/api/hue/entertainment/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "stop" }),
+        }).catch(function () {});
+      }
+
+      // ===== PixelChain On-Chain Viewer =====
+      var PXC_CORE = "0xbc0E164eE423B7800e355b012c06446e28b1a29d";
+      var PXC_DECODER = "0x6E5989599301EFF542594bC638C2B8cd5d5d29a1";
+      var PXC_RPC_URLS = [
+        "https://cloudflare-eth.com",
+        "https://ethereum-rpc.publicnode.com",
+        "https://rpc.ankr.com/eth",
+      ];
+      // Prepend custom RPC from settings if configured
+      fetch("/api/eth-rpc")
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (c) {
+          if (c.custom_rpc_url) {
+            PXC_RPC_URLS.unshift(c.custom_rpc_url);
+            pxcProvider = null;
+          }
+        })
+        .catch(function () {});
+      var CORE_ABI = [
+        "function pixelChains(uint256) view returns (string name, bytes data, bytes palette, address author, uint256 date)",
+      ];
+      var DECODER_ABI = [
+        "function generatePixelChainImage(uint256 tokenId) view returns (string)",
+      ];
+
+      var pxcCurrentMode = "pixel";
+      var pxcData = null; // Uint8Array of pixel data (1024 bytes)
+      var pxcPalette = null; // Uint8Array of RGB triplets
+      var pxcColors = null; // parsed [[r,g,b], ...] array
+      var pxcSvgHtml = null; // SVG string from decoder
+      var pxcAsciiText = null; // ASCII art string
+      var pxcHexText = null; // Raw hex data string
+      var pxcTokenId = 0;
+      var pxcProvider = null;
+
+      async function getPxcProvider() {
+        if (pxcProvider) return pxcProvider;
+        // Wait for ethers.js if loaded async
+        if (typeof ethers === 'undefined') {
+          for (var w = 0; w < 50; w++) {
+            await new Promise(function(r) { setTimeout(r, 200); });
+            if (typeof ethers !== 'undefined') break;
+          }
+          if (typeof ethers === 'undefined') throw new Error("ethers.js not loaded");
+        }
+        for (var i = 0; i < PXC_RPC_URLS.length; i++) {
+          try {
+            var p = new ethers.JsonRpcProvider(PXC_RPC_URLS[i]);
+            await p.getBlockNumber();
+            pxcProvider = p;
+            return p;
+          } catch (e) {}
+        }
+        throw new Error("No Ethereum RPC available");
+      }
+
+      document
+        .getElementById("pxc-load-btn")
+        .addEventListener("click", async function () {
+          var tokenId =
+            parseInt(document.getElementById("pxc-number").value) || 0;
+          if (tokenId < 0) tokenId = 0;
+          if (tokenId > 2803) tokenId = 2803;
+          pxcTokenId = tokenId;
+          document.getElementById("pxc-title").textContent =
+            "PixelChain #" + tokenId;
+
+          // Show loading
+          document.getElementById("pxc-placeholder").style.display = "none";
+          document.getElementById("pxc-loading").classList.add("active");
+          document.getElementById("pxc-error").style.display = "none";
+          document.getElementById("pxc-canvas").style.display = "none";
+          document.getElementById("pxc-svg").style.display = "none";
+          document.getElementById("pxc-ascii").style.display = "none";
+          document.getElementById("pxc-hex").style.display = "none";
+
+          try {
+            var provider = await getPxcProvider();
+            var core = new ethers.Contract(PXC_CORE, CORE_ABI, provider);
+
+            // Fetch on-chain pixel data
+            var result = await core.pixelChains(tokenId);
+            var name = result[0];
+            var dataHex = result[1];
+            var paletteHex = result[2];
+            var author = result[3];
+            var date = Number(result[4]);
+
+            pxcData = ethers.getBytes(dataHex);
+            pxcPalette = ethers.getBytes(paletteHex);
+
+            // Parse palette into RGB color array
+            pxcColors = [];
+            for (var i = 0; i < pxcPalette.length; i += 3) {
+              pxcColors.push([
+                pxcPalette[i],
+                pxcPalette[i + 1],
+                pxcPalette[i + 2],
+              ]);
+            }
+
+            // Update info
+            document.getElementById("pxc-info-name").textContent =
+              name || "Untitled";
+            var dateStr =
+              date > 0 ? new Date(date * 1000).toLocaleDateString() : "";
+            document.getElementById("pxc-info-author").textContent =
+              author.slice(0, 6) +
+              "..." +
+              author.slice(-4) +
+              (dateStr ? " — " + dateStr : "");
+            document.getElementById("pxc-info").style.display = "block";
+
+            // Render pixel art
+            renderPxcPixelArt();
+
+            // Generate ASCII art
+            pxcAsciiText = generatePxcAscii();
+            document.getElementById("pxc-ascii-pre").textContent = pxcAsciiText;
+
+            // Generate raw hex art
+            pxcHexText = generatePxcHex();
+            document.getElementById("pxc-hex-pre").textContent = pxcHexText;
+
+            // Fetch SVG from decoder (async, non-blocking)
+            pxcSvgHtml = null;
+            document.getElementById("pxc-svg").innerHTML = "";
+            var decoder = new ethers.Contract(
+              PXC_DECODER,
+              DECODER_ABI,
+              provider,
+            );
+            decoder
+              .generatePixelChainImage(tokenId)
+              .then(function (svg) {
+                pxcSvgHtml = svg;
+                if (pxcCurrentMode === "svg") {
+                  document.getElementById("pxc-svg").innerHTML = svg;
+                }
+                // Refresh fullscreen if open (SVG arrives after initial refresh)
+                if (
+                  document
+                    .getElementById("pxc-fullscreen")
+                    .classList.contains("active")
+                ) {
+                  refreshPxcFullscreen();
+                }
+              })
+              .catch(function (e) {
+                console.warn("SVG decoder failed:", e);
+              });
+
+            document.getElementById("pxc-loading").classList.remove("active");
+            document.getElementById("pxc-fullscreen-btn").disabled = false;
+            document.getElementById("pxc-card-send-btn").disabled = false;
+            document.getElementById("pxc-card-save-btn").disabled = false;
+            var _pxcFsSend = document.getElementById("pxc-fs-send-btn");
+            if (_pxcFsSend) _pxcFsSend.disabled = false;
+            switchPxcMode(pxcCurrentMode);
+
+            // If fullscreen is open (e.g. during auto-cycle), refresh it with new data
+            if (
+              document
+                .getElementById("pxc-fullscreen")
+                .classList.contains("active")
+            ) {
+              refreshPxcFullscreen();
+            }
+          } catch (e) {
+            document.getElementById("pxc-loading").classList.remove("active");
+            document.getElementById("pxc-error").textContent =
+              "Failed to load: " + (e.message || e);
+            document.getElementById("pxc-error").style.display = "block";
+            console.error("PixelChain load error:", e);
+          }
+        });
+
+      function renderPxcPixelArt() {
+        if (!pxcData || !pxcColors) return;
+        var canvas = document.getElementById("pxc-canvas");
+        var ctx = canvas.getContext("2d");
+        var scale = 16;
+        canvas.width = 32 * scale;
+        canvas.height = 32 * scale;
+
+        for (var i = 0; i < pxcData.length && i < 1024; i++) {
+          var colorIdx = pxcData[i];
+          var x = i % 32;
+          var y = Math.floor(i / 32);
+          var c = pxcColors[colorIdx] || [0, 0, 0];
+          ctx.fillStyle = "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+          ctx.fillRect(x * scale, y * scale, scale, scale);
+        }
+      }
+
+      function generatePxcAscii() {
+        if (!pxcData || !pxcColors) return "";
+        var density = " .:-=+*#%@";
+        var lines = [];
+        for (var y = 0; y < 32; y++) {
+          var row = "";
+          for (var x = 0; x < 32; x++) {
+            var idx = y * 32 + x;
+            var colorIdx = pxcData[idx] || 0;
+            var c = pxcColors[colorIdx] || [0, 0, 0];
+            var lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+            var charIdx = Math.min(
+              density.length - 1,
+              Math.floor((lum / 256) * density.length),
+            );
+            row += density[charIdx];
+          }
+          lines.push(row);
+        }
+        return lines.join("\n");
+      }
+
+      function generatePxcHex() {
+        if (!pxcData) return "";
+        var lines = [];
+        for (var y = 0; y < 32; y++) {
+          var row = "";
+          for (var x = 0; x < 32; x++) {
+            var idx = y * 32 + x;
+            row += (pxcData[idx] || 0).toString(16);
+          }
+          lines.push(row);
+        }
+        return lines.join("\n");
+      }
+
+      function sizePxcText(container) {
+        var pre = container.querySelector("pre");
+        if (!pre || !pre.textContent) return;
+        var w = container.clientWidth;
+        var h = container.clientHeight;
+        if (!w || !h) return;
+        // Fill width, compress line-height to fit vertically
+        var fontSize = Math.floor(w / (32 * 0.7));
+        var totalH = 32 * fontSize;
+        var lh = Math.min(1, h / totalH);
+        pre.style.fontSize = fontSize + "px";
+        pre.style.lineHeight = lh.toFixed(3);
+      }
+
+      function switchPxcMode(mode) {
+        pxcCurrentMode = mode;
+        var btns = document.querySelectorAll(".pxc-mode-btn");
+        btns.forEach(function (b) {
+          b.classList.remove("active");
+        });
+        var labels = { pixel: "Pixel", svg: "SVG", ascii: "ASCII", hex: "Hex" };
+        btns.forEach(function (b) {
+          if (b.textContent === labels[mode]) b.classList.add("active");
+        });
+
+        var canvas = document.getElementById("pxc-canvas");
+        var svg = document.getElementById("pxc-svg");
+        var ascii = document.getElementById("pxc-ascii");
+        var hex = document.getElementById("pxc-hex");
+        canvas.style.display = "none";
+        svg.style.display = "none";
+        ascii.style.display = "none";
+        hex.style.display = "none";
+
+        if (!pxcData) return; // nothing loaded yet
+
+        if (mode === "pixel") {
+          canvas.style.display = "block";
+        } else if (mode === "svg") {
+          svg.style.display = "flex";
+          if (pxcSvgHtml) svg.innerHTML = pxcSvgHtml;
+          else
+            svg.innerHTML =
+              '<div style="color:var(--text-muted);text-align:center;padding:20px;">Loading SVG from chain...</div>';
+        } else if (mode === "ascii") {
+          ascii.style.display = "flex";
+          setTimeout(function () {
+            sizePxcText(ascii);
+          }, 10);
+        } else if (mode === "hex") {
+          hex.style.display = "flex";
+          setTimeout(function () {
+            sizePxcText(hex);
+          }, 10);
+        }
+      }
+
+      // PixelChain Fullscreen
+      function refreshPxcFullscreen() {
+        var content = document.getElementById("pxc-fs-content");
+        content.innerHTML = "";
+
+        if (pxcCurrentMode === "pixel" && pxcData) {
+          var canvas = document.createElement("canvas");
+          var ctx = canvas.getContext("2d");
+          var scale = Math.min(
+            Math.floor(window.innerWidth / 32),
+            Math.floor(window.innerHeight / 32),
+          );
+          canvas.width = 32 * scale;
+          canvas.height = 32 * scale;
+          for (var i = 0; i < pxcData.length && i < 1024; i++) {
+            var c = pxcColors[pxcData[i]] || [0, 0, 0];
+            ctx.fillStyle = "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+            ctx.fillRect(
+              (i % 32) * scale,
+              Math.floor(i / 32) * scale,
+              scale,
+              scale,
+            );
+          }
+          content.appendChild(canvas);
+        } else if (pxcCurrentMode === "svg" && pxcSvgHtml) {
+          var div = document.createElement("div");
+          div.className = "pxc-fs-svg";
+          div.innerHTML = pxcSvgHtml;
+          content.appendChild(div);
+        } else if (pxcCurrentMode === "ascii" && pxcAsciiText) {
+          var pre = document.createElement("pre");
+          pre.textContent = pxcAsciiText;
+          content.appendChild(pre);
+          var sq = Math.min(window.innerWidth, window.innerHeight);
+          var fontSize = Math.floor(sq / (32 * 0.7));
+          var totalH = 32 * fontSize;
+          var lh = Math.min(1, sq / totalH);
+          pre.style.fontSize = fontSize + "px";
+          pre.style.lineHeight = lh.toFixed(3);
+        } else if (pxcCurrentMode === "hex" && pxcHexText) {
+          var pre = document.createElement("pre");
+          pre.textContent = pxcHexText;
+          content.appendChild(pre);
+          var sq = Math.min(window.innerWidth, window.innerHeight);
+          var fontSize = Math.floor(sq / (32 * 0.7));
+          var totalH = 32 * fontSize;
+          var lh = Math.min(1, sq / totalH);
+          pre.style.fontSize = fontSize + "px";
+          pre.style.lineHeight = lh.toFixed(3);
+        }
+      }
+
+      document
+        .getElementById("pxc-fullscreen-btn")
+        .addEventListener("click", function () {
+          var modal = document.getElementById("pxc-fullscreen");
+          refreshPxcFullscreen();
+          modal.classList.add("active");
+          modal.classList.add("show-controls");
+          document.body.style.overflow = "hidden";
+          startPxcControlsTimer();
+        });
+
+      var pxcControlsTimeout = null;
+
+      function startPxcControlsTimer() {
+        clearTimeout(pxcControlsTimeout);
+        pxcControlsTimeout = setTimeout(function () {
+          document
+            .getElementById("pxc-fullscreen")
+            .classList.remove("show-controls");
+        }, 3000);
+      }
+
+      function showPxcControls() {
+        document
+          .getElementById("pxc-fullscreen")
+          .classList.add("show-controls");
+        startPxcControlsTimer();
+      }
+
+      // Touch overlay — tap to show controls
+      document
+        .getElementById("pxc-fs-touch-overlay")
+        .addEventListener("click", showPxcControls);
+      document.getElementById("pxc-fs-touch-overlay").addEventListener(
+        "touchstart",
+        function (e) {
+          e.preventDefault();
+          showPxcControls();
+        },
+        { passive: false },
+      );
+
+      // Keep controls visible on hover
+      document
+        .getElementById("pxc-fs-controls")
+        .addEventListener("mouseenter", function () {
+          clearTimeout(pxcControlsTimeout);
+        });
+      document
+        .getElementById("pxc-fs-controls")
+        .addEventListener("mouseleave", function () {
+          startPxcControlsTimer();
+        });
+
+      // Close button
+      function handlePxcClose(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        closePxcFullscreen();
+      }
+      document
+        .getElementById("pxc-fs-close-btn")
+        .addEventListener("click", handlePxcClose);
+      document
+        .getElementById("pxc-fs-close-btn")
+        .addEventListener("touchstart", handlePxcClose, { passive: false });
+
+      function closePxcFullscreen() {
+        var modal = document.getElementById("pxc-fullscreen");
+        modal.classList.remove("active");
+        modal.classList.remove("show-controls");
+        document.body.style.overflow = "";
+        clearTimeout(pxcControlsTimeout);
+        // Stop Hue sync if active in fullscreen
+        if (pxcFsHueActive) {
+          pxcFsHueActive = false;
+          document
+            .getElementById("pxc-fs-hue-btn")
+            .classList.remove("hue-active");
+          clearInterval(pxcFsHueInterval);
+          pxcFsHueInterval = null;
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+        if (typeof _labReturnTo !== "undefined" && _labReturnTo)
+          window.location.href = _labReturnTo;
+      }
+
+      // Hue sync button in PixelChain fullscreen
+      var pxcFsHueActive = false;
+      var pxcFsHueInterval = null;
+
+      function handlePxcFsHue(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        pxcFsHueActive = !pxcFsHueActive;
+        var btn = document.getElementById("pxc-fs-hue-btn");
+        if (pxcFsHueActive) {
+          btn.classList.add("hue-active");
+          // Send color immediately
+          var color = extractPxcDominantColor();
+          if (color) sendHueColor(color);
+          // Start periodic sync
+          pxcFsHueInterval = setInterval(function () {
+            var c = extractPxcDominantColor();
+            if (c) sendHueColor(c);
+          }, labHueSyncMs || 3000);
+        } else {
+          btn.classList.remove("hue-active");
+          clearInterval(pxcFsHueInterval);
+          pxcFsHueInterval = null;
+          // Stop Entertainment stream to release DTLS session
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+        startPxcControlsTimer();
+      }
+      document
+        .getElementById("pxc-fs-hue-btn")
+        .addEventListener("click", handlePxcFsHue);
+      document
+        .getElementById("pxc-fs-hue-btn")
+        .addEventListener("touchstart", handlePxcFsHue, { passive: false });
+
+      // Show hue button only if connected
+      if (labHueConnected) {
+        document.getElementById("pxc-fs-hue-btn").style.display = "flex";
+      } else {
+        document.getElementById("pxc-fs-hue-btn").style.display = "none";
+      }
+
+      document.addEventListener("keydown", function (e) {
+        if (
+          e.key === "Escape" &&
+          document.getElementById("pxc-fullscreen").classList.contains("active")
+        ) {
+          closePxcFullscreen();
+        }
+      });
+
+      // ===== Hue Color Sync =====
+      var labHueEnabled = false;
+      var labHueConnected = false;
+      var labHueSyncInterval = null;
+      var labHueSyncMs = 3000;
+
+      var _labHueReady = null;
+      function checkLabHue() {
+        _labHueReady = fetch("/api/hue/settings")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (s) {
+            labHueConnected = s.connected || false;
+            labHueSyncMs = s.live_sync_interval || 3000;
+            updateLabHueButton();
+          })
+          .catch(function () {});
+        return _labHueReady;
+      }
+
+      function updateLabHueButton() {
+        var btn = document.getElementById("lab-hue-btn");
+        if (!btn) return;
+        btn.style.display = labHueConnected ? "flex" : "none";
+        if (labHueEnabled) {
+          btn.classList.add("hue-active");
+        } else {
+          btn.classList.remove("hue-active");
+        }
+        // Also update PixelChain fullscreen hue button visibility
+        var pxcHueBtn = document.getElementById("pxc-fs-hue-btn");
+        if (pxcHueBtn)
+          pxcHueBtn.style.display = labHueConnected ? "flex" : "none";
+        // Also update Burner fullscreen hue button visibility
+        var burnerHueBtn = document.getElementById("burner-fs-hue");
+        if (burnerHueBtn)
+          burnerHueBtn.style.display = labHueConnected ? "flex" : "none";
+      }
+
+      function toggleLabHue() {
+        labHueEnabled = !labHueEnabled;
+        updateLabHueButton();
+        if (labHueEnabled) {
+          startLabHueSync();
+        } else {
+          stopLabHueSync();
+          // Stop Entertainment stream to release DTLS session (lights stay at last color)
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+      }
+
+      function startLabHueSync() {
+        stopLabHueSync();
+        syncLabHueColor(); // immediate first sync
+        labHueSyncInterval = setInterval(syncLabHueColor, labHueSyncMs);
+      }
+
+      function stopLabHueSync() {
+        if (labHueSyncInterval) {
+          clearInterval(labHueSyncInterval);
+          labHueSyncInterval = null;
+        }
+      }
+
+      function syncLabHueColor() {
+        if (!labHueEnabled) return;
+
+        // PixelChain: extract dominant color from pixel data (client-side)
+        var pxcSection = document.getElementById("pixelchain-section");
+        if (
+          pxcSection &&
+          pxcSection.style.display !== "none" &&
+          pxcData &&
+          pxcColors
+        ) {
+          var color = extractPxcDominantColor();
+          if (color) {
+            sendHueColor(color);
+          }
+          return;
+        }
+
+        // Gazer: use CDP screenshot via backend (cross-origin iframe)
+        var gazerSection = document.getElementById("gazer-section");
+        if (
+          gazerSection &&
+          gazerSection.style.display !== "none" &&
+          currentGazerUrl
+        ) {
+          var display = document.getElementById("gazer-display");
+          var rect = display ? display.getBoundingClientRect() : null;
+          var url = "/api/screen-color";
+          if (rect && rect.width > 0) {
+            var dpr = window.devicePixelRatio || 1;
+            url +=
+              "?x=" +
+              Math.round(rect.left * dpr) +
+              "&y=" +
+              Math.round(rect.top * dpr) +
+              "&w=" +
+              Math.round(rect.width * dpr) +
+              "&h=" +
+              Math.round(rect.height * dpr);
+          }
+          fetch(url)
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (color) {
+              if (color.r !== undefined) {
+                sendHueColor(color);
+              }
+            })
+            .catch(function () {});
+        }
+      }
+
+      function extractPxcDominantColor() {
+        if (!pxcData || !pxcColors) return null;
+        // Count palette index frequencies (skip near-black)
+        var counts = {};
+        for (var i = 0; i < pxcData.length && i < 1024; i++) {
+          var idx = pxcData[i];
+          var c = pxcColors[idx];
+          if (!c) continue;
+          var brightness = (c[0] + c[1] + c[2]) / 3;
+          if (brightness < 30) continue;
+          if (!counts[idx]) counts[idx] = 0;
+          counts[idx]++;
+        }
+        var maxIdx = -1,
+          maxCount = 0;
+        for (var k in counts) {
+          if (counts[k] > maxCount) {
+            maxCount = counts[k];
+            maxIdx = parseInt(k);
+          }
+        }
+        if (maxIdx < 0) return null;
+        var c = pxcColors[maxIdx];
+        return { r: c[0], g: c[1], b: c[2] };
+      }
+
+      function sendHueColor(color) {
+        fetch("/api/hue/set-color", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(color),
+        }).catch(function () {});
+      }
+
+      // Check Hue connection on load
+      checkLabHue();
+
+      // Stop Hue when leaving page — release Entertainment stream
+      window.addEventListener("beforeunload", function () {
+        if (
+          labHueEnabled ||
+          ambientLightEnabled ||
+          pxcFsHueActive ||
+          punkHueActive ||
+          glyphHueActive ||
+          burnerHueActive
+        ) {
+          navigator.sendBeacon(
+            "/api/hue/entertainment/stream",
+            new Blob([JSON.stringify({ action: "stop" })], {
+              type: "application/json",
+            }),
+          );
+        }
+      });
+
+      // ===== Display Config (must be before auto-cycle logic) =====
+      var labFrostedBg = false;
+      var _displayConfigReady = fetch("/api/display-config")
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (cfg) {
+          if (cfg && cfg.frosted_background) labFrostedBg = true;
+        })
+        .catch(function () {});
+
+      // ===== Auto-Cycle Logic =====
+      var gazerCycleInterval = null;
+      var pxcCycleInterval = null;
+      var isSmallScreen = window.innerWidth <= 800 || window.innerHeight <= 800;
+      var CYCLE_MS = isSmallScreen ? 1 * 60 * 1000 : 5 * 60 * 1000; // default fallback
+      var cycleLabel = isSmallScreen ? "1 minute" : "5 minutes";
+
+      // Use slide duration from gallery settings if available
+      _displayConfigReady.then(function () {
+        fetch("/api/display-config")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (cfg) {
+            var dur = parseInt(cfg.image_duration);
+            if (dur && dur > 0) {
+              CYCLE_MS = dur * 1000;
+              if (dur >= 60) {
+                cycleLabel =
+                  Math.round(dur / 60) +
+                  " minute" +
+                  (Math.round(dur / 60) !== 1 ? "s" : "");
+              } else {
+                cycleLabel = dur + " second" + (dur !== 1 ? "s" : "");
+              }
+            }
+            updateCycleLabels();
+          })
+          .catch(function () {
+            updateCycleLabels();
+          });
+      });
+
+      function updateCycleLabels() {
+        var ids = [
+          "gazer-cycle-interval",
+          "pxc-cycle-interval",
+          "punk-cycle-interval",
+          "glyph-cycle-interval",
+          "burner-cycle-interval",
+        ];
+        ids.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = cycleLabel;
+        });
+      }
+      updateCycleLabels();
+
+      // Gazer auto-cycle
+      function toggleGazerCycle() {
+        var toggle = document.getElementById("gazer-cycle-toggle");
+        var active = toggle.classList.toggle("active");
+        localStorage.setItem("vernis-gazer-cycle", active ? "true" : "false");
+        if (active) {
+          startGazerCycle();
+        } else {
+          stopGazerCycle();
+        }
+      }
+
+      function startGazerCycle() {
+        stopGazerCycle();
+        gazerCycleInterval = setInterval(function () {
+          var num = Math.floor(Math.random() * 1000);
+          gazerInput.value = num;
+          displayBtn.click();
+        }, CYCLE_MS);
+      }
+
+      function stopGazerCycle() {
+        if (gazerCycleInterval) {
+          clearInterval(gazerCycleInterval);
+          gazerCycleInterval = null;
+        }
+      }
+
+      // PixelChain auto-cycle
+      function togglePxcCycle() {
+        var toggle = document.getElementById("pxc-cycle-toggle");
+        var active = toggle.classList.toggle("active");
+        localStorage.setItem("vernis-pxc-cycle", active ? "true" : "false");
+        if (active) {
+          startPxcCycle();
+        } else {
+          stopPxcCycle();
+        }
+      }
+
+      function startPxcCycle() {
+        stopPxcCycle();
+        pxcCycleInterval = setInterval(function () {
+          var num = Math.floor(Math.random() * 2804);
+          document.getElementById("pxc-number").value = num;
+          document.getElementById("pxc-load-btn").click();
+        }, CYCLE_MS);
+      }
+
+      function stopPxcCycle() {
+        if (pxcCycleInterval) {
+          clearInterval(pxcCycleInterval);
+          pxcCycleInterval = null;
+        }
+      }
+
+      // CryptoPunks auto-cycle
+      var punkCycleInterval = null;
+      function togglePunkCycle() {
+        var toggle = document.getElementById("punk-cycle-toggle");
+        var active = toggle.classList.toggle("active");
+        localStorage.setItem("vernis-punk-cycle", active ? "true" : "false");
+        if (active) {
+          startPunkCycle();
+        } else {
+          stopPunkCycle();
+        }
+      }
+      function startPunkCycle() {
+        stopPunkCycle();
+        loadPunk(); // load one immediately
+        punkCycleInterval = setInterval(function () {
+          document.getElementById("punk-number").value = Math.floor(
+            Math.random() * 10000,
+          );
+          loadPunk();
+        }, CYCLE_MS);
+      }
+      function stopPunkCycle() {
+        if (punkCycleInterval) {
+          clearInterval(punkCycleInterval);
+          punkCycleInterval = null;
+        }
+      }
+
+      // Autoglyphs auto-cycle
+      var glyphCycleInterval = null;
+      function toggleGlyphCycle() {
+        var toggle = document.getElementById("glyph-cycle-toggle");
+        var active = toggle.classList.toggle("active");
+        localStorage.setItem("vernis-glyph-cycle", active ? "true" : "false");
+        if (active) {
+          startGlyphCycle();
+        } else {
+          stopGlyphCycle();
+        }
+      }
+      function startGlyphCycle() {
+        stopGlyphCycle();
+        loadGlyph(); // load one immediately
+        glyphCycleInterval = setInterval(function () {
+          document.getElementById("glyph-number").value =
+            Math.floor(Math.random() * 512) + 1;
+          loadGlyph();
+        }, CYCLE_MS);
+      }
+      function stopGlyphCycle() {
+        if (glyphCycleInterval) {
+          clearInterval(glyphCycleInterval);
+          glyphCycleInterval = null;
+        }
+      }
+
+      // ===== BURNER Logic (vars hoisted before auto-cycle restore) =====
+      var BURNER_URL = "/api/burner/render/";
+      var currentBurnerUrl = "";
+      var burnerCycleInterval = null;
+      var burnerHueActive = false;
+      var burnerHueInterval = null;
+
+      // Restore toggle state from localStorage
+      (function () {
+        if (localStorage.getItem("vernis-gazer-cycle") === "true") {
+          document.getElementById("gazer-cycle-toggle").classList.add("active");
+          startGazerCycle();
+        }
+        if (localStorage.getItem("vernis-pxc-cycle") === "true") {
+          document.getElementById("pxc-cycle-toggle").classList.add("active");
+          startPxcCycle();
+        }
+        if (localStorage.getItem("vernis-punk-cycle") === "true") {
+          var t = document.getElementById("punk-cycle-toggle");
+          if (t) {
+            t.classList.add("active");
+            startPunkCycle();
+          }
+        }
+        if (localStorage.getItem("vernis-glyph-cycle") === "true") {
+          var t = document.getElementById("glyph-cycle-toggle");
+          if (t) {
+            t.classList.add("active");
+            startGlyphCycle();
+          }
+        }
+        if (localStorage.getItem("vernis-burner-cycle") === "true") {
+          var t = document.getElementById("burner-cycle-toggle");
+          if (t) {
+            t.classList.add("active");
+            startBurnerCycle();
+          }
+        }
+      })();
+
+      function loadBurner() {
+        var num = parseInt(document.getElementById("burner-number").value) || 0;
+        if (num < 0) num = 0;
+        if (num > 255) num = 255;
+        document.getElementById("burner-number").value = num;
+        document.getElementById("burner-title").textContent = "BURNER #" + num;
+        currentBurnerUrl =
+          BURNER_URL + num + (labFrostedBg ? "?frosted=1" : "");
+
+        document.getElementById("burner-placeholder").style.display = "none";
+        document.getElementById("burner-loading").classList.add("active");
+        var iframe = document.getElementById("burner-iframe");
+        iframe.src = currentBurnerUrl;
+        iframe.onload = function () {
+          document.getElementById("burner-loading").classList.remove("active");
+          iframe.classList.add("loaded");
+          document.getElementById("burner-fullscreen-btn").disabled = false;
+          document.getElementById("burner-card-send-btn").disabled = false;
+          document.getElementById("burner-card-save-btn").disabled = false;
+        };
+        // Also update fullscreen iframe if visible — use postMessage to avoid full reload
+        var fsModal = document.getElementById("burner-fullscreen");
+        if (fsModal && fsModal.style.display === "flex") {
+          var fsIframe = document.getElementById("burner-fullscreen-iframe");
+          if (
+            fsIframe.contentWindow &&
+            fsIframe.src.indexOf("burner/render") !== -1
+          ) {
+            fsIframe.contentWindow.postMessage(
+              { type: "changeToken", tokenId: num },
+              "*",
+            );
+          } else {
+            fsIframe.src = currentBurnerUrl;
+          }
+        }
+      }
+
+      document
+        .getElementById("burner-number")
+        .addEventListener("input", function () {
+          var val = parseInt(this.value) || 0;
+          if (val < 0) val = 0;
+          if (val > 255) val = 255;
+          this.value = val;
+        });
+
+      function openBurnerFullscreen() {
+        if (!currentBurnerUrl) return;
+        var modal = document.getElementById("burner-fullscreen");
+        document.getElementById("burner-fullscreen-iframe").src =
+          currentBurnerUrl;
+        modal.style.display = "flex";
+        modal.classList.add("show-controls");
+        document.body.style.overflow = "hidden";
+        startBurnerControlsTimer();
+      }
+
+      function closeBurnerFullscreen() {
+        clearTimeout(burnerControlsTimeout);
+        var modal = document.getElementById("burner-fullscreen");
+        modal.style.display = "none";
+        modal.classList.remove("show-controls");
+        document.getElementById("burner-fullscreen-iframe").src = "";
+        document.body.style.overflow = "";
+        if (burnerHueActive) {
+          burnerHueActive = false;
+          document
+            .getElementById("burner-fs-hue")
+            .classList.remove("hue-active");
+          clearInterval(burnerHueInterval);
+          burnerHueInterval = null;
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+        if (_labReturnTo) window.location.href = _labReturnTo;
+      }
+
+      // Burner Hue sync — screen sampling via CDP
+      var _burnerHueBusy = false,
+        _burnerHueBusySince = 0;
+      var _burnerHueLastColor = { r: 0, g: 0, b: 0 };
+
+      function toggleBurnerHue() {
+        burnerHueActive = !burnerHueActive;
+        var btn = document.getElementById("burner-fs-hue");
+        btn.classList.toggle("hue-active", burnerHueActive);
+        if (burnerHueActive) {
+          syncBurnerHueColor();
+          burnerHueInterval = setInterval(syncBurnerHueColor, 1500);
+        } else {
+          clearInterval(burnerHueInterval);
+          burnerHueInterval = null;
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+        startBurnerControlsTimer();
+      }
+
+      function syncBurnerHueColor() {
+        if (!burnerHueActive) return;
+        if (_burnerHueBusy && Date.now() - _burnerHueBusySince > 5000)
+          _burnerHueBusy = false;
+        if (_burnerHueBusy) return;
+        _burnerHueBusy = true;
+        _burnerHueBusySince = Date.now();
+        fetch("/api/screen-color")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (color) {
+            if (color.r === undefined) {
+              _burnerHueBusy = false;
+              return;
+            }
+            var delta =
+              Math.abs(color.r - _burnerHueLastColor.r) +
+              Math.abs(color.g - _burnerHueLastColor.g) +
+              Math.abs(color.b - _burnerHueLastColor.b);
+            if (delta < 15) {
+              _burnerHueBusy = false;
+              return;
+            }
+            _burnerHueLastColor = { r: color.r, g: color.g, b: color.b };
+            fetch("/api/hue/set-color", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(color),
+            })
+              .then(function () {
+                _burnerHueBusy = false;
+              })
+              .catch(function () {
+                _burnerHueBusy = false;
+              });
+          })
+          .catch(function () {
+            _burnerHueBusy = false;
+          });
+      }
+
+      // Burner fullscreen controls — auto-hide pattern (like PixelChain)
+      var burnerControlsTimeout = null;
+
+      function startBurnerControlsTimer() {
+        clearTimeout(burnerControlsTimeout);
+        burnerControlsTimeout = setTimeout(function () {
+          document
+            .getElementById("burner-fullscreen")
+            .classList.remove("show-controls");
+        }, 3000);
+      }
+
+      function showBurnerControls() {
+        document
+          .getElementById("burner-fullscreen")
+          .classList.add("show-controls");
+        startBurnerControlsTimer();
+      }
+
+      // Touch overlay — tap to show controls
+      document
+        .getElementById("burner-fs-touch-overlay")
+        .addEventListener("click", showBurnerControls);
+      document.getElementById("burner-fs-touch-overlay").addEventListener(
+        "touchstart",
+        function (e) {
+          e.preventDefault();
+          showBurnerControls();
+        },
+        { passive: false },
+      );
+
+      // Keep controls visible on hover
+      document
+        .getElementById("burner-fs-controls")
+        .addEventListener("mouseenter", function () {
+          clearTimeout(burnerControlsTimeout);
+        });
+      document
+        .getElementById("burner-fs-controls")
+        .addEventListener("mouseleave", function () {
+          startBurnerControlsTimer();
+        });
+
+      // Close button
+      (function () {
+        function handleBurnerClose(e) {
+          e.stopPropagation();
+          e.preventDefault();
+          closeBurnerFullscreen();
+        }
+        document
+          .getElementById("burner-fs-close")
+          .addEventListener("click", handleBurnerClose);
+        document
+          .getElementById("burner-fs-close")
+          .addEventListener("touchstart", handleBurnerClose, {
+            passive: false,
+          });
+      })();
+
+      // Hue button
+      function handleBurnerHue(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        toggleBurnerHue();
+      }
+      document
+        .getElementById("burner-fs-hue")
+        .addEventListener("click", handleBurnerHue);
+      document
+        .getElementById("burner-fs-hue")
+        .addEventListener("touchstart", handleBurnerHue, { passive: false });
+
+      // Escape key to close
+      document.addEventListener("keydown", function (e) {
+        if (
+          e.key === "Escape" &&
+          document.getElementById("burner-fullscreen").style.display === "flex"
+        ) {
+          closeBurnerFullscreen();
+        }
+      });
+
+      function toggleBurnerCycle() {
+        var toggle = document.getElementById("burner-cycle-toggle");
+        var active = toggle.classList.toggle("active");
+        localStorage.setItem("vernis-burner-cycle", active ? "true" : "false");
+        if (active) {
+          startBurnerCycle();
+        } else {
+          stopBurnerCycle();
+        }
+      }
+      function startBurnerCycle() {
+        stopBurnerCycle();
+        document.getElementById("burner-number").value = Math.floor(
+          Math.random() * 256,
+        );
+        loadBurner();
+        burnerCycleInterval = setInterval(function () {
+          document.getElementById("burner-number").value = Math.floor(
+            Math.random() * 256,
+          );
+          loadBurner();
+        }, CYCLE_MS);
+      }
+      function stopBurnerCycle() {
+        if (burnerCycleInterval) {
+          clearInterval(burnerCycleInterval);
+          burnerCycleInterval = null;
+        }
+      }
+
+      // ===== BURNER Asset Cache =====
+      var _burnerCachePoll = null;
+      function checkBurnerCacheStatus() {
+        fetch("/api/burner/cache/status")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (st) {
+            var btn = document.getElementById("burner-cache-btn");
+            var desc = document.getElementById("burner-cache-desc");
+            var title = document.getElementById("burner-cache-title");
+            if (!btn) return;
+            if (st.state === "complete") {
+              var mb = (st.size_bytes / 1048576).toFixed(0);
+              btn.textContent = "Cached";
+              btn.disabled = true;
+              btn.style.opacity = "0.5";
+              desc.textContent =
+                st.downloaded + " files cached (" + mb + " MB) — offline ready";
+              title.textContent = "Assets Cached";
+              if (_burnerCachePoll) {
+                clearInterval(_burnerCachePoll);
+                _burnerCachePoll = null;
+              }
+            } else if (
+              st.state === "running" ||
+              st.state === "downloading assets" ||
+              st.state === "downloading manifest"
+            ) {
+              var pct =
+                st.total > 0 ? Math.round((st.downloaded / st.total) * 100) : 0;
+              btn.textContent = pct + "%";
+              btn.disabled = true;
+              desc.textContent =
+                "Downloading: " + st.downloaded + "/" + st.total + " files...";
+            } else if (st.state === "error") {
+              btn.textContent = "Retry";
+              btn.disabled = false;
+              desc.textContent =
+                "Download failed: " + (st.errors[0] || "unknown error");
+              if (_burnerCachePoll) {
+                clearInterval(_burnerCachePoll);
+                _burnerCachePoll = null;
+              }
+            } else {
+              btn.textContent = "Download";
+              btn.disabled = false;
+              desc.textContent =
+                "Download full-res art from Arweave for offline use";
+            }
+          })
+          .catch(function () {});
+      }
+      function startBurnerCache() {
+        var btn = document.getElementById("burner-cache-btn");
+        btn.textContent = "...";
+        btn.disabled = true;
+        fetch("/api/burner/cache/download", { method: "POST" })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function () {
+            if (_burnerCachePoll) clearInterval(_burnerCachePoll);
+            _burnerCachePoll = setInterval(checkBurnerCacheStatus, 3000);
+            checkBurnerCacheStatus();
+          })
+          .catch(function () {
+            btn.textContent = "Error";
+            btn.disabled = false;
+          });
+      }
+      // Check cache status on load
+      checkBurnerCacheStatus();
+
+      // ===== DOOM Party Logic =====
+      var doomLoaded = false;
+      function loadDoomParty() {
+        if (doomLoaded) return;
+        doomLoaded = true;
+        document.getElementById("doom-placeholder").style.display = "none";
+        document.getElementById("doom-iframe").src = "/doom-party/";
+      }
+
+      document
+        .getElementById("doom-fullscreen-btn")
+        .addEventListener("click", function () {
+          var modal = document.getElementById("doom-fullscreen");
+          document.getElementById("doom-fullscreen-iframe").src =
+            "/doom-party/";
+          modal.style.display = "flex";
+          document.body.style.overflow = "hidden";
+        });
+
+      function closeDoomFullscreen() {
+        var modal = document.getElementById("doom-fullscreen");
+        modal.style.display = "none";
+        document.getElementById("doom-fullscreen-iframe").src = "";
+        document.body.style.overflow = "";
+      }
+
+      document.addEventListener("keydown", function (e) {
+        if (
+          e.key === "Escape" &&
+          document.getElementById("doom-fullscreen").style.display === "flex"
+        ) {
+          closeDoomFullscreen();
+        }
+      });
+
+      // ===== CryptoPunks Viewer =====
+      function loadPunk() {
+        var id = parseInt(document.getElementById("punk-number").value) || 0;
+        if (id < 0 || id > 9999) {
+          id = 0;
+        }
+        document.getElementById("punk-title").textContent = "CryptoPunk #" + id;
+        document.getElementById("punk-placeholder").style.display = "none";
+        document.getElementById("punk-loading").style.display = "flex";
+        document.getElementById("punk-image").style.display = "none";
+        document.getElementById("punk-error").style.display = "none";
+
+        fetch("/api/cryptopunk/" + id)
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            document.getElementById("punk-loading").style.display = "none";
+            if (data.svg) {
+              var img = document.getElementById("punk-image");
+              var svgStr = data.svg;
+              if (svgStr.indexOf("data:") === 0) {
+                var ci = svgStr.indexOf(",");
+                if (ci !== -1) svgStr = svgStr.substring(ci + 1);
+              }
+              img.src = "data:image/svg+xml;base64," + btoa(svgStr);
+              img.style.display = "block";
+              document.getElementById("punk-fullscreen-btn").disabled = false;
+              document.getElementById("punk-card-send-btn").disabled = false;
+              document.getElementById("punk-card-save-btn").disabled = false;
+              // Update fullscreen if open (auto-cycle)
+              if (
+                document.getElementById("punk-fullscreen").style.display ===
+                "flex"
+              ) {
+                document.getElementById("punk-fullscreen-img").src = img.src;
+              }
+            } else if (data.image_url) {
+              var img = document.getElementById("punk-image");
+              img.src = data.image_url;
+              img.style.display = "block";
+              document.getElementById("punk-fullscreen-btn").disabled = false;
+              document.getElementById("punk-card-send-btn").disabled = false;
+              document.getElementById("punk-card-save-btn").disabled = false;
+              // Update fullscreen if open (auto-cycle)
+              if (
+                document.getElementById("punk-fullscreen").style.display ===
+                "flex"
+              ) {
+                document.getElementById("punk-fullscreen-img").src = img.src;
+              }
+            } else {
+              document.getElementById("punk-error").textContent =
+                data.error || "Failed to load punk";
+              document.getElementById("punk-error").style.display = "block";
+            }
+          })
+          .catch(function () {
+            document.getElementById("punk-loading").style.display = "none";
+            document.getElementById("punk-error").textContent =
+              "Network error — check internet connection";
+            document.getElementById("punk-error").style.display = "block";
+          });
+      }
+
+      // ===== Autoglyphs Viewer =====
+      function loadGlyph() {
+        var id = parseInt(document.getElementById("glyph-number").value) || 0;
+        if (id < 1 || id > 512) {
+          id = 1;
+        }
+        document.getElementById("glyph-title").textContent = "Autoglyph #" + id;
+        document.getElementById("glyph-placeholder").style.display = "none";
+        document.getElementById("glyph-loading").style.display = "flex";
+        document.getElementById("glyph-art").style.display = "none";
+        document.getElementById("glyph-error").style.display = "none";
+
+        fetch("/api/autoglyph/" + id)
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            document.getElementById("glyph-loading").style.display = "none";
+            if (data.art) {
+              var pre = document.getElementById("glyph-art");
+              pre.textContent = data.art;
+              pre.style.display = "block";
+              document.getElementById("glyph-fullscreen-btn").disabled = false;
+              document.getElementById("glyph-card-send-btn").disabled = false;
+              document.getElementById("glyph-card-save-btn").disabled = false;
+              // Update fullscreen if open (auto-cycle)
+              if (
+                document.getElementById("glyph-fullscreen").style.display ===
+                "flex"
+              ) {
+                document.getElementById("glyph-fullscreen-art").textContent =
+                  data.art;
+              }
+            } else {
+              document.getElementById("glyph-error").textContent =
+                data.error || "Failed to load Autoglyph";
+              document.getElementById("glyph-error").style.display = "block";
+            }
+          })
+          .catch(function () {
+            document.getElementById("glyph-loading").style.display = "none";
+            document.getElementById("glyph-error").textContent =
+              "Network error — check internet connection";
+            document.getElementById("glyph-error").style.display = "block";
+          });
+      }
+
+      // ===== Punk/Glyph Fullscreen with auto-hide close button =====
+      var _fsCloseTimer = null;
+
+      // Map close button → all related buttons in that fullscreen
+      var _fsBtnMap = {
+        "punk-fs-close": ["punk-fs-send", "punk-fs-save", "punk-fs-hue"],
+        "glyph-fs-close": ["glyph-fs-send", "glyph-fs-save", "glyph-fs-hue"],
+      };
+
+      function _startFsCloseTimer(btnId) {
+        clearTimeout(_fsCloseTimer);
+        var ids = [btnId].concat(_fsBtnMap[btnId] || []);
+        ids.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.style.opacity = "1";
+        });
+        _fsCloseTimer = setTimeout(function () {
+          ids.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.opacity = "0";
+          });
+        }, 3000);
+      }
+
+      function _showFsClose(btnId) {
+        var ids = [btnId].concat(_fsBtnMap[btnId] || []);
+        ids.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.style.opacity = "1";
+        });
+        _startFsCloseTimer(btnId);
+      }
+
+      function openPunkFullscreen() {
+        var src = document.getElementById("punk-image").src;
+        if (!src) return;
+        document.getElementById("punk-fullscreen-img").src = src;
+        document.getElementById("punk-fullscreen").style.display = "flex";
+        document.body.style.overflow = "hidden";
+        _startFsCloseTimer("punk-fs-close");
+      }
+      // Set by URL param ?return=gallery to navigate back on fullscreen close
+      var _labReturnTo = null;
+
+      // Send current easter egg to Pi frame via remote command
+      function sendToFrame(type) {
+        var idMap = {
+          punk: "punk-number",
+          glyph: "glyph-number",
+          pixelchain: "pxc-number",
+          gazer: "gazer-number",
+          burner: "burner-number",
+        };
+        var cycleKey = {
+          punk: "vernis-punk-cycle",
+          glyph: "vernis-glyph-cycle",
+          pixelchain: "vernis-pxc-cycle",
+          gazer: "vernis-gazer-cycle",
+          burner: "vernis-burner-cycle",
+        };
+        var inputEl = document.getElementById(idMap[type]);
+        var id = inputEl ? parseInt(inputEl.value) || 0 : 0;
+        var cycle = localStorage.getItem(cycleKey[type]) === "true";
+        var payload = {
+          command: "easter_egg",
+          type: type,
+          id: id,
+          cycle: cycle,
+        };
+        // Pass PixelChain display mode (pixel, svg, ascii, hex)
+        if (type === "pixelchain" && pxcCurrentMode) {
+          payload.mode = pxcCurrentMode;
+        }
+        // Transfer Hue sync state so Pi starts Hue sync too
+        if (
+          labHueEnabled ||
+          ambientLightEnabled ||
+          pxcFsHueActive ||
+          punkHueActive ||
+          glyphHueActive ||
+          burnerHueActive
+        ) {
+          payload.hue = true;
+        }
+        console.log("[sendToFrame] payload:", JSON.stringify(payload));
+        fetch("/api/remote/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then(function (r) {
+            console.log("[sendToFrame] response status:", r.status);
+            if (r.ok) {
+              showEasterEggToast("Sent to frame!");
+            } else {
+              r.json()
+                .then(function (d) {
+                  showEasterEggToast("Error: " + (d.error || "Failed"));
+                })
+                .catch(function () {
+                  showEasterEggToast("HTTP " + r.status);
+                });
+            }
+          })
+          .catch(function (err) {
+            console.error("[sendToFrame] fetch error:", err);
+            showEasterEggToast("Network error: " + err.message);
+          });
+      }
+
+      function saveToGallery(type) {
+        var idMap = {
+          punk: "punk-number",
+          glyph: "glyph-number",
+          pixelchain: "pxc-number",
+          gazer: "gazer-number",
+          burner: "burner-number",
+        };
+        var nameMap = {
+          punk: "Punk",
+          glyph: "Glyph",
+          pixelchain: "PixelChain",
+          gazer: "Gazer",
+          burner: "Burner",
+        };
+        var inputEl = document.getElementById(idMap[type]);
+        if (!inputEl) return;
+        var id = parseInt(inputEl.value) || 0;
+        var name = nameMap[type] + " #" + id;
+
+        var body = { type: type, id: id, name: name };
+
+        if (type === "gazer") {
+          var tokenId = 215000000 + id;
+          body.preview_url = "https://media.artblocks.io/" + tokenId + ".png";
+          doSaveToGallery(body, name);
+        } else if (type === "pixelchain") {
+          var modeLabel = { pixel: "Pixel", svg: "SVG", ascii: "ASCII", hex: "Hex" };
+          body.mode = pxcCurrentMode;
+          body.name = name + " " + (modeLabel[pxcCurrentMode] || "Pixel");
+          name = body.name;
+          if (pxcCurrentMode === "pixel") {
+            var canvas = document.getElementById("pxc-canvas");
+            if (canvas) body.preview_data = canvas.toDataURL("image/png");
+          } else if (pxcCurrentMode === "svg" && pxcSvgHtml) {
+            body.preview_data = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(pxcSvgHtml)));
+          } else if (pxcCurrentMode === "ascii" || pxcCurrentMode === "hex") {
+            // Capture text view as canvas snapshot
+            var textEl = document.getElementById(pxcCurrentMode === "ascii" ? "pxc-ascii" : "pxc-hex");
+            if (textEl) {
+              try {
+                var c = document.createElement("canvas");
+                c.width = 400; c.height = 400;
+                var cx = c.getContext("2d");
+                cx.fillStyle = "#000";
+                cx.fillRect(0, 0, 400, 400);
+                cx.fillStyle = "#0f0";
+                cx.font = "6px monospace";
+                var lines = (pxcCurrentMode === "ascii" ? pxcAsciiText : pxcHexText || "").split("\n");
+                lines.forEach(function(line, i) { cx.fillText(line, 4, 10 + i * 7); });
+                body.preview_data = c.toDataURL("image/png");
+              } catch(e) {}
+            }
+          }
+          doSaveToGallery(body, name);
+        } else if (type === "punk") {
+          capturePunkPreview(function (dataUrl) {
+            if (dataUrl) body.preview_data = dataUrl;
+            doSaveToGallery(body, name);
+          });
+          return;
+        } else if (type === "glyph") {
+          captureGlyphPreview(function (dataUrl) {
+            if (dataUrl) body.preview_data = dataUrl;
+            doSaveToGallery(body, name);
+          });
+          return;
+        } else {
+          doSaveToGallery(body, name);
+        }
+      }
+
+      var _saveBtnIds = {
+        gazer: ['gazer-card-save-btn', 'gazer-fs-save'],
+        pixelchain: ['pxc-card-save-btn', 'pxc-fs-save-btn'],
+        punk: ['punk-card-save-btn', 'punk-fs-save'],
+        glyph: ['glyph-card-save-btn', 'glyph-fs-save'],
+        burner: ['burner-card-save-btn', 'burner-fs-save']
+      };
+
+      function _setSaveBtnSpinner(type, loading) {
+        var ids = _saveBtnIds[type] || [];
+        ids.forEach(function(id) {
+          var btn = document.getElementById(id);
+          if (!btn) return;
+          if (loading) {
+            btn._origSvg = btn.firstElementChild;
+            var spinner = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            spinner.setAttribute('width', '18');
+            spinner.setAttribute('height', '18');
+            spinner.setAttribute('viewBox', '0 0 24 24');
+            spinner.setAttribute('fill', 'none');
+            spinner.setAttribute('stroke', 'currentColor');
+            spinner.setAttribute('stroke-width', '2');
+            spinner.style.animation = 'spin 1s linear infinite';
+            var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '12');
+            circle.setAttribute('cy', '12');
+            circle.setAttribute('r', '10');
+            circle.setAttribute('stroke-dasharray', '31.4 31.4');
+            circle.setAttribute('stroke-linecap', 'round');
+            spinner.appendChild(circle);
+            btn.replaceChildren(spinner);
+            btn.disabled = true;
+          } else if (btn._origSvg) {
+            btn.replaceChildren(btn._origSvg);
+            btn.disabled = false;
+            delete btn._origSvg;
+          }
+        });
+      }
+
+      function doSaveToGallery(body, name) {
+        var type = body.type;
+        _setSaveBtnSpinner(type, true);
+        fetch("/api/atelier/save-to-gallery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            _setSaveBtnSpinner(type, false);
+            if (data.status === "saved") {
+              showEasterEggToast(name + " added to Gallery");
+            } else if (data.status === "exists") {
+              showEasterEggToast(name + " is already in your Gallery");
+            } else if (data.error) {
+              showEasterEggToast("Error: " + data.error);
+            }
+          })
+          .catch(function () {
+            _setSaveBtnSpinner(type, false);
+            showEasterEggToast("Failed to save — try again");
+          });
+      }
+
+      function capturePunkPreview(callback) {
+        var img = document.getElementById("punk-image");
+        if (!img || !img.src) return callback(null);
+        var canvas = document.createElement("canvas");
+        canvas.width = 300;
+        canvas.height = 300;
+        var ctx = canvas.getContext("2d");
+        var tempImg = new Image();
+        tempImg.crossOrigin = "anonymous";
+        tempImg.onload = function () {
+          ctx.drawImage(tempImg, 0, 0, 300, 300);
+          callback(canvas.toDataURL("image/png"));
+        };
+        tempImg.onerror = function () { callback(null); };
+        tempImg.src = img.src;
+      }
+
+      function captureGlyphPreview(callback) {
+        var pre = document.getElementById("glyph-art");
+        if (!pre || !pre.textContent.trim()) return callback(null);
+        var canvas = document.createElement("canvas");
+        canvas.width = 300;
+        canvas.height = 300;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, 300, 300);
+        ctx.fillStyle = "#000000";
+        ctx.font = "6px monospace";
+        var lines = pre.textContent.split("\n");
+        for (var i = 0; i < lines.length; i++) {
+          ctx.fillText(lines[i], 4, 10 + i * 6);
+        }
+        callback(canvas.toDataURL("image/png"));
+      }
+
+      // ===== Punk/Glyph Hue Sync =====
+      var punkHueActive = false,
+        punkHueInterval = null;
+      var glyphHueActive = false,
+        glyphHueInterval = null;
+
+      // Extract dominant color from punk image via canvas
+      function extractPunkColor() {
+        var img = document.getElementById("punk-fullscreen-img");
+        if (!img || !img.src) return null;
+        try {
+          var c = document.createElement("canvas");
+          c.width = img.naturalWidth || 24;
+          c.height = img.naturalHeight || 24;
+          var ctx = c.getContext("2d", { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          var data = ctx.getImageData(0, 0, c.width, c.height).data;
+          var counts = {};
+          for (var i = 0; i < data.length; i += 4) {
+            // Skip near-black and background color (#638596 = 99,133,150)
+            var r = data[i],
+              g = data[i + 1],
+              b = data[i + 2];
+            if ((r + g + b) / 3 < 30) continue;
+            if (
+              Math.abs(r - 99) < 15 &&
+              Math.abs(g - 133) < 15 &&
+              Math.abs(b - 150) < 15
+            )
+              continue;
+            var key = (r >> 4) + "," + (g >> 4) + "," + (b >> 4);
+            counts[key] = counts[key] || { r: r, g: g, b: b, n: 0 };
+            counts[key].n++;
+          }
+          var best = null;
+          for (var k in counts) {
+            if (!best || counts[k].n > best.n) best = counts[k];
+          }
+          return best ? { r: best.r, g: best.g, b: best.b } : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function togglePunkHue(e) {
+        if (e) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+        punkHueActive = !punkHueActive;
+        var btn = document.getElementById("punk-fs-hue");
+        if (punkHueActive) {
+          btn.classList.add("hue-active");
+          var color = extractPunkColor();
+          if (color) sendHueColor(color);
+          punkHueInterval = setInterval(function () {
+            var c = extractPunkColor();
+            if (c) sendHueColor(c);
+          }, labHueSyncMs || 3000);
+        } else {
+          btn.classList.remove("hue-active");
+          clearInterval(punkHueInterval);
+          punkHueInterval = null;
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+      }
+
+      function toggleGlyphHue(e) {
+        if (e) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+        glyphHueActive = !glyphHueActive;
+        var btn = document.getElementById("glyph-fs-hue");
+        if (glyphHueActive) {
+          btn.classList.add("hue-active");
+          // Glyph is text art — use screen-color CDP sampling
+          syncGlyphHueColor();
+          glyphHueInterval = setInterval(
+            syncGlyphHueColor,
+            labHueSyncMs || 3000,
+          );
+        } else {
+          btn.classList.remove("hue-active");
+          clearInterval(glyphHueInterval);
+          glyphHueInterval = null;
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+      }
+
+      function syncGlyphHueColor() {
+        if (!glyphHueActive) return;
+        fetch("/api/screen-color")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (color) {
+            if (color.r !== undefined) sendHueColor(color);
+          })
+          .catch(function () {});
+      }
+
+      // Wire up Hue buttons
+      document
+        .getElementById("punk-fs-hue")
+        .addEventListener("click", togglePunkHue);
+      document
+        .getElementById("punk-fs-hue")
+        .addEventListener("touchstart", togglePunkHue, { passive: false });
+      document
+        .getElementById("glyph-fs-hue")
+        .addEventListener("click", toggleGlyphHue);
+      document
+        .getElementById("glyph-fs-hue")
+        .addEventListener("touchstart", toggleGlyphHue, { passive: false });
+
+      // Show Hue buttons if connected
+      if (labHueConnected) {
+        document.getElementById("punk-fs-hue").style.display = "flex";
+        document.getElementById("glyph-fs-hue").style.display = "flex";
+      }
+
+      function closePunkFullscreen() {
+        clearTimeout(_fsCloseTimer);
+        document.getElementById("punk-fullscreen").style.display = "none";
+        document.body.style.overflow = "";
+        if (punkHueActive) {
+          punkHueActive = false;
+          document.getElementById("punk-fs-hue").classList.remove("hue-active");
+          clearInterval(punkHueInterval);
+          punkHueInterval = null;
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+        if (_labReturnTo) window.location.href = _labReturnTo;
+      }
+      function openGlyphFullscreen() {
+        var art = document.getElementById("glyph-art").textContent;
+        if (!art) return;
+        document.getElementById("glyph-fullscreen-art").textContent = art;
+        document.getElementById("glyph-fullscreen").style.display = "flex";
+        document.body.style.overflow = "hidden";
+        _startFsCloseTimer("glyph-fs-close");
+      }
+      function closeGlyphFullscreen() {
+        clearTimeout(_fsCloseTimer);
+        document.getElementById("glyph-fullscreen").style.display = "none";
+        document.body.style.overflow = "";
+        if (glyphHueActive) {
+          glyphHueActive = false;
+          document
+            .getElementById("glyph-fs-hue")
+            .classList.remove("hue-active");
+          clearInterval(glyphHueInterval);
+          glyphHueInterval = null;
+          fetch("/api/hue/entertainment/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "stop" }),
+          }).catch(function () {});
+        }
+        if (_labReturnTo) window.location.href = _labReturnTo;
+      }
+
+      // Tap anywhere to show buttons, then auto-hide after 3s
+      var _punkBtnIds = ["punk-fs-close", "punk-fs-send", "punk-fs-save", "punk-fs-hue"];
+      var _glyphBtnIds = ["glyph-fs-close", "glyph-fs-send", "glyph-fs-save", "glyph-fs-hue"];
+      document
+        .getElementById("punk-fullscreen")
+        .addEventListener("click", function (e) {
+          if (_punkBtnIds.indexOf(e.target.id) === -1)
+            _showFsClose("punk-fs-close");
+        });
+      document.getElementById("punk-fullscreen").addEventListener(
+        "touchstart",
+        function (e) {
+          if (_punkBtnIds.indexOf(e.target.id) === -1)
+            _showFsClose("punk-fs-close");
+        },
+        { passive: true },
+      );
+      document
+        .getElementById("glyph-fullscreen")
+        .addEventListener("click", function (e) {
+          if (_glyphBtnIds.indexOf(e.target.id) === -1)
+            _showFsClose("glyph-fs-close");
+        });
+      document.getElementById("glyph-fullscreen").addEventListener(
+        "touchstart",
+        function (e) {
+          if (_glyphBtnIds.indexOf(e.target.id) === -1)
+            _showFsClose("glyph-fs-close");
+        },
+        { passive: true },
+      );
+
+      // Burner fullscreen button show/hide
+      var _burnerBtnIds = [
+        "burner-fs-close",
+        "burner-fs-send",
+        "burner-fs-save",
+        "burner-fs-hue",
+      ];
+      document
+        .getElementById("burner-fullscreen")
+        .addEventListener("click", function (e) {
+          if (_burnerBtnIds.indexOf(e.target.id) === -1)
+            _showFsClose("burner-fs-close");
+        });
+      document.getElementById("burner-fullscreen").addEventListener(
+        "touchstart",
+        function (e) {
+          if (_burnerBtnIds.indexOf(e.target.id) === -1)
+            _showFsClose("burner-fs-close");
+        },
+        { passive: true },
+      );
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          if (
+            document.getElementById("punk-fullscreen").style.display === "flex"
+          )
+            closePunkFullscreen();
+          if (
+            document.getElementById("glyph-fullscreen").style.display === "flex"
+          )
+            closeGlyphFullscreen();
+          if (
+            document.getElementById("burner-fullscreen").style.display ===
+            "flex"
+          )
+            closeBurnerFullscreen();
+        }
+      });
+
+      // ===== Easter Egg Toast =====
+      function showEasterEggToast(msg) {
+        var toast = document.createElement("div");
+        toast.textContent = msg;
+        toast.style.cssText =
+          "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);color:#00ff88;padding:20px 32px;border-radius:12px;font-size:18px;font-weight:600;z-index:99999;border:1px solid rgba(0,255,136,0.4);box-shadow:0 0 40px rgba(0,255,136,0.2);text-align:center;pointer-events:none;animation:eggFadeIn 0.3s ease;";
+        document.body.appendChild(toast);
+        setTimeout(function () {
+          toast.style.opacity = "0";
+          toast.style.transition = "opacity 0.5s";
+        }, 2000);
+        setTimeout(function () {
+          toast.remove();
+        }, 2500);
+      }
+
+      // ===== DOOM Puzzle Solution Check (on-demand, no polling) =====
+      function updateDoomDots() {
+        var d1 = document.getElementById("doom-dot-1");
+        var d2 = document.getElementById("doom-dot-2");
+        var fd1 = document.getElementById("doom-fs-dot-1");
+        var fd2 = document.getElementById("doom-fs-dot-2");
+        if (localStorage.getItem("vernis-punks-unlocked") === "true") {
+          d1.style.background = "#22c55e";
+          if (fd1) fd1.style.background = "#22c55e";
+        }
+        if (localStorage.getItem("vernis-autoglyphs-unlocked") === "true") {
+          d2.style.background = "#22c55e";
+          if (fd2) fd2.style.background = "#22c55e";
+        }
+      }
+      updateDoomDots();
+
+      function sendDoomReset() {
+        var iframes = [
+          document.getElementById("doom-iframe"),
+          document.getElementById("doom-fullscreen-iframe"),
+        ];
+        for (var i = 0; i < iframes.length; i++) {
+          try {
+            var iframe = iframes[i];
+            if (!iframe) continue;
+            // The DOOM party game uses body.onkeypress with keyCode == '114' (lowercase 'r')
+            var doc = iframe.contentDocument;
+            if (doc && doc.body) {
+              doc.body.dispatchEvent(
+                new KeyboardEvent("keypress", {
+                  key: "r",
+                  code: "KeyR",
+                  keyCode: 114,
+                  charCode: 114,
+                  which: 114,
+                  bubbles: true,
+                  cancelable: true,
+                }),
+              );
+            }
+            // Fallback: directly call reset function if dispatch didn't work (same-origin)
+            var win = iframe.contentWindow;
+            if (win && typeof win.setAllToFirstLayer === "function") {
+              win.setAllToFirstLayer();
+              if (typeof win.dMode !== "undefined") win.dMode = false;
+            }
+          } catch (e) {
+            /* cross-origin safety */
+          }
+        }
+      }
+
+      function checkDoomSolutions() {
+        var found1 = false,
+          found2 = false;
+        var iframes = [
+          document.getElementById("doom-iframe"),
+          document.getElementById("doom-fullscreen-iframe"),
+        ];
+        for (var i = 0; i < iframes.length; i++) {
+          try {
+            var doc = iframes[i] && iframes[i].contentDocument;
+            if (!doc) continue;
+            var imgs = doc.querySelectorAll("img");
+            for (var j = 0; j < imgs.length; j++) {
+              var src = imgs[j].src || "";
+              if (src.indexOf("solution1") !== -1) {
+                found1 = true;
+                localStorage.setItem("vernis-punks-unlocked", "true");
+                fetch("/api/easter-egg", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ punks: true }),
+                }).catch(function () {});
+                document.getElementById("punks-section").style.display = "";
+              }
+              if (src.indexOf("solution2") !== -1) {
+                found2 = true;
+                localStorage.setItem("vernis-autoglyphs-unlocked", "true");
+                fetch("/api/easter-egg", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ autoglyphs: true }),
+                }).catch(function () {});
+                document.getElementById("autoglyphs-section").style.display =
+                  "";
+              }
+            }
+          } catch (e) {
+            /* cross-origin safety */
+          }
+        }
+
+        var btns = [document.getElementById("doom-unlock-btn"), document.getElementById("doom-fs-unlock-btn")];
+        var openLock = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0"/>';
+
+        if (found1 || found2) {
+          btns.forEach(function(b) {
+            if (!b) return;
+            b.style.opacity = "1";
+            b.style.color = "#22c55e";
+            var svg = b.querySelector("svg");
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+            var tmp = document.createElement("div");
+            tmp.innerHTML = openLock;
+            while (tmp.firstChild) svg.appendChild(tmp.firstChild);
+          });
+          updateDoomDots();
+          if (found1 && found2) {
+            showEasterEggToast("CryptoPunks + Autoglyphs unlocked!");
+          } else if (found1) {
+            showEasterEggToast("CryptoPunks unlocked!");
+          } else {
+            showEasterEggToast("Autoglyphs unlocked!");
+          }
+          setTimeout(function () {
+            sendDoomReset();
+          }, 800);
+        } else {
+          btns.forEach(function(b) {
+            if (!b) return;
+            b.style.opacity = "1";
+            b.style.color = "var(--error)";
+          });
+          sendDoomReset();
+          setTimeout(function () {
+            btns.forEach(function(b) {
+              if (!b) return;
+              b.style.opacity = "0.4";
+              b.style.color = "";
+            });
+          }, 1500);
+        }
+      }
+
+      // ===== Easter Egg State Check =====
+      (function () {
+        var visibleSections = [];
+        function showDividers() {
+          // Show dividers between consecutive visible sections
+          if (
+            visibleSections.includes("pixels") &&
+            visibleSections.includes("moon")
+          ) {
+            document.getElementById("pxc-divider").style.display = "";
+          }
+          if (
+            visibleSections.includes("doom") &&
+            (visibleSections.includes("moon") ||
+              visibleSections.includes("pixels"))
+          ) {
+            document.getElementById("doom-divider").style.display = "";
+          }
+          if (visibleSections.includes("punks") && visibleSections.length > 1) {
+            document.getElementById("punks-divider").style.display = "";
+          }
+          if (
+            visibleSections.includes("autoglyphs") &&
+            visibleSections.length > 1
+          ) {
+            document.getElementById("autoglyphs-divider").style.display = "";
+          }
+          if (
+            visibleSections.includes("burner") &&
+            visibleSections.length > 1
+          ) {
+            document.getElementById("burner-divider").style.display = "";
+          }
+        }
+        function refreshScrollbar() {
+          setTimeout(function () {
+            window.dispatchEvent(new Event("resize"));
+          }, 200);
+        }
+        fetch("/api/easter-egg")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (state) {
+            if (state.moon) {
+              document.getElementById("gazer-section").style.display = "";
+              visibleSections.push("moon");
+            }
+            if (state.pixels) {
+              document.getElementById("pixelchain-section").style.display = "";
+              visibleSections.push("pixels");
+            }
+            if (state.doom) {
+              document.getElementById("doom-party-section").style.display = "";
+              visibleSections.push("doom");
+            }
+            if (state.punks) {
+              document.getElementById("punks-section").style.display = "";
+              visibleSections.push("punks");
+            }
+            if (state.autoglyphs) {
+              document.getElementById("autoglyphs-section").style.display = "";
+              visibleSections.push("autoglyphs");
+            }
+            if (state.burner) {
+              document.getElementById("burner-section").style.display = "";
+              visibleSections.push("burner");
+            }
+            updateDoomDots();
+            showDividers();
+            refreshScrollbar();
+            if (visibleSections.length > 0)
+              document.getElementById("lab-empty").style.display = "none";
+          })
+          .catch(function () {
+            // Fallback to localStorage
+            if (localStorage.getItem("vernis-moon-unlocked") === "true") {
+              document.getElementById("gazer-section").style.display = "";
+              visibleSections.push("moon");
+            }
+            if (localStorage.getItem("vernis-pixels-unlocked") === "true") {
+              document.getElementById("pixelchain-section").style.display = "";
+              visibleSections.push("pixels");
+            }
+            if (localStorage.getItem("vernis-doom-unlocked") === "true") {
+              document.getElementById("doom-party-section").style.display = "";
+              visibleSections.push("doom");
+            }
+            if (localStorage.getItem("vernis-punks-unlocked") === "true") {
+              document.getElementById("punks-section").style.display = "";
+              visibleSections.push("punks");
+            }
+            if (localStorage.getItem("vernis-autoglyphs-unlocked") === "true") {
+              document.getElementById("autoglyphs-section").style.display = "";
+              visibleSections.push("autoglyphs");
+            }
+            if (localStorage.getItem("vernis-burner-unlocked") === "true") {
+              document.getElementById("burner-section").style.display = "";
+              visibleSections.push("burner");
+            }
+            showDividers();
+            refreshScrollbar();
+            if (visibleSections.length > 0)
+              document.getElementById("lab-empty").style.display = "none";
+          });
+      })();
+
+      // ===== URL Parameter Auto-Load (for Send to Frame) =====
+      // Params: ?type=punk|glyph|pixelchain|gazer|burner&id=33&fullscreen=1&cycle=1&mode=pixel|svg|ascii|hex&hue=1&return=gallery
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var type = params.get("type");
+        var id = params.get("id");
+        if (!type || id === null) return;
+
+        if (params.get("return") === "gallery") _labReturnTo = "gallery.html";
+        var wantFullscreen = params.get("fullscreen") === "1";
+        var wantCycle = params.get("cycle") === "1";
+        var wantMode = params.get("mode");
+        var wantHue = params.get("hue") === "1";
+
+        // Wait for Hue settings to load before proceeding (prevents race condition)
+        if (wantHue && _labHueReady) {
+          _labHueReady.then(function() { _labAutoLoad(type, id, wantFullscreen, wantCycle, wantMode, wantHue); });
+        } else {
+          _labAutoLoad(type, id, wantFullscreen, wantCycle, wantMode, wantHue);
+        }
+      })();
+
+      function _labAutoLoad(type, id, wantFullscreen, wantCycle, wantMode, wantHue) {
+
+        // Force-unlock the sections so they're visible on the kiosk
+        if (type === "punk")
+          localStorage.setItem("vernis-punks-unlocked", "true");
+        if (type === "glyph")
+          localStorage.setItem("vernis-autoglyphs-unlocked", "true");
+
+        // Wait for DOM and scripts to be ready, then load
+        setTimeout(function () {
+          if (type === "punk") {
+            document.getElementById("punks-section").style.display = "";
+            document.getElementById("punk-number").value = id;
+            loadPunk();
+            if (wantFullscreen) {
+              // Wait for fetch to complete, then fullscreen
+              var _punkWait = setInterval(function () {
+                var img = document.getElementById("punk-image");
+                if (img && img.style.display === "block" && img.src) {
+                  clearInterval(_punkWait);
+                  openPunkFullscreen();
+                  if (wantCycle) {
+                    startPunkCycle();
+                  }
+                  if (wantHue && labHueConnected && !punkHueActive) {
+                    setTimeout(function () {
+                      togglePunkHue();
+                    }, 1000);
+                  }
+                }
+              }, 200);
+              setTimeout(function () {
+                clearInterval(_punkWait);
+              }, 15000);
+            }
+          } else if (type === "glyph") {
+            document.getElementById("autoglyphs-section").style.display = "";
+            document.getElementById("glyph-number").value = id;
+            loadGlyph();
+            if (wantFullscreen) {
+              var _glyphWait = setInterval(function () {
+                var art = document.getElementById("glyph-art");
+                if (art && art.style.display === "block" && art.textContent) {
+                  clearInterval(_glyphWait);
+                  openGlyphFullscreen();
+                  if (wantCycle) {
+                    startGlyphCycle();
+                  }
+                  if (wantHue && labHueConnected && !glyphHueActive) {
+                    setTimeout(function () {
+                      toggleGlyphHue();
+                    }, 1000);
+                  }
+                }
+              }, 200);
+              setTimeout(function () {
+                clearInterval(_glyphWait);
+              }, 15000);
+            }
+          } else if (type === "pixelchain") {
+            localStorage.setItem("vernis-pixels-unlocked", "true");
+            document.getElementById("pixelchain-section").style.display = "";
+            // Set display mode before loading (pixel, svg, ascii, hex)
+            if (
+              wantMode &&
+              ["pixel", "svg", "ascii", "hex"].indexOf(wantMode) !== -1
+            ) {
+              pxcCurrentMode = wantMode;
+            }
+            document.getElementById("pxc-number").value = id;
+            document.getElementById("pxc-load-btn").click();
+            if (wantFullscreen) {
+              var _pxcWait = setInterval(function () {
+                var btn = document.getElementById("pxc-fullscreen-btn");
+                if (btn && !btn.disabled) {
+                  clearInterval(_pxcWait);
+                  btn.click();
+                  if (wantCycle) {
+                    startPxcCycle();
+                  }
+                  // Auto-start Hue sync in PixelChain fullscreen
+                  if (wantHue && labHueConnected && !pxcFsHueActive) {
+                    setTimeout(function () {
+                      var hBtn = document.getElementById("pxc-fs-hue-btn");
+                      if (hBtn) hBtn.click();
+                    }, 1000);
+                  }
+                }
+              }, 200);
+              setTimeout(function () {
+                clearInterval(_pxcWait);
+              }, 15000);
+            }
+          } else if (type === "gazer") {
+            localStorage.setItem("vernis-moon-unlocked", "true");
+            document.getElementById("gazer-section").style.display = "";
+            document.getElementById("gazer-number").value = id;
+            document.getElementById("display-btn").click();
+            if (wantFullscreen) {
+              var _gazerWait = setInterval(function () {
+                var btn = document.getElementById("fullscreen-btn");
+                if (btn && !btn.disabled) {
+                  clearInterval(_gazerWait);
+                  btn.click();
+                  if (wantCycle) {
+                    startGazerCycle();
+                  }
+                  // Auto-start Hue sync in Gazer fullscreen
+                  if (wantHue && labHueConnected && !ambientLightEnabled) {
+                    setTimeout(function () {
+                      startAmbientLight();
+                    }, 1000);
+                  }
+                }
+              }, 200);
+              setTimeout(function () {
+                clearInterval(_gazerWait);
+              }, 15000);
+            }
+          } else if (type === "burner") {
+            localStorage.setItem("vernis-burner-unlocked", "true");
+            document.getElementById("burner-section").style.display = "";
+            document.getElementById("burner-number").value = id;
+            // Wait for display config before loading (frosted bg needs it)
+            _displayConfigReady.then(function () {
+              loadBurner();
+              if (wantFullscreen) {
+                var _burnerWait = setInterval(function () {
+                  var iframe = document.getElementById("burner-iframe");
+                  if (
+                    iframe &&
+                    iframe.src &&
+                    iframe.src.indexOf("burner/render") !== -1
+                  ) {
+                    clearInterval(_burnerWait);
+                    openBurnerFullscreen();
+                    if (wantCycle) {
+                      startBurnerCycle();
+                    }
+                    if (wantHue && labHueConnected && !burnerHueActive) {
+                      setTimeout(function () {
+                        toggleBurnerHue();
+                      }, 1000);
+                    }
+                  }
+                }, 200);
+                setTimeout(function () {
+                  clearInterval(_burnerWait);
+                }, 15000);
+              }
+            });
+          }
+        }, 300);
+      }
+    </script>
+    <!-- FPS Overlay Logic -->
+    <script>
+      (function() {
+        var fpsEnabled = false;
+        var frameCount = 0;
+        var lastFpsUpdate = performance.now();
+        var statsInterval = null;
+
+        function measureFps(timestamp) {
+          if (!fpsEnabled) return;
+          frameCount++;
+          var elapsed = timestamp - lastFpsUpdate;
+          if (elapsed >= 1000) {
+            var fps = Math.round((frameCount * 1000) / elapsed);
+            var el = document.getElementById('fps-value');
+            if (el) {
+              el.textContent = fps;
+              el.style.color = fps >= 30 ? '#4ade80' : fps >= 20 ? '#f59e0b' : '#ef4444';
+            }
+            frameCount = 0;
+            lastFpsUpdate = timestamp;
+          }
+          requestAnimationFrame(measureFps);
+        }
+
+        function updateSystemStats() {
+          if (!fpsEnabled) return;
+          fetch('/api/system/pi-model').then(function(r) { return r.json(); }).then(function(data) {
+            if (data.current_freq_mhz) {
+              document.getElementById('fps-freq').textContent = data.current_freq_mhz;
+            }
+            if (data.current_temp_c) {
+              var temp = data.current_temp_c.toFixed(0);
+              var el = document.getElementById('fps-temp');
+              if (el) {
+                el.textContent = temp;
+                el.style.color = data.current_temp_c >= 80 ? '#ef4444' : data.current_temp_c >= 70 ? '#f59e0b' : '#4ade80';
+              }
+            }
+          }).catch(function() {});
+        }
+
+        function setFps(enabled) {
+          fpsEnabled = enabled;
+          var overlay = document.getElementById('fps-overlay');
+          if (overlay) overlay.style.display = fpsEnabled ? 'block' : 'none';
+          if (fpsEnabled) {
+            requestAnimationFrame(measureFps);
+            updateSystemStats();
+            if (!statsInterval) statsInterval = setInterval(updateSystemStats, 5000);
+          } else if (statsInterval) {
+            clearInterval(statsInterval);
+            statsInterval = null;
+          }
+        }
+
+        // Check config on load and poll every 30s
+        function checkFpsConfig() {
+          fetch('/api/display-config').then(function(r) { return r.json(); }).then(function(cfg) {
+            var want = !!cfg.fps_overlay;
+            if (want !== fpsEnabled) setFps(want);
+          }).catch(function() {});
+        }
+        checkFpsConfig();
+        setInterval(checkFpsConfig, 30000);
+      })();
+    </script>
+
+    <script>
+      (function () {
+        var t = 0;
+        function r() {
+          var n = Date.now();
+          if (n - t < 30000) return;
+          t = n;
+          fetch("/api/screen/activity", { method: "POST" }).catch(
+            function () {},
+          );
+        }
+        // Only touchstart — click fires on programmatic .click() from auto-cycle
+        document.addEventListener("touchstart", r, { passive: true });
+      })();
+    </script>
+  </body>
+</html>

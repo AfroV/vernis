@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Add Art • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <link rel="stylesheet" href="" id="supersize-css">
+  <script src="vernis-notifications.js"></script>
+  <script>
+    // Load supersize settings early
+    (function () {
+      let supersize = localStorage.getItem('vernis-supersize');
+      if (supersize && supersize !== 'normal') {
+        document.getElementById('supersize-css').href = 'vernis-supersize-' + supersize + '.css';
+      }
+    })();
+  </script>
+  <style>
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .main {
+      padding: 130px 50px 80px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      font-size: 16px;
+    }
+
+    .upload-box {
+      background: var(--bg-secondary);
+      border: 2px dashed var(--border-light);
+      border-radius: 20px;
+      padding: 50px 30px;
+      text-align: center;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+
+    .upload-box:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-tertiary);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px var(--shadow-md);
+    }
+
+    .upload-box.dragover {
+      border-color: var(--accent-primary);
+      background: var(--bg-tertiary);
+      transform: scale(1.02);
+      box-shadow: 0 20px 60px var(--shadow-lg);
+    }
+
+    .upload-box h3 {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+
+    .upload-box p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .upload-icon {
+      font-size: 80px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+      color: var(--accent-primary);
+      user-select: none;
+    }
+
+    input[type=file] {
+      display: none;
+    }
+
+    /* Metadata Fields */
+    .metadata-section {
+      margin-top: 30px;
+      padding: 24px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+    }
+
+    .metadata-section h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: var(--font-body);
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-alpha);
+    }
+
+    .form-group input::placeholder,
+    .form-group textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* Success State */
+    .success-state {
+      display: none;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .success-state.active {
+      display: block;
+    }
+
+    .success-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    .success-state h3 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .success-state p {
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    /* Info Box */
+    .info-box {
+      margin-top: 30px;
+      padding: 20px;
+      background: rgba(99, 102, 241, 0.1);
+      border-left: 4px solid var(--accent-primary);
+      border-radius: 0 12px 12px 0;
+    }
+
+    .info-box h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-primary);
+      margin-bottom: 8px;
+    }
+
+    .info-box p {
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .main {
+        padding: 110px 20px 60px;
+      }
+
+      h1 {
+        font-size: 36px;
+      }
+
+      .upload-box {
+        padding: 40px 20px;
+      }
+
+      .upload-icon {
+        font-size: 60px;
+      }
+    }
+  </style>
+  <script>
+    // Load theme
+    (function () {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      if (mode === 'auto') { var _h = new Date().getHours(); mode = (_h >= 20 || _h < 7) ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+      function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}_syncTheme();setInterval(_syncTheme,5000);
+    })();
+  </script>
+  <script src="vernis-keyboard.js"></script>
+</head>
+
+<body>
+  <!-- Custom scrollbar - only shown when enabled in settings (for touch screens) -->
+  <div id="custom-scrollbar" class="custom-scrollbar-track">
+    <div id="custom-scrollbar-thumb" class="custom-scrollbar-thumb"></div>
+  </div>
+  <script>
+    // Auto-enable thick scrollbar on localhost (Pi)
+    (function() {
+      const setting = localStorage.getItem('vernis-thick-scrollbar');
+      if (setting === null && window.location.hostname === 'localhost') {
+        localStorage.setItem('vernis-thick-scrollbar', 'true');
+      }
+      const enabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+      if (!enabled) {
+        document.getElementById('custom-scrollbar').style.display = 'none';
+      }
+    })();
+  </script>
+  <style>
+    .custom-scrollbar-track {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: var(--scrollbar-track, rgba(128,128,128,0.2));
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .custom-scrollbar-thumb {
+      position: absolute;
+      right: 4px;
+      width: 32px;
+      background: var(--scrollbar-thumb, var(--accent-primary, rgba(150,150,150,0.8)));
+      border-radius: 16px;
+      min-height: 80px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      pointer-events: auto;
+    }
+    .custom-scrollbar-thumb:hover,
+    .custom-scrollbar-thumb:active {
+      background: var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)));
+    }
+  </style>
+  <script>
+    (function() {
+      const scrollbar = document.getElementById('custom-scrollbar');
+      const thumb = document.getElementById('custom-scrollbar-thumb');
+      if (!scrollbar || !thumb) return;
+
+      function updateThumb() {
+        const thickScrollbarEnabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+        if (!thickScrollbarEnabled) { scrollbar.style.display = 'none'; return; }
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        if (docHeight <= winHeight) { scrollbar.style.display = 'none'; return; }
+        scrollbar.style.display = 'block';
+        const scrollable = docHeight - winHeight;
+        const thumbH = Math.max(80, (winHeight / docHeight) * winHeight);
+        const thumbY = (window.scrollY / scrollable) * (winHeight - thumbH);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top = Math.max(0, thumbY) + 'px';
+      }
+      window.addEventListener('scroll', updateThumb);
+      window.addEventListener('resize', updateThumb);
+      setTimeout(updateThumb, 100);
+
+      let dragging = false, dragStartY = 0, dragStartScroll = 0;
+      thumb.addEventListener('touchstart', function(e) {
+        dragging = true;
+        dragStartY = e.touches[0].clientY;
+        dragStartScroll = window.scrollY;
+        e.stopPropagation();
+      }, { passive: true });
+      thumb.addEventListener('mousedown', function(e) {
+        dragging = true;
+        dragStartY = e.clientY;
+        dragStartScroll = window.scrollY;
+      });
+      document.addEventListener('touchmove', function(e) {
+        if (dragging && e.touches.length === 1) {
+          const delta = e.touches[0].clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      }, { passive: true });
+      document.addEventListener('mousemove', function(e) {
+        if (dragging) {
+          const delta = e.clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      });
+      document.addEventListener('touchend', function() { dragging = false; });
+      document.addEventListener('mouseup', function() { dragging = false; });
+    })();
+  </script>
+
+  <div class="header">
+    <a href="index.html" class="logo">Vernis</a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="add.html">Add Art</a>
+      <a href="library.html">Library</a>
+      <a href="manage.html">Manage Art</a>
+      <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
+    <a href="add.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
+    <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
+    <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
+    <a href="settings.html" class="settings-parent"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</a>
+    <div class="settings-submenu">
+    <div class="menu-divider">Appearance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-theme'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Theme</div>
+    <div class="menu-divider">Display</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-display'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Display Settings</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-screensaver'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Screen Timeout</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-orientation'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Orientation</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-hue'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg> Ambient Light</div>
+    <div class="menu-divider">Content</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-github'" style="display:none;"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg> GitHub Library</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ethereum'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 3 12 12 22 21 12"/></svg> Ethereum RPC</div>
+    <div class="menu-divider">Storage</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ipfs'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> IPFS Pinning</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-external'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M6 14h2"/></svg> External Drive</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-backup'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Backup</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-storage'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Storage Health</div>
+    <div class="menu-divider">System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-wifi'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> Wi-Fi</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-performance'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Performance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-system'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.6 15H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 6.6V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-about'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About</div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const toggle = document.querySelector('.menu-toggle');
+      menu.classList.toggle('active');
+      toggle.classList.toggle('active');
+      var isOpen = menu.classList.contains('active');
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      var mc = document.querySelector('.main');
+      if (mc) mc.style.visibility = isOpen ? 'hidden' : '';
+      if (!isOpen) void document.body.offsetHeight;
+    }
+    (function(){
+      if(localStorage.getItem('vernis-moon-unlocked')==='true'||localStorage.getItem('vernis-pixels-unlocked')==='true'||localStorage.getItem('vernis-doom-unlocked')==='true'||localStorage.getItem('vernis-burner-unlocked')==='true'){
+        document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }
+      fetch('/api/easter-egg').then(function(r){return r.json();}).then(function(s){
+        if(s.moon||s.pixels||s.doom||s.burner) document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }).catch(function(){});
+    })();
+  </script>
+
+  <div class="main">
+    <h1>Add Collection</h1>
+    <p class="subtitle">Upload a CSV file to add a new collection to your library</p>
+
+    <a href="wallet-tool.html" class="btn btn-secondary" style="display:block; text-align:center; padding:16px 24px; font-size:15px; margin-bottom:30px; text-decoration:none; border-radius:12px;">
+      Import from Wallet (OpenSea)
+    </a>
+
+    <div style="text-align: center; color: var(--text-muted); margin-bottom: 30px; font-size: 14px;">
+      — or add by CID —
+    </div>
+
+    <!-- Quick Add by CID -->
+    <div class="metadata-section" style="margin-bottom: 30px;">
+      <h4>Quick Add by CID</h4>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+        Add a single NFT directly — paste a CID, IPFS URL, or directory CID with path
+      </p>
+      <div class="form-group">
+        <label>IPFS CID or URL</label>
+        <input type="text" id="quick-cid" placeholder="Qm.../6.json, bafy..., or https://ipfs.io/ipfs/...">
+      </div>
+      <div class="form-group">
+        <label>Name (optional)</label>
+        <input type="text" id="quick-name" placeholder="e.g., My NFT">
+      </div>
+      <button class="btn" id="quick-add-btn" onclick="quickAddCID()" style="width: 100%;">Add to Gallery</button>
+      <div id="quick-add-success" style="display:none; margin-top:16px; padding:20px; background:var(--bg-secondary); border:1px solid var(--accent-primary); border-radius:12px; text-align:center;">
+        <div style="font-size:32px; margin-bottom:8px;">✓</div>
+        <p id="quick-add-success-msg" style="margin-bottom:16px; color:var(--text-primary);"></p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <a href="manage.html#ipfs" class="btn btn-secondary" style="font-size:13px;">View in Manage</a>
+          <a href="/" class="btn btn-secondary" style="font-size:13px;">Go to Gallery</a>
+          <button class="btn" onclick="document.getElementById('quick-add-success').style.display='none'; document.getElementById('quick-add-btn').style.display=''" style="font-size:13px;">Add Another</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align: center; color: var(--text-muted); margin-bottom: 30px; font-size: 14px;">
+      — or add multiple NFTs via CSV —
+    </div>
+
+    <!-- Upload Form -->
+    <div id="upload-form">
+      <div class="upload-box" id="drop">
+        <div class="upload-icon">📁</div>
+        <h3>Drop your CSV file here</h3>
+        <p>or click to browse your files</p>
+        <input type="file" id="csv" accept=".csv">
+        <button class="btn" onclick="document.getElementById('csv').click()">Choose CSV File</button>
+      </div>
+
+      <div class="metadata-section">
+        <h4>Collection Details (Optional)</h4>
+        <div class="form-group">
+          <label>Collection Name</label>
+          <input type="text" id="collection-name" placeholder="e.g., My NFT Collection">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="collection-desc" placeholder="Brief description of this collection..."></textarea>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <h4>CSV Format</h4>
+        <p>Your CSV should contain columns for contract address and token ID, or IPFS CIDs. After uploading, visit the
+          <a href="library.html" style="color: var(--accent-primary); font-weight: 600;">Library</a> to install and
+          download your collection.
+        </p>
+        <button class="btn btn-secondary" style="margin-top: 12px; font-size: 13px;" onclick="downloadTemplate()">
+          Download CSV Template
+        </button>
+      </div>
+    </div>
+
+    <!-- Success State -->
+    <div class="success-state" id="success-state">
+      <div class="success-icon">✓</div>
+      <h3>Collection Added!</h3>
+      <p id="success-message">Your collection has been added to the library.</p>
+      <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+        <a href="library.html" class="btn">Go to Library</a>
+        <button class="btn btn-secondary" onclick="resetForm()">Add Another</button>
+      </div>
+    </div>
+
+    <!-- Upload Files (non-media) -->
+    <div style="text-align: center; color: var(--text-muted); margin: 40px 0 30px; font-size: 14px;">
+      — or upload general files —
+    </div>
+
+    <div class="metadata-section" id="file-upload-section">
+      <h4>Upload Files</h4>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+        Upload any file type — PDFs, documents, 3D models, archives, etc. Files are pinned to IPFS.
+      </p>
+
+      <!-- Step 1: Select files -->
+      <div id="file-select-step">
+        <div class="upload-box" id="file-drop">
+          <div class="upload-icon">📎</div>
+          <h3>Drop files here</h3>
+          <p>or click to browse — any file type accepted</p>
+          <input type="file" id="file-input" multiple style="display:none">
+          <button class="btn" onclick="document.getElementById('file-input').click()">Choose Files</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Review & name files before upload -->
+      <div id="file-review-step" style="display: none;">
+        <div id="file-review-list" style="margin-bottom: 16px;"></div>
+        <div class="form-group">
+          <label>Collection (optional — applies to all files)</label>
+          <input type="text" id="file-collection" placeholder="e.g., My Collection">
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+          <button class="btn" onclick="resetFileUpload()" style="flex:1;">Cancel</button>
+          <button class="btn btn-primary" id="file-upload-btn" onclick="uploadStagedFiles()" style="flex:2;">Upload &amp; Pin</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Results -->
+      <div id="file-result-step" style="display: none;">
+        <div id="file-result-list"></div>
+        <div style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+          <a href="manage.html#ipfs" class="btn btn-secondary">View in Manage</a>
+          <button class="btn" onclick="resetFileUpload()">Upload More</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const drop = document.getElementById('drop');
+    const uploadForm = document.getElementById('upload-form');
+    const successState = document.getElementById('success-state');
+
+    // Drag and drop handlers
+    ['dragover', 'dragenter'].forEach(e => drop.addEventListener(e, (ev) => {
+      ev.preventDefault();
+      drop.classList.add('dragover');
+    }));
+
+    ['dragleave', 'dragend', 'drop'].forEach(e => drop.addEventListener(e, () => {
+      drop.classList.remove('dragover');
+    }));
+
+    drop.addEventListener('drop', e => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith('.csv')) {
+        uploadFile(file);
+      } else {
+        showError('Please upload a CSV file');
+      }
+    });
+
+    // Click to browse
+    drop.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') {
+        document.getElementById('csv').click();
+      }
+    });
+
+    document.getElementById('csv').addEventListener('change', e => {
+      if (e.target.files[0]) uploadFile(e.target.files[0]);
+    });
+
+    function uploadFile(file) {
+      const name = document.getElementById('collection-name').value.trim();
+      const description = document.getElementById('collection-desc').value.trim();
+
+      var dismissLoading = showLoading(`Uploading ${file.name}...`);
+
+      const fd = new FormData();
+      fd.append('file', file);
+      if (name) fd.append('name', name);
+      if (description) fd.append('description', description);
+
+      fetch('/api/csv-library/upload', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+          dismissLoading();
+          if (d.success) {
+            showSuccess(d.message);
+            document.getElementById('success-message').textContent =
+              `"${d.filename}" added with ${d.count} items. Go to Library to install.`;
+            uploadForm.style.display = 'none';
+            successState.classList.add('active');
+          } else {
+            showError(d.error || 'Upload failed');
+          }
+        })
+        .catch(err => {
+          dismissLoading();
+          showError(`Upload failed: ${err.message}`);
+        });
+    }
+
+    function resetForm() {
+      uploadForm.style.display = 'block';
+      successState.classList.remove('active');
+      document.getElementById('csv').value = '';
+      document.getElementById('collection-name').value = '';
+      document.getElementById('collection-desc').value = '';
+    }
+
+    function downloadTemplate() {
+      const template = `contract_address,token_id,ipfs_cid,name,description
+0x1234567890abcdef1234567890abcdef12345678,1,,My First NFT,Description here
+0x1234567890abcdef1234567890abcdef12345678,2,,My Second NFT,Another description
+,,QmYourIPFSCidHere,IPFS Artwork,Direct IPFS link example
+,,bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi,Bafy Example,Another IPFS example`;
+
+      const blob = new Blob([template], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'collection-template.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // File upload (staged — select, review, upload)
+    var stagedFiles = [];
+    var fileDrop = document.getElementById('file-drop');
+    ['dragover', 'dragenter'].forEach(function(e) {
+      fileDrop.addEventListener(e, function(ev) { ev.preventDefault(); fileDrop.classList.add('dragover'); });
+    });
+    ['dragleave', 'dragend', 'drop'].forEach(function(e) {
+      fileDrop.addEventListener(e, function() { fileDrop.classList.remove('dragover'); });
+    });
+    fileDrop.addEventListener('drop', function(e) {
+      e.preventDefault();
+      if (e.dataTransfer.files.length) stageFiles(e.dataTransfer.files);
+    });
+    fileDrop.addEventListener('click', function(e) {
+      if (e.target.tagName !== 'BUTTON') document.getElementById('file-input').click();
+    });
+    document.getElementById('file-input').addEventListener('change', function(e) {
+      if (e.target.files.length) stageFiles(e.target.files);
+    });
+
+    function stageFiles(files) {
+      stagedFiles = Array.from(files);
+      document.getElementById('file-select-step').style.display = 'none';
+      document.getElementById('file-review-step').style.display = 'block';
+      document.getElementById('file-result-step').style.display = 'none';
+
+      var html = '';
+      stagedFiles.forEach(function(f, i) {
+        var size = f.size < 1024*1024 ? (f.size/1024).toFixed(0) + ' KB' : (f.size/1024/1024).toFixed(1) + ' MB';
+        html += '<div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">';
+        html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">';
+        html += '<strong style="font-size: 13px; word-break: break-all;">' + f.name + '</strong>';
+        html += '<span style="font-size: 12px; color: var(--text-muted); white-space: nowrap; margin-left: 12px;">' + size + '</span>';
+        html += '</div>';
+        html += '<input type="text" id="file-name-' + i + '" placeholder="Display name (optional)" style="width:100%; padding:8px 12px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--bg-secondary); color:var(--text-primary); font-size:13px;">';
+        html += '</div>';
+      });
+      document.getElementById('file-review-list').innerHTML = html;
+    }
+
+    function resetFileUpload() {
+      stagedFiles = [];
+      document.getElementById('file-input').value = '';
+      document.getElementById('file-select-step').style.display = 'block';
+      document.getElementById('file-review-step').style.display = 'none';
+      document.getElementById('file-result-step').style.display = 'none';
+    }
+
+    function uploadStagedFiles() {
+      var collection = document.getElementById('file-collection').value.trim();
+      var btn = document.getElementById('file-upload-btn');
+      btn.disabled = true;
+      btn.textContent = 'Uploading & Pinning...';
+
+      var total = stagedFiles.length;
+      var done = 0;
+      var failed = 0;
+      var results = [];
+
+      stagedFiles.forEach(function(file, i) {
+        var displayName = document.getElementById('file-name-' + i).value.trim();
+        var fd = new FormData();
+        fd.append('file', file);
+        if (displayName) fd.append('name', displayName);
+        if (collection) fd.append('collection', collection);
+
+        fetch('/api/files/upload', { method: 'POST', body: fd })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.success) {
+              done++;
+              results.push({ name: displayName || file.name, cid: d.ipfs_cid || '', filename: d.filename });
+            } else {
+              failed++;
+              results.push({ name: file.name, error: d.error || 'Failed' });
+            }
+            checkDone();
+          })
+          .catch(function(err) {
+            failed++;
+            results.push({ name: file.name, error: err.message });
+            checkDone();
+          });
+      });
+
+      function checkDone() {
+        if (done + failed < total) {
+          btn.textContent = 'Uploading ' + (done + failed) + '/' + total + '...';
+          return;
+        }
+        // All done — show results
+        btn.disabled = false;
+        btn.textContent = 'Upload & Pin';
+        document.getElementById('file-review-step').style.display = 'none';
+        document.getElementById('file-result-step').style.display = 'block';
+
+        var html = '';
+        results.forEach(function(r) {
+          html += '<div style="padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">';
+          if (r.error) {
+            html += '<div style="color: #ef4444; font-size: 13px;">' + r.name + ' — ' + r.error + '</div>';
+          } else {
+            html += '<div style="font-weight: 600; font-size: 13px; margin-bottom: 6px;">' + r.name + '</div>';
+            if (r.cid) {
+              html += '<div style="display: flex; align-items: center; gap: 8px;">';
+              html += '<code style="font-size: 11px; color: var(--text-secondary); word-break: break-all; flex: 1;">' + r.cid + '</code>';
+              html += '<button class="btn" onclick="event.stopPropagation(); copyToClipboard(\'' + r.cid + '\')" style="padding: 10px 14px; font-size: 13px; white-space: nowrap;">Copy CID</button>';
+              html += '</div>';
+            } else {
+              html += '<div style="font-size: 12px; color: var(--text-muted);">Uploaded (IPFS not available for pinning)</div>';
+            }
+          }
+          html += '</div>';
+        });
+
+        if (done > 0) showSuccess(done + ' file(s) uploaded and pinned.');
+        if (failed > 0) showError(failed + ' file(s) failed.');
+        document.getElementById('file-result-list').innerHTML = html;
+        stagedFiles = [];
+        document.getElementById('file-input').value = '';
+      }
+    }
+
+    function quickAddCID() {
+      let cid = document.getElementById('quick-cid').value.trim();
+      const name = document.getElementById('quick-name').value.trim() || 'Quick Add NFT';
+
+      if (!cid) {
+        showError('Please enter an IPFS CID or URL');
+        return;
+      }
+
+      // Strip common IPFS URL prefixes to extract CID (with optional /path)
+      cid = cid.replace(/^https?:\/\/[^/]*\/ipfs\//, '');  // https://ipfs.io/ipfs/QmXYZ/path → QmXYZ/path
+      cid = cid.replace(/^ipfs:\/\//, '');                   // ipfs://QmXYZ/path → QmXYZ/path
+
+      // Validate base CID format (before any /path)
+      var baseCid = cid.split('/')[0];
+      if (!baseCid.startsWith('Qm') && !baseCid.startsWith('bafy')) {
+        showError('Invalid CID format. Should start with "Qm" or "bafy"');
+        return;
+      }
+
+      showInfo('Adding NFT to gallery...');
+
+      fetch('/api/quick-add-cid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cid, name })
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            document.getElementById('quick-cid').value = '';
+            document.getElementById('quick-name').value = '';
+            var successEl = document.getElementById('quick-add-success');
+            document.getElementById('quick-add-success-msg').textContent = (d.message || 'NFT added!') + ' Downloading in the background — it will appear in your gallery shortly.';
+            successEl.style.display = 'block';
+            document.getElementById('quick-add-btn').style.display = 'none';
+          } else {
+            showError(d.error || 'Failed to add NFT');
+          }
+        })
+        .catch(err => {
+          showError('Failed to add NFT: ' + err.message);
+        });
+    }
+  </script>
+  <script>(function(){var t=0;function r(){var n=Date.now();if(n-t<30000)return;t=n;fetch('/api/screen/activity',{method:'POST'}).catch(function(){});}document.addEventListener('touchstart',r,{passive:true});})();</script>
+</body>
+
+</html>

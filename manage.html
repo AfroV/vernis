@@ -1,0 +1,2194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Manage Art • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <link rel="stylesheet" href="" id="supersize-css">
+  <script src="vernis-notifications.js"></script>
+  <script>
+    // Load supersize settings early
+    (function () {
+      let supersize = localStorage.getItem('vernis-supersize');
+      if (supersize && supersize !== 'normal') {
+        document.getElementById('supersize-css').href = 'vernis-supersize-' + supersize + '.css';
+      }
+    })();
+  </script>
+  <style>
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Scrollbar colors - width controlled by supersize CSS or settings */
+    ::-webkit-scrollbar-track {
+      background: #1a1a1a;
+      background: var(--bg-tertiary, #1a1a1a);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #00ffff;
+      background: var(--accent-primary, #00ffff);
+      border: 3px solid #1a1a1a;
+      border-color: var(--bg-tertiary, #1a1a1a);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #ff00ff;
+      background: var(--accent-secondary, #ff00ff);
+    }
+
+    .main {
+      padding: 130px 50px 80px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 56px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 24px 30px;
+      margin-bottom: 30px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .btn {
+      padding: 10px 16px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .toolbar select,
+    .toolbar input {
+      padding: 10px 15px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: var(--font-body);
+      transition: all 0.3s;
+      max-width: 160px;
+    }
+
+    .toolbar select:focus,
+    .toolbar input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-alpha);
+    }
+
+    .toolbar input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-light);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-secondary);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ff3b30, #ff6b59);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(255, 59, 48, 0.3);
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .nft-card {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border-light);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.3s;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .nft-card:hover {
+      border-color: var(--accent-primary);
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px var(--shadow-md);
+    }
+
+    .nft-card.selected {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 20px var(--accent-primary-alpha);
+    }
+
+    .nft-card.hidden-nft {
+      opacity: 0.4;
+    }
+
+    .nft-img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      background: var(--bg-tertiary);
+    }
+    .nft-img[src*="/api/thumbnail/"] {
+      background: linear-gradient(110deg, var(--bg-tertiary) 30%, var(--bg-secondary) 50%, var(--bg-tertiary) 70%);
+      background-size: 200% 100%;
+      animation: thumb-shimmer 1.5s ease-in-out infinite;
+    }
+    .nft-img.thumb-loaded { animation: none; background: var(--bg-tertiary); }
+    @keyframes thumb-shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .nft-info {
+      padding: 15px;
+    }
+
+    .nft-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nft-size {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Checkbox overlay */
+    .checkbox-overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 32px;
+      height: 32px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--border-light);
+      transition: all 0.3s;
+      backdrop-filter: blur(10px);
+    }
+
+    .nft-card.selected .checkbox-overlay {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+    }
+
+    .checkbox-overlay::after {
+      content: '✓';
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .nft-card.selected .checkbox-overlay::after {
+      opacity: 1;
+    }
+
+    /* Hidden badge */
+    .hidden-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: linear-gradient(135deg, #ff3b30, #ff6b59);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Storage type badge */
+    .storage-badge {
+      position: absolute;
+      bottom: 46px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      z-index: 2;
+      cursor: pointer;
+    }
+    .storage-badge svg { width: 14px; height: 14px; }
+    .storage-badge.storage-ipfs { background: rgba(0, 180, 180, 0.85); }
+    .storage-badge.storage-arweave { background: rgba(140, 140, 140, 0.85); }
+    .storage-badge.storage-on_chain { background: rgba(200, 160, 0, 0.85); }
+    .storage-badge.storage-copy { background: rgba(80, 80, 80, 0.7); }
+
+    /* Storage type filter section */
+    .storage-type-section {
+      margin-bottom: 16px;
+    }
+    .storage-type-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .storage-stat {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .storage-stat svg { width: 12px; height: 12px; }
+    .storage-stat.stat-ipfs { background: rgba(0, 180, 180, 0.3); color: #00e6e6; }
+    .storage-stat.stat-arweave { background: rgba(140, 140, 140, 0.3); color: #ccc; }
+    .storage-stat.stat-on_chain { background: rgba(200, 160, 0, 0.3); color: #ffc800; }
+    .storage-stat.stat-copy { background: rgba(80, 80, 80, 0.3); color: #999; }
+
+    /* Stats */
+    .stats {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 24px 30px;
+      margin-bottom: 30px;
+      display: flex;
+      gap: 40px;
+    }
+
+    .stat {
+      flex: 1;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 100px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty h3 {
+      font-family: var(--font-display);
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 100px 20px;
+      color: var(--text-secondary);
+      font-size: 18px;
+    }
+    .loading .load-spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border-light);
+      border-top-color: var(--accent-primary);
+      border-radius: 50%;
+      animation: load-spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes load-spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      .main {
+        padding: 110px 25px 60px;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .subtitle {
+        font-size: 16px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 15px;
+      }
+
+      .stats {
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .toolbar {
+        padding: 15px;
+        gap: 12px;
+      }
+
+      .toolbar .btn {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+
+      .toolbar select,
+      .toolbar input {
+        padding: 8px 10px;
+        font-size: 12px;
+        min-width: 0;
+      }
+
+      .toolbar-group {
+        gap: 6px;
+      }
+    }
+
+    /* Collection toggle switches */
+    .collections-toggle-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 6px;
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 4px 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .collection-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: var(--card-bg, #1a1a2e);
+    }
+    .collection-toggle-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+    .collection-toggle-name {
+      font-size: 13px;
+      color: var(--text-color, #eee);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .collection-toggle-count {
+      font-size: 11px;
+      color: var(--text-muted, #888);
+      flex-shrink: 0;
+    }
+    .collection-toggle-switch {
+      width: 44px;
+      height: 26px;
+      border-radius: 13px;
+      background: #555;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+      margin-left: 10px;
+    }
+    .collection-toggle-switch.active {
+      background: var(--accent-color, #6c63ff);
+    }
+    .collection-toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+    }
+    .collection-toggle-switch.active::after {
+      transform: translateX(18px);
+    }
+    .collections-header-btns {
+      display: flex;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .collections-header-btns .btn {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+    @media (max-width: 768px) {
+      .collections-toggle-list {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Manage tabs */
+    .manage-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 30px;
+      border-bottom: 2px solid var(--border-light);
+    }
+    .manage-tab {
+      padding: 12px 24px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    .manage-tab:hover { color: var(--text-secondary); }
+    .manage-tab.active {
+      color: var(--accent-primary);
+      border-bottom-color: var(--accent-primary);
+    }
+    .toolbar-subtab {
+      padding: 8px 14px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+      touch-action: manipulation;
+    }
+    .toolbar-subtab:hover { color: var(--text-secondary); }
+    .toolbar-subtab.active {
+      color: var(--accent-primary);
+      border-bottom-color: var(--accent-primary);
+    }
+
+    /* File list */
+    .file-list { display: flex; flex-direction: column; gap: 8px; }
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 18px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .file-row:hover { border-color: var(--accent-primary); }
+    .file-row.selected { border-color: var(--accent-primary); background: var(--bg-tertiary); }
+    .file-icon { font-size: 28px; width: 48px; height: 48px; text-align: center; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .file-icon img, .file-icon video { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; background: var(--bg-tertiary); }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .file-cid-btn {
+      background: var(--bg-secondary);
+      color: var(--accent-primary);
+      border: 1px solid var(--border-subtle);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .file-checkbox {
+      width: 24px; height: 24px;
+      background: rgba(0,0,0,0.4);
+      border: 2px solid var(--border-light);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .file-row.selected .file-checkbox {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+    }
+    .file-row.selected .file-checkbox::after {
+      content: '✓';
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    @media (max-width: 768px) {
+      .file-row { padding: 10px 12px; gap: 10px; }
+      .file-icon { font-size: 22px; width: 30px; }
+      .file-name { font-size: 13px; }
+      .manage-tab { padding: 10px 16px; font-size: 14px; }
+    }
+  </style>
+  <script>
+    // Load theme
+    (function () {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      if (mode === 'auto') { var _h = new Date().getHours(); mode = (_h >= 20 || _h < 7) ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+      function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}_syncTheme();setInterval(_syncTheme,5000);
+      // Apply saved UI scale (default 120% for small screens)
+      let scale = localStorage.getItem('vernis-ui-scale');
+      if (!scale) {
+        const isSmallScreen = window.innerWidth <= 720 || window.innerHeight <= 720;
+        scale = isSmallScreen ? '120' : '100';
+        localStorage.setItem('vernis-ui-scale', scale);
+      }
+      if (scale !== '100') document.documentElement.style.fontSize = (scale / 100) * 16 + 'px';
+    })();
+  </script>
+  <script src="vernis-keyboard.js"></script>
+</head>
+
+<body>
+  <!-- Custom scrollbar - only shown when enabled in settings (for touch screens) -->
+  <div id="custom-scrollbar" class="custom-scrollbar-track">
+    <div id="custom-scrollbar-thumb" class="custom-scrollbar-thumb"></div>
+  </div>
+  <script>
+    // Auto-enable thick scrollbar on localhost (Pi)
+    (function() {
+      const setting = localStorage.getItem('vernis-thick-scrollbar');
+      if (setting === null && window.location.hostname === 'localhost') {
+        localStorage.setItem('vernis-thick-scrollbar', 'true');
+      }
+      const enabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+      if (!enabled) {
+        document.getElementById('custom-scrollbar').style.display = 'none';
+      }
+    })();
+  </script>
+  <style>
+    .custom-scrollbar-track {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: var(--scrollbar-track, rgba(128,128,128,0.2));
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .custom-scrollbar-thumb {
+      position: absolute;
+      right: 4px;
+      width: 32px;
+      background: var(--scrollbar-thumb, var(--accent-primary, rgba(150,150,150,0.8)));
+      border-radius: 16px;
+      min-height: 80px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      pointer-events: auto;
+    }
+    .custom-scrollbar-thumb:hover,
+    .custom-scrollbar-thumb:active {
+      background: var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)));
+    }
+  </style>
+  <script>
+    (function() {
+      const scrollbar = document.getElementById('custom-scrollbar');
+      const thumb = document.getElementById('custom-scrollbar-thumb');
+      if (!scrollbar || !thumb) return;
+
+      function updateThumb() {
+        const thickScrollbarEnabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+        if (!thickScrollbarEnabled) { scrollbar.style.display = 'none'; return; }
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        if (docHeight <= winHeight) { scrollbar.style.display = 'none'; return; }
+        scrollbar.style.display = 'block';
+        const scrollable = docHeight - winHeight;
+        const thumbH = Math.max(80, (winHeight / docHeight) * winHeight);
+        const thumbY = (window.scrollY / scrollable) * (winHeight - thumbH);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top = Math.max(0, thumbY) + 'px';
+      }
+      window.addEventListener('scroll', updateThumb);
+      window.addEventListener('resize', updateThumb);
+      setTimeout(updateThumb, 100);
+
+      let dragging = false, dragStartY = 0, dragStartScroll = 0;
+      thumb.addEventListener('touchstart', function(e) {
+        dragging = true;
+        dragStartY = e.touches[0].clientY;
+        dragStartScroll = window.scrollY;
+        e.stopPropagation();
+      }, { passive: true });
+      thumb.addEventListener('mousedown', function(e) {
+        dragging = true;
+        dragStartY = e.clientY;
+        dragStartScroll = window.scrollY;
+      });
+      document.addEventListener('touchmove', function(e) {
+        if (dragging && e.touches.length === 1) {
+          const delta = e.touches[0].clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      }, { passive: true });
+      document.addEventListener('mousemove', function(e) {
+        if (dragging) {
+          const delta = e.clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      });
+      document.addEventListener('touchend', function() { dragging = false; });
+      document.addEventListener('mouseup', function() { dragging = false; });
+    })();
+  </script>
+
+  <div class="header">
+    <a href="index.html" class="logo">Vernis</a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="add.html">Add Art</a>
+      <a href="library.html">Library</a>
+      <a href="manage.html">Manage Art</a>
+      <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
+    <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
+    <a href="manage.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
+    <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
+    <a href="settings.html" class="settings-parent"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</a>
+    <div class="settings-submenu">
+    <div class="menu-divider">Appearance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-theme'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Theme</div>
+    <div class="menu-divider">Display</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-display'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Display Settings</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-screensaver'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Screen Timeout</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-orientation'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Orientation</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-hue'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg> Ambient Light</div>
+    <div class="menu-divider">Content</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-github'" style="display:none;"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg> GitHub Library</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ethereum'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 3 12 12 22 21 12"/></svg> Ethereum RPC</div>
+    <div class="menu-divider">Storage</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ipfs'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> IPFS Pinning</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-external'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M6 14h2"/></svg> External Drive</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-backup'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Backup</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-storage'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Storage Health</div>
+    <div class="menu-divider">System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-wifi'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> Wi-Fi</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-performance'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Performance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-system'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.6 15H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 6.6V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-about'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About</div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const toggle = document.querySelector('.menu-toggle');
+      menu.classList.toggle('active');
+      toggle.classList.toggle('active');
+      var isOpen = menu.classList.contains('active');
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      var mc = document.querySelector('.main');
+      if (mc) mc.style.visibility = isOpen ? 'hidden' : '';
+      if (!isOpen) void document.body.offsetHeight;
+    }
+    (function(){
+      if(localStorage.getItem('vernis-moon-unlocked')==='true'||localStorage.getItem('vernis-pixels-unlocked')==='true'||localStorage.getItem('vernis-doom-unlocked')==='true'||localStorage.getItem('vernis-burner-unlocked')==='true'){
+        document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }
+      fetch('/api/easter-egg').then(function(r){return r.json();}).then(function(s){
+        if(s.moon||s.pixels||s.doom||s.burner) document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }).catch(function(){});
+    })();
+
+    // Touch scroll helper
+    (function () {
+      let startY = 0;
+      document.addEventListener('touchstart', function (e) {
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+      document.addEventListener('touchmove', function (e) {
+        var menu = document.getElementById('mobileMenu');
+        if (menu && menu.classList.contains('active')) return;
+        if (Math.abs(e.touches[0].clientY - startY) > 10) {
+          document.body.style.touchAction = 'pan-y';
+        }
+      }, { passive: true });
+    })();
+  </script>
+
+  <div class="main">
+    <h1>Manage Art</h1>
+    <div class="subtitle">Select which NFTs to display in your gallery slideshow</div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="total-count">0</div>
+        <div class="stat-label">Total NFTs</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="visible-count">0</div>
+        <div class="stat-label">In Slideshow</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="hidden-count">0</div>
+        <div class="stat-label">Hidden</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="selected-count">0</div>
+        <div class="stat-label">Selected</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="manage-tabs">
+      <button class="manage-tab active" id="tab-artworks" onclick="switchManageTab('artworks')">Artworks</button>
+      <button class="manage-tab" id="tab-ipfs" onclick="switchManageTab('ipfs')">All IPFS Files</button>
+    </div>
+
+    <div id="artworks-tab">
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <button class="btn btn-secondary" id="refresh-btn" onclick="refreshList()" title="Refresh list">↻
+          Refresh</button>
+        <button class="btn" onclick="selectAll()">Select All</button>
+        <button class="btn btn-secondary" onclick="selectNone()">Deselect All</button>
+        <button class="btn btn-secondary" onclick="invertSelection()">Invert Selection</button>
+      </div>
+
+      <div class="toolbar-group" style="width:100%; margin-top:10px; padding-top:10px; border-top:1px solid #444;">
+        <button class="btn btn-primary" onclick="showOnlySelected()">Show Only Selected</button>
+        <button class="btn btn-primary" onclick="showSelected()">Add to Gallery</button>
+        <button class="btn" onclick="hideSelected()">Hide Selected</button>
+        <button class="btn" onclick="previewSelectedInGallery()" title="Open gallery with only selected artworks">Preview in Gallery</button>
+      </div>
+      <div style="width:100%; font-size:12px; color:var(--text-muted,#888); margin-top:6px; line-height:1.4;">
+        Tap artworks to select them, then use the buttons above to control which ones appear in your gallery slideshow.
+      </div>
+
+      <!-- Sub-tabs for Filters, Collections, Carousels -->
+      <div class="toolbar-subtabs" style="width:100%; margin-top:10px; padding-top:10px; border-top:1px solid #444; display:flex; gap:0; border-bottom:2px solid var(--border-light,#333);">
+        <button class="toolbar-subtab" id="subtab-filters" onclick="switchToolbarSubtab('filters')">Filters</button>
+        <button class="toolbar-subtab" id="subtab-collections" onclick="switchToolbarSubtab('collections')">Collections</button>
+        <button class="toolbar-subtab" id="subtab-carousels" onclick="switchToolbarSubtab('carousels')">Slideshow Presets</button>
+      </div>
+
+      <div id="filters-section" style="display: none; width:100%; padding: 10px 0;">
+        <div class="toolbar-group" style="width:100%; flex-wrap: wrap;">
+          <select id="filter" onchange="filterNFTs()">
+            <option value="all">All NFTs</option>
+            <option value="visible">In Slideshow</option>
+            <option value="hidden">Hidden</option>
+          </select>
+
+          <select id="artistFilter" onchange="filterNFTs()">
+            <option value="">All Artists</option>
+          </select>
+
+          <select id="sort" onchange="sortNFTs()">
+            <option value="name-asc">Name A-Z</option>
+            <option value="name-desc">Name Z-A</option>
+            <option value="date-desc">Newest First</option>
+            <option value="date-asc">Oldest First</option>
+            <option value="size-desc">Largest First</option>
+            <option value="size-asc">Smallest First</option>
+            <option value="collection">By Collection</option>
+            <option value="artist">By Artist</option>
+          </select>
+
+          <input type="text" id="search" placeholder="Search..." oninput="searchNFTs()">
+        </div>
+        <div class="toolbar-group" style="width:100%; margin-top:10px; padding-top:10px; border-top:1px solid #333;">
+          <button class="btn btn-danger" onclick="deleteSelected()">Delete Selected</button>
+        </div>
+      </div>
+
+      <div id="collections-section" style="display: none; width:100%; padding: 10px 0;">
+        <div class="storage-type-section" id="storage-type-section" style="display:none; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid #444;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <div style="font-size:13px; font-weight:600; color:var(--text-secondary,#aaa);">Storage Type</div>
+            <button onclick="document.getElementById('storage-legend').style.display=document.getElementById('storage-legend').style.display==='none'?'':'none'" style="background:none; border:1px solid var(--border-light,#444); border-radius:50%; width:20px; height:20px; color:var(--text-muted,#888); font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; line-height:1;" title="What do these icons mean?">?</button>
+          </div>
+          <div class="storage-type-summary" id="storage-type-summary"></div>
+          <div id="storage-legend" style="display:none; margin-top:10px; padding:12px; background:var(--bg-tertiary,#1a1a1a); border-radius:10px; font-size:12px; line-height:1.8;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; background:rgba(0,180,180,0.85);"><svg viewBox="0 0 24 24" fill="white" style="width:13px;height:13px;"><path d="M12 1L3 6.5v11L12 23l9-5.5v-11L12 1zm0 2.3l6.5 4L12 11.2 5.5 7.3 12 3.3zM4.5 8.6l6.5 4v8.1l-6.5-4V8.6zm9 12.1v-8.1l6.5-4v8.1l-6.5 4z"/></svg></span><span><strong style="color:#00e6e6;">IPFS</strong> <span style="color:var(--text-muted,#888);">— Pinned on the distributed IPFS network. Permanent as long as at least one node pins it.</span></span></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; background:rgba(140,140,140,0.85);"><svg viewBox="0 0 24 24" fill="white" style="width:13px;height:13px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-1v-2h1c2.76 0 5-2.24 5-5s-2.24-5-5-5H9v7H7V5h4c3.87 0 7 3.13 7 7s-3.13 7-7 7z"/></svg></span><span><strong style="color:#ccc;">Arweave</strong> <span style="color:var(--text-muted,#888);">— Stored permanently on Arweave blockchain. Cannot be deleted or modified.</span></span></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; background:rgba(200,160,0,0.85);"><svg viewBox="0 0 24 24" fill="white" style="width:13px;height:13px;"><path d="M8 11h3v10h2V11h3l-4-4-4 4zM4 3v2h16V3H4z"/><path d="M7 7l5-5 5 5" fill="none" stroke="white" stroke-width="1.5"/></svg></span><span><strong style="color:#ffc800;">On-chain</strong> <span style="color:var(--text-muted,#888);">— Artwork data lives directly on the blockchain (e.g. Ethereum). Fully decentralized.</span></span></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:5px; background:rgba(80,80,80,0.7);"><svg viewBox="0 0 24 24" fill="white" style="width:13px;height:13px;"><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg></span><span><strong style="color:#999;">Cloud/URL</strong> <span style="color:var(--text-muted,#888);">— Downloaded from a server URL. May become unavailable if the server goes offline.</span></span></div>
+          </div>
+          <div id="storage-type-toggles"></div>
+        </div>
+        <div id="async-layer-row" class="collection-toggle-row" style="display:none; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #444;">
+          <div class="collection-toggle-info">
+            <span class="collection-toggle-name">Async Layers</span>
+            <span class="collection-toggle-count" id="async-layer-count"></span>
+          </div>
+          <div class="collection-toggle-switch" id="async-layer-toggle"
+               onclick="toggleAsyncLayers(this)"></div>
+        </div>
+        <div class="toolbar-group" style="width:100%; margin-bottom:8px;">
+          <button class="btn btn-secondary" onclick="collectionToggleAll(true)">All On</button>
+          <button class="btn btn-secondary" onclick="collectionToggleAll(false)">All Off</button>
+        </div>
+        <div class="collections-toggle-list" id="collections-toggle-list"></div>
+      </div>
+
+      <div id="carousel-section" style="display: none; width:100%; padding: 10px 0;">
+        <div class="toolbar-group" style="width:100%; flex-wrap: wrap;">
+          <select id="savedCarousels" style="min-width:180px;">
+            <option value="">-- Select Preset --</option>
+          </select>
+          <button class="btn btn-secondary" onclick="loadCarousel()">Load</button>
+          <button class="btn btn-secondary" onclick="deleteCarousel()">Delete</button>
+          <button class="btn" onclick="saveCarouselPrompt()">Save Current</button>
+          <button class="btn btn-secondary" onclick="downloadCarousel()">Download</button>
+          <button class="btn btn-secondary"
+            onclick="document.getElementById('importCarouselFile').click()">Import</button>
+          <input type="file" id="importCarouselFile" accept=".json" style="display:none;"
+            onchange="importCarousel(event)">
+        </div>
+      </div>
+
+      <div id="metadataAutoStatus" style="display:none; width:100%; margin-top:6px; padding: 6px 10px; font-size: 12px; color: var(--text-muted); background: var(--card-bg, #1a1a2e); border-radius: 8px;"></div>
+    </div>
+
+    <!-- Grid -->
+    <div id="loading" class="loading"><div class="load-spinner"></div>Loading your artworks...<br><span style="font-size:13px;color:var(--text-muted);">Generating thumbnails for first load may take a moment</span></div>
+    <div id="grid" class="grid" style="display:none;"></div>
+    <div id="empty" class="empty" style="display:none;">
+      <p style="font-size:80px; opacity:0.2;">🖼️</p>
+      <h3>No NFTs found</h3>
+      <p>Add some NFTs to get started</p>
+    </div>
+    </div><!-- /artworks-tab -->
+
+    <div id="ipfs-tab" style="display: none;">
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="ipfs-total">0</div>
+          <div class="stat-label">Total Files</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="ipfs-size">0 MB</div>
+          <div class="stat-label">Total Size</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="ipfs-selected-count">0</div>
+          <div class="stat-label">Selected</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="toolbar-group">
+          <button class="btn btn-secondary" onclick="loadIpfsFiles()">↻ Refresh</button>
+          <button class="btn" onclick="selectAllIpfs()">Select All</button>
+          <button class="btn btn-secondary" onclick="deselectAllIpfs()">Deselect</button>
+        </div>
+        <div class="toolbar-group" style="width:100%; margin-top:10px; padding-top:10px; border-top:1px solid #444;">
+          <select id="ipfs-type-filter" onchange="filterIpfsFiles()">
+            <option value="">All Types</option>
+            <option value="json">JSON Metadata</option>
+            <option value="image">Images</option>
+            <option value="video">Video</option>
+            <option value="other">Other</option>
+          </select>
+          <input type="text" id="ipfs-search" placeholder="Search by name or CID..." oninput="filterIpfsFiles()">
+        </div>
+        <div class="toolbar-group" style="width:100%; margin-top:10px; padding-top:10px; border-top:1px solid #444;">
+          <button class="btn btn-danger" onclick="deleteSelectedIpfs()">Delete Selected</button>
+        </div>
+      </div>
+
+      <div id="ipfs-loading" class="loading">Loading all IPFS files...</div>
+      <div id="ipfs-list" class="file-list" style="display:none;"></div>
+      <div id="ipfs-empty" class="empty" style="display:none;">
+        <p style="font-size:80px; opacity:0.2;">📦</p>
+        <h3>No IPFS files found</h3>
+        <p>Add art from the <a href="add.html" style="color:var(--accent-primary)">Add Art</a> page</p>
+      </div>
+    </div><!-- /ipfs-tab -->
+  </div>
+
+  <script>
+    let allNFTs = [];
+    let selectedNFTs = new Set();
+    let hiddenNFTs = new Set();
+    let metadataCache = { nfts: {}, collections: [], artists: [] };
+    let collectionToggles = {};
+    let storageToggles = { ipfs: true, arweave: true, on_chain: true, copy: true };
+    let showAsyncLayers = false; // default OFF — hides layer/state cards
+
+    // Storage type toggle persistence
+    function loadStorageToggles() {
+      try {
+        var saved = localStorage.getItem('vernis-storage-toggles');
+        if (saved) storageToggles = JSON.parse(saved);
+      } catch(e) {}
+    }
+    function saveStorageToggles() {
+      try { localStorage.setItem('vernis-storage-toggles', JSON.stringify(storageToggles)); } catch(e) {}
+    }
+
+    // Collection toggle persistence
+    function loadCollectionToggles() {
+      try {
+        const saved = localStorage.getItem('vernis-csv-toggles');
+        if (saved) collectionToggles = JSON.parse(saved);
+      } catch (e) { collectionToggles = {}; }
+    }
+    function saveCollectionToggles() {
+      localStorage.setItem('vernis-csv-toggles', JSON.stringify(collectionToggles));
+    }
+
+    // Async layer toggle persistence
+    function loadAsyncLayerToggle() {
+      try {
+        const saved = localStorage.getItem('vernis-async-layers');
+        if (saved !== null) showAsyncLayers = JSON.parse(saved);
+      } catch (e) {}
+    }
+    function saveAsyncLayerToggle() {
+      localStorage.setItem('vernis-async-layers', JSON.stringify(showAsyncLayers));
+    }
+
+    // Toggle the collections section open/closed
+    var activeSubtab = '';
+    function switchToolbarSubtab(tab) {
+      var tabs = ['filters', 'collections', 'carousels'];
+      var sectionIds = { filters: 'filters-section', collections: 'collections-section', carousels: 'carousel-section' };
+      if (activeSubtab === tab) {
+        // clicking active tab closes it
+        document.getElementById('subtab-' + tab).classList.remove('active');
+        document.getElementById(sectionIds[tab]).style.display = 'none';
+        activeSubtab = '';
+        return;
+      }
+      tabs.forEach(function(t) {
+        document.getElementById('subtab-' + t).classList.toggle('active', t === tab);
+        document.getElementById(sectionIds[t]).style.display = t === tab ? 'block' : 'none';
+      });
+      activeSubtab = tab;
+    }
+
+    // Legacy toggle aliases (kept for any external calls)
+    function toggleCollectionsSection() { switchToolbarSubtab('collections'); }
+    function toggleFiltersSection() { switchToolbarSubtab('filters'); }
+
+    // Build collection toggle switches grouped by CSV source file
+    function buildCollectionToggles() {
+      loadCollectionToggles();
+      const container = document.getElementById('collections-toggle-list');
+      if (!container) return;
+
+      // Count NFTs per source CSV file
+      const counts = {};
+      allNFTs.forEach(nft => {
+        const meta = getNFTMetadata(nft.filename);
+        const key = meta.source_csv || 'Other';
+        counts[key] = (counts[key] || 0) + 1;
+      });
+
+      const sorted = Object.keys(counts).sort((a, b) => {
+        if (a === 'Other') return 1;
+        if (b === 'Other') return -1;
+        return a.localeCompare(b);
+      });
+      let onCount = 0;
+      const total = sorted.length;
+
+      let html = '';
+      sorted.forEach(csvFile => {
+        const isOn = collectionToggles[csvFile] !== false;
+        if (isOn) onCount++;
+        const label = csvFile === 'Other' ? 'Other' : csvFile.replace(/\.csv$/i, '').replace(/_/g, ' ');
+        html += `<div class="collection-toggle-row">
+          <div class="collection-toggle-info">
+            <span class="collection-toggle-name" title="${label}">${label}</span>
+            <span class="collection-toggle-count">(${counts[csvFile]})</span>
+          </div>
+          <div class="collection-toggle-switch${isOn ? ' active' : ''}" onclick="toggleCollectionSwitch(this, '${csvFile.replace(/'/g, "\\'")}')"></div>
+        </div>`;
+      });
+
+      container.innerHTML = html;
+
+      // Update sub-tab label with count
+      const headerLabel = document.getElementById('subtab-collections');
+      if (headerLabel) headerLabel.textContent = `Collections (${onCount}/${total})`;
+
+      // Async layers toggle — show only if async NFTs exist
+      loadAsyncLayerToggle();
+      const asyncCount = allNFTs.filter(n => { const m = getNFTMetadata(n.filename); return m.async_type === 'layer' || m.async_type === 'state'; }).length;
+      const asyncRow = document.getElementById('async-layer-row');
+      const asyncToggle = document.getElementById('async-layer-toggle');
+      const asyncLabel = document.getElementById('async-layer-count');
+      if (asyncRow) asyncRow.style.display = asyncCount > 0 ? '' : 'none';
+      if (asyncToggle) { if (showAsyncLayers) asyncToggle.classList.add('active'); else asyncToggle.classList.remove('active'); }
+      if (asyncLabel) asyncLabel.textContent = `(${asyncCount})`;
+    }
+
+    // Toggle a single collection
+    function toggleCollectionSwitch(el, coll) {
+      const isActive = el.classList.toggle('active');
+      collectionToggles[coll] = isActive;
+      saveCollectionToggles();
+      buildCollectionToggleLabel();
+      renderNFTs();
+    }
+
+    function toggleAsyncLayers(el) {
+      showAsyncLayers = el.classList.toggle('active');
+      saveAsyncLayerToggle();
+      renderNFTs();
+    }
+
+    // Build storage type toggle switches
+    function buildStorageToggles() {
+      loadStorageToggles();
+      var counts = { ipfs: 0, arweave: 0, on_chain: 0, copy: 0 };
+      allNFTs.forEach(function(nft) {
+        var meta = getNFTMetadata(nft.filename);
+        var st = meta.storage_type || 'copy';
+        counts[st] = (counts[st] || 0) + 1;
+      });
+      var total = counts.ipfs + counts.arweave + counts.on_chain + counts.copy;
+      if (total === 0) return;
+
+      var section = document.getElementById('storage-type-section');
+      if (section) section.style.display = '';
+
+      // Summary chips
+      var summaryEl = document.getElementById('storage-type-summary');
+      if (summaryEl) {
+        var parts = [];
+        if (counts.ipfs > 0) parts.push('<span class="storage-stat stat-ipfs">' + _storageIcons.ipfs + ' IPFS: ' + counts.ipfs + '</span>');
+        if (counts.arweave > 0) parts.push('<span class="storage-stat stat-arweave">' + _storageIcons.arweave + ' Arweave: ' + counts.arweave + '</span>');
+        if (counts.on_chain > 0) parts.push('<span class="storage-stat stat-on_chain">' + _storageIcons.on_chain + ' On-chain: ' + counts.on_chain + '</span>');
+        if (counts.copy > 0) parts.push('<span class="storage-stat stat-copy">' + _storageIcons.copy + ' Copy: ' + counts.copy + '</span>');
+        summaryEl.innerHTML = parts.join('');
+      }
+
+      // Toggle switches
+      var togglesEl = document.getElementById('storage-type-toggles');
+      if (togglesEl) {
+        var types = [
+          { key: 'ipfs', label: 'IPFS Pinned', count: counts.ipfs },
+          { key: 'arweave', label: 'Arweave', count: counts.arweave },
+          { key: 'on_chain', label: 'On-chain', count: counts.on_chain },
+          { key: 'copy', label: 'CDN Copy', count: counts.copy }
+        ];
+        var html = '';
+        types.forEach(function(t) {
+          if (t.count === 0) return;
+          var isOn = storageToggles[t.key] !== false;
+          html += '<div class="collection-toggle-row">' +
+            '<div class="collection-toggle-info">' +
+            '<span class="collection-toggle-name">' + t.label + '</span>' +
+            '<span class="collection-toggle-count">(' + t.count + ')</span>' +
+            '</div>' +
+            '<div class="collection-toggle-switch' + (isOn ? ' active' : '') + '" onclick="toggleStorageType(this, \'' + t.key + '\')"></div>' +
+            '</div>';
+        });
+        togglesEl.innerHTML = html;
+      }
+    }
+
+    function toggleStorageType(el, type) {
+      var isActive = el.classList.toggle('active');
+      storageToggles[type] = isActive;
+      saveStorageToggles();
+      renderNFTs();
+    }
+
+    // Update just the header label count
+    function buildCollectionToggleLabel() {
+      const container = document.getElementById('collections-toggle-list');
+      if (!container) return;
+      const switches = container.querySelectorAll('.collection-toggle-switch');
+      let on = 0;
+      switches.forEach(s => { if (s.classList.contains('active')) on++; });
+      const label = document.getElementById('subtab-collections');
+      if (label) label.textContent = `Collections (${on}/${switches.length})`;
+    }
+
+    // Bulk toggle all collections on or off
+    function collectionToggleAll(state) {
+      const container = document.getElementById('collections-toggle-list');
+      if (!container) return;
+      container.querySelectorAll('.collection-toggle-switch').forEach(s => {
+        if (state) s.classList.add('active');
+        else s.classList.remove('active');
+      });
+      // Update state object
+      Object.keys(collectionToggles).forEach(k => collectionToggles[k] = state);
+      // Also set any collections we know about
+      const rows = container.querySelectorAll('.collection-toggle-row');
+      rows.forEach(row => {
+        const name = row.querySelector('.collection-toggle-name').textContent;
+        collectionToggles[name] = state;
+      });
+      saveCollectionToggles();
+      buildCollectionToggleLabel();
+      renderNFTs();
+    }
+
+    // Load NFTs
+    async function loadNFTs() {
+      try {
+        // Add cache-busting timestamp to ensure fresh data
+        const response = await fetch('/api/nft-list-detailed?t=' + Date.now());
+        const data = await response.json();
+
+        allNFTs = data.nfts || [];
+        // Filter hidden list to only include files that still exist
+        const existingFilenames = new Set(allNFTs.map(n => n.filename));
+        const validHidden = (data.hidden || []).filter(f => existingFilenames.has(f));
+        hiddenNFTs = new Set(validHidden);
+
+        // Load metadata cache
+        await loadMetadataCache();
+
+        document.getElementById('loading').style.display = 'none';
+
+        if (allNFTs.length === 0) {
+          document.getElementById('empty').style.display = 'block';
+        } else {
+          document.getElementById('grid').style.display = 'grid';
+          renderNFTs();
+          updateStats();
+        }
+      } catch (error) {
+        document.getElementById('loading').innerHTML = '<p style="color:#f66;">Error loading NFTs</p>';
+      }
+    }
+
+    // Load metadata cache
+    async function loadMetadataCache() {
+      try {
+        const response = await fetch('/api/nft-metadata?t=' + Date.now());
+        metadataCache = await response.json();
+        populateFilterDropdowns();
+        updateMetadataStatus();
+      } catch (error) {
+        console.error('Error loading metadata:', error);
+      }
+    }
+
+    // Populate collection and artist filter dropdowns
+    function populateFilterDropdowns() {
+      const artistSelect = document.getElementById('artistFilter');
+
+      // Clear existing options except first
+      artistSelect.innerHTML = '<option value="">All Artists</option>';
+
+      // Add artists
+      (metadataCache.artists || []).forEach(artist => {
+        const opt = document.createElement('option');
+        opt.value = artist;
+        opt.textContent = artist;
+        artistSelect.appendChild(opt);
+      });
+
+      // Build collection toggle switches
+      buildCollectionToggles();
+      buildStorageToggles();
+    }
+
+    // Update metadata status display
+    function updateMetadataStatus() {
+      const status = document.getElementById('metadataStatus');
+      const nftCount = Object.keys(metadataCache.nfts || {}).length;
+      const collCount = (metadataCache.collections || []).length;
+      const artistCount = (metadataCache.artists || []).length;
+      status.textContent = `${nftCount} indexed | ${collCount} collections | ${artistCount} artists`;
+    }
+
+    // Get metadata for an NFT
+    function getNFTMetadata(filename) {
+      return metadataCache.nfts[filename] || {};
+    }
+
+    // Sort NFTs
+    function sortNFTs() {
+      renderNFTs();
+    }
+
+    // Parse size string to bytes for sorting
+    function parseSizeToBytes(sizeStr) {
+      if (!sizeStr) return 0;
+      const match = sizeStr.match(/([\d.]+)\s*(KB|MB|GB|B)/i);
+      if (!match) return 0;
+      const num = parseFloat(match[1]);
+      const unit = match[2].toUpperCase();
+      const multipliers = { 'B': 1, 'KB': 1024, 'MB': 1024 * 1024, 'GB': 1024 * 1024 * 1024 };
+      return num * (multipliers[unit] || 1);
+    }
+
+    // Extract collection from filename (e.g., "CollectionName_001.jpg" -> "CollectionName")
+    function getCollection(filename) {
+      // Try to extract collection from CID-based names or standard names
+      const parts = filename.split('_');
+      if (parts.length > 1) {
+        return parts[0];
+      }
+      // For CID-style names, group by first 8 chars
+      return filename.substring(0, 8);
+    }
+
+    // Render NFT grid
+    function renderNFTs() {
+      const filter = document.getElementById('filter').value;
+      const artistFilter = document.getElementById('artistFilter').value;
+      const search = document.getElementById('search').value.toLowerCase();
+      const sortBy = document.getElementById('sort').value;
+
+      let filtered = allNFTs.filter(nft => {
+        const meta = getNFTMetadata(nft.filename);
+
+        // Visibility filter
+        const matchesFilter = filter === 'all' ||
+          (filter === 'visible' && !hiddenNFTs.has(nft.filename)) ||
+          (filter === 'hidden' && hiddenNFTs.has(nft.filename));
+
+        // Collection toggle filter (by source CSV file)
+        const collKey = meta.source_csv || 'Other';
+        const matchesCollection = collectionToggles[collKey] !== false;
+
+        // Async layer/state filter
+        const matchesAsync = showAsyncLayers || !meta.async_type || meta.async_type === 'master';
+
+        // Artist filter
+        const matchesArtist = !artistFilter || meta.artist === artistFilter;
+
+        // Storage type filter
+        const matchesStorage = storageToggles[meta.storage_type || 'copy'] !== false;
+
+        // Search filter (search name, collection, artist)
+        const searchText = [nft.filename, meta.name || '', meta.collection || '', meta.artist || ''].join(' ').toLowerCase();
+        const matchesSearch = !search || searchText.includes(search);
+
+        return matchesFilter && matchesCollection && matchesAsync && matchesArtist && matchesSearch && matchesStorage;
+      });
+
+      // Sort the filtered results
+      filtered.sort((a, b) => {
+        const metaA = getNFTMetadata(a.filename);
+        const metaB = getNFTMetadata(b.filename);
+
+        switch (sortBy) {
+          case 'name-asc':
+            return a.filename.localeCompare(b.filename);
+          case 'name-desc':
+            return b.filename.localeCompare(a.filename);
+          case 'date-desc':
+            return (b.mtime || 0) - (a.mtime || 0);
+          case 'date-asc':
+            return (a.mtime || 0) - (b.mtime || 0);
+          case 'size-desc':
+            return parseSizeToBytes(b.size) - parseSizeToBytes(a.size);
+          case 'size-asc':
+            return parseSizeToBytes(a.size) - parseSizeToBytes(b.size);
+          case 'collection':
+            const collA = metaA.collection || getCollection(a.filename);
+            const collB = metaB.collection || getCollection(b.filename);
+            return collA.localeCompare(collB) || a.filename.localeCompare(b.filename);
+          case 'artist':
+            const artA = metaA.artist || '';
+            const artB = metaB.artist || '';
+            return artA.localeCompare(artB) || a.filename.localeCompare(b.filename);
+          default:
+            return 0;
+        }
+      });
+
+      const grid = document.getElementById('grid');
+      grid.innerHTML = filtered.map(nft => {
+        const isHidden = hiddenNFTs.has(nft.filename);
+        const isSelected = selectedNFTs.has(nft.filename);
+        const isVideo = nft.filename.endsWith('.mp4');
+        const meta = getNFTMetadata(nft.filename);
+        const displayName = meta.name || nft.filename;
+        const safeFilename = escHTML(nft.filename).replace(/'/g, "&#39;");
+        const safeDisplayName = escHTML(displayName);
+        const collectionBadge = meta.collection ? `<span style="color:var(--accent-primary);font-size:11px;">${escHTML(meta.collection)}</span>` : '';
+        const storageType = meta.storage_type || 'copy';
+        const storageBadgeHtml = getStorageBadgeHtml(storageType);
+        const asyncBadge = meta.async_type === 'master' ?
+          '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(100,200,255,0.15);color:var(--accent-primary);border:1px solid rgba(100,200,255,0.25);vertical-align:middle;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:4px;">Master</span>' :
+          meta.async_type === 'layer' ?
+          '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(180,130,255,0.15);color:#b482ff;border:1px solid rgba(180,130,255,0.25);vertical-align:middle;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:4px;">Layer</span>' : '';
+
+        return `
+      <div class="nft-card ${isSelected ? 'selected' : ''} ${isHidden ? 'hidden-nft' : ''}"
+           data-filename="${safeFilename}"
+           onclick="toggleSelect('${safeFilename}')">
+        <div class="checkbox-overlay"></div>
+        ${isHidden ? '<div class="hidden-badge">Hidden</div>' : ''}
+        ${storageBadgeHtml}
+        ${isVideo ?
+            `<video class="nft-img" src="${nft.url}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>` :
+            `<img class="nft-img" src="/api/thumbnail/${encodeURIComponent(nft.filename)}" alt="${safeFilename}" loading="lazy" onload="this.classList.add('thumb-loaded')" onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='${nft.url}'}else{this.onerror=null;this.classList.add('thumb-loaded');this.style.display='none';this.parentNode.insertAdjacentHTML('afterbegin','<div style=\\'width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(180,130,255,0.15),rgba(100,200,255,0.1));color:#b482ff;font-size:13px;font-weight:600;\\'>${meta.async_type==='layer'?'Layer':meta.async_type==='state'?'State':'?'}</div>')}">`
+          }
+        <div class="nft-info">
+          <div class="nft-name" title="${safeFilename}">${safeDisplayName}${asyncBadge}</div>
+          <div class="nft-size">${escHTML(nft.size)} ${collectionBadge}</div>
+        </div>
+      </div>
+    `;
+      }).join('');
+
+      updateStats();
+    }
+
+    // Toggle selection
+    function toggleSelect(filename) {
+      if (selectedNFTs.has(filename)) {
+        selectedNFTs.delete(filename);
+      } else {
+        selectedNFTs.add(filename);
+      }
+      renderNFTs();
+    }
+
+    // Selection functions
+    function selectAll() {
+      const filter = document.getElementById('filter').value;
+      const artistFilter = document.getElementById('artistFilter').value;
+      const search = document.getElementById('search').value.toLowerCase();
+      allNFTs.forEach(nft => {
+        const meta = getNFTMetadata(nft.filename);
+
+        // Visibility filter
+        const matchesFilter = filter === 'all' ||
+          (filter === 'visible' && !hiddenNFTs.has(nft.filename)) ||
+          (filter === 'hidden' && hiddenNFTs.has(nft.filename));
+
+        // Collection toggle filter (by source CSV file)
+        const collKey = meta.source_csv || 'Other';
+        const matchesCollection = collectionToggles[collKey] !== false;
+
+        // Async layer/state filter
+        const matchesAsync = showAsyncLayers || !meta.async_type || meta.async_type === 'master';
+
+        // Artist filter
+        const matchesArtist = !artistFilter || meta.artist === artistFilter;
+
+        // Search filter
+        const searchText = [nft.filename, meta.name || '', meta.collection || '', meta.artist || ''].join(' ').toLowerCase();
+        const matchesSearch = !search || searchText.includes(search);
+
+        if (matchesFilter && matchesCollection && matchesAsync && matchesArtist && matchesSearch) {
+          selectedNFTs.add(nft.filename);
+        }
+      });
+      renderNFTs();
+    }
+
+    function selectNone() {
+      selectedNFTs.clear();
+      renderNFTs();
+    }
+
+    function invertSelection() {
+      const newSelection = new Set();
+      allNFTs.forEach(nft => {
+        if (!selectedNFTs.has(nft.filename)) {
+          newSelection.add(nft.filename);
+        }
+      });
+      selectedNFTs = newSelection;
+      renderNFTs();
+    }
+
+    // Filter and search
+    function filterNFTs() {
+      renderNFTs();
+    }
+
+    function searchNFTs() {
+      renderNFTs();
+    }
+
+    // Toggle carousel section
+    function toggleCarouselSection() { switchToolbarSubtab('carousels'); }
+
+    // Show Only Selected - hides everything except selected NFTs
+    async function showOnlySelected() {
+      if (selectedNFTs.size === 0) return showError('Select the NFTs you want in the slideshow first');
+
+      const hideCount = allNFTs.length - selectedNFTs.size;
+      if (!await vernisConfirm(`Create slideshow with ${selectedNFTs.size} NFTs? (${hideCount} will be hidden)`)) return;
+
+      const dismissLoading = showLoading('Creating slideshow...');
+      try {
+        // Hide everything not selected
+        const toHide = allNFTs.map(n => n.filename).filter(f => !selectedNFTs.has(f));
+        // Show everything selected (in case some were hidden)
+        const toShow = Array.from(selectedNFTs);
+
+        // First show selected ones
+        if (toShow.length > 0) {
+          await fetch('/api/nft-visibility', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'show', filenames: toShow })
+          });
+        }
+
+        // Then hide the rest
+        if (toHide.length > 0) {
+          await fetch('/api/nft-visibility', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'hide', filenames: toHide })
+          });
+        }
+
+        // Update local state
+        hiddenNFTs = new Set(toHide);
+        selectedNFTs.clear();
+        renderNFTs();
+        dismissLoading();
+        showSuccess(`Slideshow created with ${toShow.length} NFTs`);
+      } catch (error) {
+        dismissLoading();
+        showError('Error creating slideshow');
+      }
+    }
+
+    // Actions
+    async function hideSelected() {
+      if (selectedNFTs.size === 0) return showError('No NFTs selected');
+
+
+      if (await vernisConfirm(`Hide ${selectedNFTs.size} NFTs from slideshow?`)) {
+        const dismissLoading = showLoading('Hiding NFTs...');
+        try {
+          const response = await fetch('/api/nft-visibility', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'hide',
+              filenames: Array.from(selectedNFTs)
+            })
+          });
+
+          const result = await response.json();
+          dismissLoading();
+          if (result.success) {
+            selectedNFTs.forEach(f => hiddenNFTs.add(f));
+            selectedNFTs.clear();
+            renderNFTs();
+            showSuccess('NFTs hidden from slideshow');
+          }
+        } catch (error) {
+          dismissLoading();
+          showError('Error hiding NFTs');
+        }
+      }
+    }
+
+
+
+    function previewSelectedInGallery() {
+      if (selectedNFTs.size === 0) return showError('Select artworks to preview first');
+      localStorage.setItem('vernis-gallery-preview', JSON.stringify(Array.from(selectedNFTs)));
+      window.open('gallery.html?preview=1', '_blank');
+    }
+
+    async function showSelected() {
+      if (selectedNFTs.size === 0) return showError('No NFTs selected');
+
+      const dismissLoading = showLoading('Adding NFTs to slideshow...');
+      try {
+        const response = await fetch('/api/nft-visibility', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'show',
+            filenames: Array.from(selectedNFTs)
+          })
+        });
+
+        const result = await response.json();
+        dismissLoading();
+        if (result.success) {
+          selectedNFTs.forEach(f => hiddenNFTs.delete(f));
+          selectedNFTs.clear();
+          renderNFTs();
+          showSuccess('NFTs added to slideshow');
+        }
+      } catch (error) {
+        dismissLoading();
+        showError('Error showing NFTs');
+      }
+    }
+
+    async function hideAllNFTs() {
+      if (allNFTs.length === 0) return showError('No NFTs to hide');
+
+      if (await vernisConfirm(`Hide all ${allNFTs.length} NFTs from slideshow?`)) {
+        const dismissLoading = showLoading('Hiding all NFTs...');
+        try {
+          const allFilenames = allNFTs.map(nft => nft.filename);
+          const response = await fetch('/api/nft-visibility', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'hide',
+              filenames: allFilenames
+            })
+          });
+
+          const result = await response.json();
+          dismissLoading();
+          if (result.success) {
+            allFilenames.forEach(f => hiddenNFTs.add(f));
+            selectedNFTs.clear();
+            renderNFTs();
+            showSuccess('All NFTs hidden from slideshow');
+          }
+        } catch (error) {
+          dismissLoading();
+          showError('Error hiding NFTs');
+        }
+      }
+    }
+
+    async function showAllNFTs() {
+      if (hiddenNFTs.size === 0) return showError('No hidden NFTs to show');
+
+      if (await vernisConfirm(`Show all ${hiddenNFTs.size} hidden NFTs in slideshow?`)) {
+        const dismissLoading = showLoading('Showing all NFTs...');
+        try {
+          const response = await fetch('/api/nft-visibility', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'show',
+              filenames: Array.from(hiddenNFTs)
+            })
+          });
+
+          const result = await response.json();
+          dismissLoading();
+          if (result.success) {
+            hiddenNFTs.clear();
+            selectedNFTs.clear();
+            renderNFTs();
+            showSuccess('All NFTs shown in slideshow');
+          }
+        } catch (error) {
+          dismissLoading();
+          showError('Error showing NFTs');
+        }
+      }
+    }
+
+    async function deleteSelected() {
+      if (selectedNFTs.size === 0) return showError('No NFTs selected');
+
+      if (await vernisConfirm(`⚠️ Permanently delete ${selectedNFTs.size} NFT files? This cannot be undone!`)) {
+
+        try {
+          const response = await fetch('/api/nft-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filenames: Array.from(selectedNFTs)
+            })
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            allNFTs = allNFTs.filter(nft => !selectedNFTs.has(nft.filename));
+            selectedNFTs.forEach(f => hiddenNFTs.delete(f));
+            selectedNFTs.clear();
+            renderNFTs();
+            showSuccess(`Deleted ${result.deleted} files`);
+          }
+        } catch (error) {
+          showError('Error deleting NFTs');
+        }
+      }
+    }
+
+
+    // Update stats
+    function updateStats() {
+      const visibleCount = allNFTs.length - hiddenNFTs.size;
+      document.getElementById('total-count').textContent = allNFTs.length;
+      document.getElementById('visible-count').textContent = visibleCount;
+      document.getElementById('hidden-count').textContent = hiddenNFTs.size;
+      document.getElementById('selected-count').textContent = selectedNFTs.size;
+
+    }
+
+    // =====================
+    // Carousel Management
+    // =====================
+
+    // Load saved carousels list
+    async function loadSavedCarousels() {
+      try {
+        const response = await fetch('/api/carousels');
+        const data = await response.json();
+        const select = document.getElementById('savedCarousels');
+        select.innerHTML = '<option value="">-- Select Preset --</option>';
+        (data.carousels || []).forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+      } catch (error) {
+        console.error('Error loading carousels:', error);
+      }
+    }
+
+    // Save current carousel
+    async function saveCarouselPrompt() {
+      const name = await vernisPrompt('Name this slideshow');
+      if (!name || !name.trim()) return;
+
+      try {
+        const visible = allNFTs.filter(n => !hiddenNFTs.has(n.filename)).map(n => n.filename);
+        const response = await fetch('/api/carousels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.trim(),
+            hidden: Array.from(hiddenNFTs),
+            visible: visible
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          showSuccess(`Slideshow "${name}" saved`);
+          loadSavedCarousels();
+        } else {
+          showError(result.error || 'Error saving slideshow');
+        }
+      } catch (error) {
+        showError('Error saving slideshow');
+      }
+    }
+
+    // Load a saved carousel
+    async function loadCarousel() {
+      const name = document.getElementById('savedCarousels').value;
+      if (!name) return showError('Select a preset to load');
+
+      if (!await vernisConfirm(`Load slideshow "${name}"? This will replace your current visibility settings.`)) return;
+
+      try {
+        const response = await fetch(`/api/carousels/${encodeURIComponent(name)}`);
+        const data = await response.json();
+        if (data.error) {
+          showError(data.error);
+          return;
+        }
+
+        // Compute hidden list: if carousel has visible list, hide everything else
+        const allFiles = allNFTs.map(n => n.filename);
+        let hiddenNFTsList;
+        if (data.visible && data.visible.length > 0) {
+          const visibleSet = new Set(data.visible);
+          hiddenNFTsList = allFiles.filter(f => !visibleSet.has(f));
+        } else {
+          hiddenNFTsList = data.hidden || [];
+        }
+
+        // First show all, then hide the computed list
+        await fetch('/api/nft-visibility', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'show', filenames: allFiles })
+        });
+
+        if (hiddenNFTsList.length > 0) {
+          await fetch('/api/nft-visibility', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'hide', filenames: hiddenNFTsList })
+          });
+        }
+
+        hiddenNFTs = new Set(hiddenNFTsList);
+        selectedNFTs.clear();
+        renderNFTs();
+        showSuccess(`Slideshow "${name}" loaded`);
+      } catch (error) {
+        showError('Error loading slideshow');
+      }
+    }
+
+    // Delete a saved carousel
+    async function deleteCarousel() {
+      const name = document.getElementById('savedCarousels').value;
+      if (!name) return showError('Select a preset to delete');
+
+      if (!await vernisConfirm(`Delete slideshow "${name}"?`)) return;
+
+      try {
+        const response = await fetch(`/api/carousels/${encodeURIComponent(name)}`, {
+          method: 'DELETE'
+        });
+        const result = await response.json();
+        if (result.success) {
+          showSuccess(`Slideshow "${name}" deleted`);
+          loadSavedCarousels();
+        } else {
+          showError(result.error || 'Error deleting slideshow');
+        }
+      } catch (error) {
+        showError('Error deleting slideshow');
+      }
+    }
+
+    // Download current carousel as JSON
+    function downloadCarousel() {
+      const name = document.getElementById('savedCarousels').value || 'carousel';
+      const data = {
+        name: name,
+        hidden: Array.from(hiddenNFTs),
+        exported: new Date().toISOString(),
+        totalNFTs: allNFTs.length
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name.replace(/[^a-z0-9]/gi, '_')}-slideshow.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showSuccess('Slideshow preset downloaded');
+    }
+
+    // Import carousel from JSON file
+    async function importCarousel(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (!data.hidden || !Array.isArray(data.hidden)) {
+          showError('Invalid slideshow file format');
+          return;
+        }
+
+        const name = data.name || file.name.replace('.json', '');
+
+        if (!await vernisConfirm(`Import slideshow "${name}" with ${data.hidden.length} hidden NFTs?`)) {
+          event.target.value = '';
+          return;
+        }
+
+        // Save the imported carousel
+        const response = await fetch('/api/carousels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            hidden: data.hidden
+          })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          showSuccess(`Slideshow "${name}" imported`);
+          loadSavedCarousels();
+          document.getElementById('savedCarousels').value = name;
+        } else {
+          showError(result.error || 'Error importing slideshow');
+        }
+      } catch (error) {
+        showError('Error reading slideshow file');
+      }
+
+      event.target.value = '';
+    }
+
+
+    // =====================
+    // Metadata Management
+    // =====================
+
+    // Auto-import metadata from JSON files and CSV library (runs silently on load)
+    async function autoImportMetadata() {
+      const statusEl = document.getElementById('metadataAutoStatus');
+      try {
+        const response = await fetch('/api/nft-metadata/scan', { method: 'POST' });
+        const result = await response.json();
+
+        if (result.success && result.updated > 0) {
+          const parts = [];
+          if (result.json_matched > 0) parts.push(`${result.json_matched} from JSON`);
+          if (result.csv_matched > 0) parts.push(`${result.csv_matched} from CSV`);
+          if (result.async_masters > 0) parts.push(`${result.async_masters} Async Art master${result.async_masters !== 1 ? 's' : ''}`);
+          if (result.async_states_hidden > 0) parts.push(`${result.async_states_hidden} state images hidden`);
+          const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+
+          // Show brief status, then fade out
+          if (statusEl) {
+            statusEl.textContent = `Synced metadata for ${result.updated} NFTs${detail}`;
+            statusEl.style.display = 'block';
+            setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
+          }
+          await loadMetadataCache();
+          renderNFTs();
+        }
+      } catch (error) {
+        console.error('Auto-import metadata error:', error);
+      }
+    }
+
+    // Refresh list with visual feedback
+    async function refreshList() {
+      const btn = document.getElementById('refresh-btn');
+      btn.textContent = '↻ Loading...';
+      btn.disabled = true;
+      try {
+        await loadNFTs();
+        autoImportMetadata(); // Re-scan metadata in background
+        showSuccess('List refreshed');
+      } catch (e) {
+        showError('Refresh failed');
+      }
+      btn.textContent = '↻ Refresh';
+      btn.disabled = false;
+    }
+
+    // Load on start
+    loadCollectionToggles();
+    loadStorageToggles();
+    loadAsyncLayerToggle();
+    loadNFTs().then(() => autoImportMetadata());
+    loadSavedCarousels();
+
+    // Auto-refresh when page becomes visible (after switching tabs/windows)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        loadNFTs().then(() => autoImportMetadata());
+      }
+    });
+
+    // =====================
+    // Files Tab
+    // =====================
+    function switchManageTab(tab) {
+      document.getElementById('tab-artworks').classList.toggle('active', tab === 'artworks');
+      document.getElementById('tab-ipfs').classList.toggle('active', tab === 'ipfs');
+      document.getElementById('artworks-tab').style.display = tab === 'artworks' ? '' : 'none';
+      document.getElementById('ipfs-tab').style.display = tab === 'ipfs' ? '' : 'none';
+      if (tab === 'ipfs' && !ipfsFilesLoaded) {
+        loadIpfsFiles();
+      }
+    }
+
+    function getFileIcon(filename) {
+      var ext = (filename.split('.').pop() || '').toLowerCase();
+      var icons = {
+        pdf: '📄', doc: '📝', docx: '📝', txt: '📝', rtf: '📝',
+        zip: '📦', rar: '📦', tar: '📦', gz: '📦', '7z': '📦',
+        stl: '🧊', obj: '🧊', fbx: '🧊', gltf: '🧊', glb: '🧊', '3mf': '🧊',
+        json: '🔧', xml: '🔧', yaml: '🔧', yml: '🔧', csv: '🔧', toml: '🔧',
+        html: '🌐', css: '🌐', js: '🌐',
+        py: '💻', sh: '💻', c: '💻', cpp: '💻', rs: '💻',
+        mp3: '🎵', wav: '🎵', flac: '🎵', ogg: '🎵', aac: '🎵',
+        psd: '🎨', ai: '🎨', sketch: '🎨', fig: '🎨', xd: '🎨',
+        jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', svg: '🖼️', webp: '🖼️',
+        mp4: '🎬', mov: '🎬', avi: '🎬', mkv: '🎬', webm: '🎬'
+      };
+      return icons[ext] || '📎';
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+      return (bytes / 1073741824).toFixed(2) + ' GB';
+    }
+
+    function escHTML(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    var _storageIcons = {
+      ipfs: '<svg viewBox="0 0 24 24" fill="white"><path d="M12 1L3 6.5v11L12 23l9-5.5v-11L12 1zm0 2.3l6.5 4L12 11.2 5.5 7.3 12 3.3zM4.5 8.6l6.5 4v8.1l-6.5-4V8.6zm9 12.1v-8.1l6.5-4v8.1l-6.5 4z"/></svg>',
+      arweave: '<svg viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-1v-2h1c2.76 0 5-2.24 5-5s-2.24-5-5-5H9v7H7V5h4c3.87 0 7 3.13 7 7s-3.13 7-7 7z"/></svg>',
+      on_chain: '<svg viewBox="0 0 24 24" fill="white"><path d="M8 11h3v10h2V11h3l-4-4-4 4zM4 3v2h16V3H4z"/><path d="M7 7l5-5 5 5" fill="none" stroke="white" stroke-width="1.5"/></svg>',
+      copy: '<svg viewBox="0 0 24 24" fill="white"><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>'
+    };
+    var _storageTitles = {
+      ipfs: 'IPFS Pinned — Permanently preserved',
+      arweave: 'Arweave — Permanent storage',
+      on_chain: 'On-chain — Stored on blockchain',
+      copy: 'Copy — CDN/external source'
+    };
+
+    function getStorageBadgeHtml(type) {
+      var t = (_storageTitles[type] || '').replace(/'/g, "\\'");
+      return '<div class="storage-badge storage-' + type + '" title="' + (_storageTitles[type] || '') + '" onclick="event.stopPropagation();showInfo(\'' + t + '\')">' + (_storageIcons[type] || '') + '</div>';
+    }
+
+    // Open IPFS tab if URL has #ipfs
+    if (window.location.hash === '#ipfs') {
+      switchManageTab('ipfs');
+    }
+
+    // =====================
+    // ALL IPFS FILES TAB
+    // =====================
+    var allIpfsFiles = [];
+    var selectedIpfsFiles = new Set();
+    var ipfsFilesLoaded = false;
+
+    function loadIpfsFiles() {
+      var loading = document.getElementById('ipfs-loading');
+      var list = document.getElementById('ipfs-list');
+      var empty = document.getElementById('ipfs-empty');
+      loading.style.display = 'block';
+      list.style.display = 'none';
+      empty.style.display = 'none';
+
+      fetch('/api/nft-list-all')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          allIpfsFiles = data.files || [];
+          ipfsFilesLoaded = true;
+          selectedIpfsFiles.clear();
+          renderIpfsFiles();
+          updateIpfsStats();
+        })
+        .catch(function(err) {
+          loading.innerHTML = 'Failed to load files: ' + err.message;
+        });
+    }
+
+    function getIpfsFileType(ext) {
+      if (['jpg','jpeg','png','gif','svg','webp'].indexOf(ext) !== -1) return 'image';
+      if (['mp4','mov','avi','mkv','webm'].indexOf(ext) !== -1) return 'video';
+      if (ext === 'json') return 'json';
+      return 'other';
+    }
+
+    function renderIpfsFiles() {
+      var loading = document.getElementById('ipfs-loading');
+      var list = document.getElementById('ipfs-list');
+      var empty = document.getElementById('ipfs-empty');
+
+      var search = (document.getElementById('ipfs-search').value || '').toLowerCase();
+      var typeFilter = document.getElementById('ipfs-type-filter').value;
+
+      var filtered = allIpfsFiles.filter(function(f) {
+        if (search && f.filename.toLowerCase().indexOf(search) === -1 && (f.cid || '').toLowerCase().indexOf(search) === -1 && (f.metadata_name || '').toLowerCase().indexOf(search) === -1) return false;
+        if (typeFilter) {
+          var ft = getIpfsFileType(f.type);
+          if (typeFilter !== ft) return false;
+        }
+        return true;
+      });
+
+      loading.style.display = 'none';
+
+      if (filtered.length === 0) {
+        list.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+
+      empty.style.display = 'none';
+      list.style.display = 'flex';
+
+      var html = '';
+      filtered.forEach(function(f) {
+        var sel = selectedIpfsFiles.has(f.filename) ? ' selected' : '';
+        var safeName = escHTML(f.filename);
+        var safeCid = escHTML(f.cid || '');
+        var displayName = f.metadata_name ? escHTML(f.metadata_name) : safeName;
+        var date = f.mtime ? new Date(f.mtime * 1000).toLocaleDateString() : '';
+        var ft = getIpfsFileType(f.type);
+        var iconHtml;
+        if (ft === 'image') {
+          iconHtml = '<img src="/api/thumbnail/' + encodeURIComponent(f.filename) + '" loading="lazy" onerror="this.outerHTML=\'' + getFileIcon(f.filename) + '\'">';
+        } else if (ft === 'video') {
+          iconHtml = '<video src="' + escHTML(f.url) + '" muted preload="metadata"></video>';
+        } else {
+          iconHtml = getFileIcon(f.filename);
+        }
+
+        html += '<div class="file-row' + sel + '" onclick="toggleIpfsSelect(\'' + safeName.replace(/'/g, "\\'") + '\')">';
+        html += '<div class="file-checkbox"></div>';
+        html += '<div class="file-icon">' + iconHtml + '</div>';
+        html += '<div class="file-info">';
+        html += '<div class="file-name" title="' + safeName + '">' + displayName + '</div>';
+        html += '<div class="file-meta">';
+        html += '<span style="font-family:monospace; font-size:11px; opacity:0.7;">' + safeCid.substring(0, 16) + '...</span>';
+        html += '<span>' + escHTML(f.size) + '</span>';
+        if (date) html += '<span>' + date + '</span>';
+        html += '<span style="text-transform:uppercase; font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.1);">' + escHTML(f.type) + '</span>';
+        if (f.referenced_cid) {
+          html += '<span style="font-size:10px; color:var(--accent-secondary);">refs: ' + escHTML(f.referenced_cid).substring(0, 12) + '...</span>';
+        }
+        html += '<button class="file-cid-btn" onclick="event.stopPropagation(); copyToClipboard(\'' + safeCid + '\')" title="' + safeCid + '">Copy CID</button>';
+        html += '</div></div></div>';
+      });
+      list.innerHTML = html;
+    }
+
+    function filterIpfsFiles() { renderIpfsFiles(); }
+
+    function updateIpfsStats() {
+      document.getElementById('ipfs-total').textContent = allIpfsFiles.length;
+      var totalSize = allIpfsFiles.reduce(function(s, f) { return s + (f.size_bytes || 0); }, 0);
+      document.getElementById('ipfs-size').textContent = formatFileSize(totalSize);
+      document.getElementById('ipfs-selected-count').textContent = selectedIpfsFiles.size;
+    }
+
+    function toggleIpfsSelect(filename) {
+      if (selectedIpfsFiles.has(filename)) {
+        selectedIpfsFiles.delete(filename);
+      } else {
+        selectedIpfsFiles.add(filename);
+      }
+      renderIpfsFiles();
+      updateIpfsStats();
+    }
+
+    function selectAllIpfs() {
+      allIpfsFiles.forEach(function(f) { selectedIpfsFiles.add(f.filename); });
+      renderIpfsFiles();
+      updateIpfsStats();
+    }
+
+    function deselectAllIpfs() {
+      selectedIpfsFiles.clear();
+      renderIpfsFiles();
+      updateIpfsStats();
+    }
+
+    function deleteSelectedIpfs() {
+      if (selectedIpfsFiles.size === 0) { showError('No files selected'); return; }
+      vernisConfirm('Delete ' + selectedIpfsFiles.size + ' file(s) from IPFS storage?', function() {
+        fetch('/api/nft-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filenames: Array.from(selectedIpfsFiles) })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success) {
+            var msg = 'Deleted ' + d.deleted + ' file(s)';
+            if (d.related_deleted && d.related_deleted.length > 0) {
+              msg += ' + ' + d.related_deleted.length + ' related metadata';
+            }
+            showSuccess(msg);
+            loadIpfsFiles();
+          } else {
+            showError(d.error || 'Delete failed');
+          }
+        })
+        .catch(function(err) { showError('Delete failed: ' + err.message); });
+      });
+    }
+  </script>
+  <script>(function(){var t=0;function r(){var n=Date.now();if(n-t<30000)return;t=n;fetch('/api/screen/activity',{method:'POST'}).catch(function(){});}document.addEventListener('touchstart',r,{passive:true});})();</script>
+</body>
+
+</html>

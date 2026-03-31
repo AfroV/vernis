@@ -1,0 +1,2851 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vernis • View Art</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <link rel="stylesheet" href="" id="supersize-css">
+  <script src="vernis-notifications.js"></script>
+  <script>
+    // Apply theme EARLY to prevent flash of wrong colors on splash screen
+    (function () {
+      var theme = localStorage.getItem('vernis-theme-style') || 'gallery';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'light';
+      if (mode === 'auto') { var _h = new Date().getHours(); mode = (_h >= 20 || _h < 7) ? 'dark' : 'light'; }
+      var key = theme + '-' + mode;
+      document.documentElement.setAttribute('data-theme', key);
+
+      // Inline theme vars so body/splash render correct colors before CSS loads
+      var t = {
+        'gallery-light':  { bg: '#fafaf9', a1: '#2f2f2f', a2: '#525252', a3: '#737373' },
+        'gallery-dark':   { bg: '#0a0a0a', a1: '#e5e5e5', a2: '#d4d4d4', a3: '#a3a3a3' },
+        'nordic-light':   { bg: '#f7f8fa', a1: '#5e81ac', a2: '#81a1c1', a3: '#88c0d0' },
+        'nordic-dark':    { bg: '#2e3440', a1: '#88c0d0', a2: '#81a1c1', a3: '#5e81ac' },
+        'walnut-light':   { bg: '#f7f3ee', a1: '#d4af37', a2: '#b8960c', a3: '#c9a227' },
+        'walnut-dark':    { bg: '#0a0a0a', a1: '#d4af37', a2: '#f5e6a3', a3: '#c9a227' },
+        'xcopy-light':    { bg: '#0a0a0a', a1: '#00ffff', a2: '#ff00ff', a3: '#ffff00' },
+        'xcopy-dark':     { bg: '#000000', a1: '#ff00ff', a2: '#00ffff', a3: '#00ff00' },
+        'hackatao-light': { bg: '#faf9f7', a1: '#c9a962', a2: '#8b7355', a3: '#d4af37' },
+        'hackatao-dark':  { bg: '#0f0e0c', a1: '#d4af37', a2: '#c9a962', a3: '#e8c874' },
+        'pop-light':      { bg: '#f8f8f8', a1: '#E63946', a2: '#457B9D', a3: '#F4A261' },
+        'pop-dark':       { bg: '#0a0a0a', a1: '#E63946', a2: '#457B9D', a3: '#F4A261' }
+      };
+      var v = t[key] || { bg: '#0a0a0a', a1: '#e5e5e5', a2: '#d4d4d4', a3: '#a3a3a3' };
+      var s = document.documentElement.style;
+      s.setProperty('--bg-primary', v.bg);
+      s.setProperty('--accent-primary', v.a1);
+      s.setProperty('--accent-secondary', v.a2);
+      s.setProperty('--accent-tertiary', v.a3);
+      // Sync theme from server (initial + poll every 5s)
+      function _syncGalleryTheme(){fetch('/api/theme').then(function(r){return r.json()}).then(function(d){
+        if(!d.style) return;
+        var m=d.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(d.mode||'dark');
+        var k=d.style+'-'+m;
+        if(document.documentElement.getAttribute('data-theme')===k) return;
+        document.documentElement.setAttribute('data-theme',k);
+        localStorage.setItem('vernis-theme-style',d.style);localStorage.setItem('vernis-theme-mode',d.mode||'dark');
+        var nv=t[k]||t['walnut-dark'];
+        if(nv){s.setProperty('--bg-primary',nv.bg);s.setProperty('--accent-primary',nv.a1);s.setProperty('--accent-secondary',nv.a2);s.setProperty('--accent-tertiary',nv.a3);}
+      }).catch(function(){});}
+      _syncGalleryTheme(); setInterval(_syncGalleryTheme, 5000);
+    })();
+  </script>
+  <script>
+    // Load supersize and scrollbar settings early
+    (function () {
+      // Gallery uses normal sizing (no supersize) for a clean, premium look
+      // Supersize only applies to settings/index pages for touch accessibility
+      const scrollbarWidth = localStorage.getItem('vernis-scrollbar-width');
+      if (scrollbarWidth) {
+        const style = document.createElement('style');
+        style.id = 'scrollbar-width-style';
+        style.textContent = 'html::-webkit-scrollbar, body::-webkit-scrollbar, *::-webkit-scrollbar { width: ' + scrollbarWidth + 'px !important; height: ' + scrollbarWidth + 'px !important; } html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb, *::-webkit-scrollbar-thumb { border-radius: ' + Math.floor(scrollbarWidth / 2) + 'px !important; }';
+        document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(style); });
+      }
+    })();
+  </script>
+  <script>
+    // First-boot setup check — redirect to wizard if not completed
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('single') || params.get('preview')) return;
+      // Skip wizard on Pi kiosk — setup is done from PC/phone
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+      fetch('/api/setup/check')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (!d.setup_complete) window.location.replace('welcome.html'); })
+        .catch(function() {});
+    })();
+  </script>
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-primary, black);
+      overflow: hidden;
+      position: relative;
+      /* Disable swipe back/forward navigation */
+      overscroll-behavior: none;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* Hide cursor when idle */
+    body.cursor-hidden {
+      cursor: none;
+    }
+
+    body.cursor-hidden * {
+      cursor: none !important;
+    }
+
+    /* Frosted background layer */
+    .frosted-bg {
+      position: absolute;
+      inset: -20px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(var(--frosted-blur, 4px));
+      opacity: 0.55;
+      display: none;
+      z-index: 0;
+      transform: scale(1.1);
+      /* Image is pre-blurred via tiny canvas downscale; CSS blur adds adjustable smoothing */
+      transition: background-image 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+    }
+    /* Noise dither overlay — breaks up color banding on RGB666 (18-bit) DPI displays */
+    .frosted-bg-dither {
+      position: absolute;
+      inset: -20px;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.06;
+      display: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+    }
+
+    /* Main content layer */
+    img,
+    video,
+    iframe.gallery-artwork {
+      position: absolute !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      object-fit: contain !important;
+      opacity: 0;
+      transition: opacity var(--crossfade, 0.8s) ease;
+      z-index: 1;
+    }
+
+    iframe.gallery-artwork {
+      border: none;
+      background: black;
+    }
+
+    .active,
+    iframe.gallery-artwork.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* In passive mode (default), iframe doesn't capture events */
+    iframe.gallery-artwork.active:not(.interact) {
+      pointer-events: none;
+    }
+
+    /* In interact mode, iframe captures all events */
+    iframe.gallery-artwork.active.interact {
+      pointer-events: auto;
+      z-index: 5;
+    }
+
+    /* No-glow override: disables theme artwork glow effects */
+    .no-glow img.active,
+    .no-glow video.active {
+      filter: none !important;
+    }
+
+    /* Non-active images should not block clicks */
+    img:not(.active),
+    video:not(.active),
+    iframe.gallery-artwork:not(.active) {
+      pointer-events: none;
+    }
+
+    /* Force horizontal - improved for full-screen filling */
+    .force-horizontal {
+      transform: rotate(90deg);
+      transform-origin: center center;
+      width: 100vh !important;
+      height: 100vw !important;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      translate: -50% -50%;
+      object-fit: cover;
+      z-index: 2;
+    }
+
+    /* Splash Screen — SVG-inspired premium design */
+    .splash-overlay {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 42%, rgba(212,175,55,0.08) 0%, transparent 100%),
+        radial-gradient(ellipse at 50% 50%, transparent 0%, transparent 60%, rgba(0,0,0,0.5) 100%),
+        linear-gradient(135deg, #0f0e0c 0%, #1a1815 50%, #0f0e0c 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 1s ease-out;
+    }
+
+    .splash-overlay.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Decorative gold frame with corner ornaments */
+    .splash-frame {
+      position: absolute;
+      inset: 40px;
+      border: 1px solid rgba(201,169,98,0.35);
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    .splash-frame::before {
+      content: '';
+      position: absolute;
+      top: -1px; left: -1px;
+      width: 80px; height: 80px;
+      border-top: 1px solid rgba(201,169,98,0.6);
+      border-left: 1px solid rgba(201,169,98,0.6);
+    }
+    .splash-frame::after {
+      content: '';
+      position: absolute;
+      top: -1px; right: -1px;
+      width: 80px; height: 80px;
+      border-top: 1px solid rgba(201,169,98,0.6);
+      border-right: 1px solid rgba(201,169,98,0.6);
+    }
+    /* Bottom corners via inner element */
+    .splash-frame-bottom {
+      position: absolute;
+      inset: 40px;
+      pointer-events: none;
+    }
+    .splash-frame-bottom::before {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: -1px;
+      width: 80px; height: 80px;
+      border-bottom: 1px solid rgba(201,169,98,0.6);
+      border-left: 1px solid rgba(201,169,98,0.6);
+    }
+    .splash-frame-bottom::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; right: -1px;
+      width: 80px; height: 80px;
+      border-bottom: 1px solid rgba(201,169,98,0.6);
+      border-right: 1px solid rgba(201,169,98,0.6);
+    }
+
+    .splash-content {
+      text-align: center;
+      animation: fadeIn 1.5s ease-in-out;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Decorative diamond */
+    .splash-diamond {
+      width: 12px; height: 12px;
+      border: 1px solid var(--accent-primary);
+      transform: rotate(45deg);
+      margin: 0 auto 24px;
+      position: relative;
+      opacity: 0.7;
+      animation: slideUp 0.8s ease-out;
+    }
+    .splash-diamond::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 6px; height: 6px;
+      background: var(--accent-primary);
+    }
+
+    /* Gold gradient decorative line */
+    .splash-line {
+      width: 500px; height: 1.5px;
+      background: linear-gradient(90deg, transparent 0%, var(--accent-primary) 15%, var(--accent-secondary) 50%, var(--accent-primary) 85%, transparent 100%);
+      margin: 0 auto;
+      opacity: 0.6;
+      animation: fadeIn 1.2s ease-out;
+    }
+    .splash-line.short { width: 360px; margin-top: 20px; }
+    .splash-line.short::before,
+    .splash-line.short::after {
+      content: '';
+      position: absolute;
+      top: 50%; transform: translateY(-50%);
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      opacity: 0.5;
+    }
+    .splash-line.short { position: relative; }
+    .splash-line.short::before { left: -12px; }
+    .splash-line.short::after { right: -12px; }
+
+    .splash-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 110px;
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      margin: 24px 0 0;
+      animation: slideUp 1s ease-out;
+      filter: drop-shadow(0 0 20px rgba(var(--accent-primary-rgb, 212,175,55),0.15));
+    }
+
+    .splash-tagline {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 26px;
+      font-weight: 300;
+      letter-spacing: 0.35em;
+      color: #d4cfc4;
+      text-transform: uppercase;
+      margin: 28px 0 40px;
+      opacity: 0.9;
+      animation: slideUp 1s ease-out 0.3s both;
+    }
+
+    .splash-status {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 16px;
+      font-weight: 400;
+      letter-spacing: 0.15em;
+      color: #8b7b68;
+      margin-top: 30px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .loading-bar {
+      width: 300px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(var(--accent-primary-rgb, 201,169,98),0.2), transparent);
+      border-radius: 1px;
+      margin: 0 auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .loading-progress {
+      position: absolute;
+      left: 0; top: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary));
+      animation: loading 2s ease-in-out forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes loading {
+      0% { width: 0%; }
+      50% { width: 70%; }
+      100% { width: 100%; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.9; }
+    }
+
+    /* Controls Overlay - No grayed background for cleaner look */
+    .controls-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      pointer-events: none;
+      /* Removed gradient background - controls now float over artwork */
+    }
+
+    .controls-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Status indicator */
+    /* Responsive fixes for small screens */
+    /* 4" square screens (720x720, 750x750) - already in kiosk fullscreen */
+    @media (max-width: 760px) and (max-height: 760px) {
+      .fullscreen-btn {
+        display: none !important;
+      }
+    }
+
+    .gallery-status .stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gallery-status .stat-value {
+      font-weight: 600;
+      font-size: 16px;
+    }
+
+    .gallery-status .stat-label {
+      opacity: 0.7;
+      font-size: 12px;
+    }
+
+    .gallery-status .divider {
+      width: 1px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .gallery-status .pin-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gallery-status .pin-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+
+    .gallery-status .pin-dot.partial {
+      background: #facc15;
+    }
+
+    .gallery-status .pin-dot.none {
+      background: #666;
+    }
+
+    /* Gallery buttons - small by default, supersize CSS enlarges them */
+    .exit-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 28px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: auto;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (hover: hover) {
+      .exit-btn:hover {
+        opacity: 1;
+        background: rgba(0, 0, 0, 0.8);
+        transform: scale(1.1);
+        border-color: rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    .exit-btn:active {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.9);
+      transform: scale(0.95);
+      border-color: rgba(255, 255, 255, 0.8);
+    }
+
+    .fullscreen-btn {
+      position: absolute;
+      top: 20px;
+      right: 110px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: all 0.3s ease;
+      font-size: 20px;
+      color: white;
+      touch-action: manipulation;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (hover: hover) {
+      .fullscreen-btn:hover {
+        opacity: 1;
+        background: rgba(0, 0, 0, 0.8);
+        transform: scale(1.1);
+        border-color: rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    .fullscreen-btn:active {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.9);
+      transform: scale(0.95);
+      border-color: rgba(255, 255, 255, 0.8);
+    }
+
+    .gallery-power-controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      gap: 12px;
+      opacity: 0.7;
+      transition: opacity 0.3s ease;
+      z-index: 100;
+      pointer-events: auto;
+    }
+
+    @media (hover: hover) {
+      .gallery-power-controls:hover {
+        opacity: 1;
+      }
+    }
+
+    .gallery-power-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      font-size: 28px;
+      touch-action: manipulation;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (hover: hover) {
+      .gallery-power-btn:hover {
+        background: rgba(0, 0, 0, 0.8);
+        transform: scale(1.1);
+        border-color: rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    .gallery-power-btn:active {
+      background: rgba(0, 0, 0, 0.9);
+      transform: scale(0.95);
+      border-color: rgba(255, 255, 255, 0.8);
+    }
+
+    @media (hover: hover) {
+      .gallery-power-danger:hover {
+        background: rgba(239, 68, 68, 0.4);
+        border-color: rgba(239, 68, 68, 0.5);
+      }
+    }
+
+    /* Hue button - OFF state */
+    .gallery-power-btn.hue-btn {
+      position: relative;
+    }
+
+    .gallery-power-btn.hue-btn::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #666;
+      border: 2px solid rgba(0, 0, 0, 0.5);
+    }
+
+    /* Hue button - ON state */
+    .gallery-power-btn.hue-active {
+      background: rgba(255, 180, 50, 0.5);
+      border-color: rgba(255, 180, 50, 0.8);
+      box-shadow: 0 0 20px rgba(255, 180, 50, 0.5);
+    }
+
+    .gallery-power-btn.hue-active::after {
+      background: #4ade80;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+    }
+
+    @media (hover: hover) {
+      .gallery-power-btn.hue-active:hover {
+        background: rgba(255, 180, 50, 0.6);
+      }
+    }
+
+    /* Info button */
+    .gallery-power-btn.info-btn {
+      position: relative;
+      font-weight: 700;
+      font-size: 26px;
+      font-family: Georgia, serif;
+      font-style: italic;
+    }
+
+    .gallery-power-btn.info-btn.info-active {
+      background: rgba(96, 165, 250, 0.5);
+      border-color: rgba(96, 165, 250, 0.8);
+      box-shadow: 0 0 20px rgba(96, 165, 250, 0.4);
+    }
+
+    /* Artwork info panel */
+    .artwork-info-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: 70vh;
+      background: rgba(10, 10, 10, 0.92);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      z-index: 6000;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow-y: auto;
+      pointer-events: auto;
+    }
+
+    .artwork-info-panel.visible {
+      transform: translateY(0);
+    }
+
+    .artwork-info-inner {
+      padding: 28px 32px 40px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .artwork-info-panel .info-title {
+      font-size: 22px;
+      font-weight: 600;
+      margin: 0 0 6px;
+      line-height: 1.3;
+    }
+
+    .artwork-info-panel .info-artist {
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.6);
+      margin: 0 0 16px;
+    }
+
+    .artwork-info-panel .info-description {
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.8);
+      margin: 0 0 16px;
+    }
+
+    .artwork-info-panel .info-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 0 0 16px;
+    }
+
+    .artwork-info-panel .info-tag {
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .artwork-info-panel .info-attrs {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+
+    .artwork-info-panel .info-attr {
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .artwork-info-panel .info-attr-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(255, 255, 255, 0.4);
+      margin-bottom: 2px;
+    }
+
+    .artwork-info-panel .info-attr-value {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .artwork-info-panel .info-empty {
+      text-align: center;
+      padding: 20px;
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 14px;
+    }
+
+    /* 4" small screens — larger info text for readability */
+    @media (max-width: 760px) and (max-height: 760px) {
+      .artwork-info-panel {
+        max-height: 80vh;
+      }
+      .artwork-info-inner {
+        padding: 20px 18px 30px;
+      }
+      .artwork-info-panel .info-title {
+        font-size: 26px;
+      }
+      .artwork-info-panel .info-artist {
+        font-size: 18px;
+        margin: 0 0 12px;
+      }
+      .artwork-info-panel .info-description {
+        font-size: 17px;
+        line-height: 1.5;
+      }
+      .artwork-info-panel .info-tag {
+        font-size: 15px;
+        padding: 6px 12px;
+      }
+      .artwork-info-panel .info-attrs {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 6px;
+      }
+      .artwork-info-panel .info-attr-label {
+        font-size: 12px;
+      }
+      .artwork-info-panel .info-attr-value {
+        font-size: 16px;
+      }
+      .artwork-info-panel .info-empty {
+        font-size: 17px;
+      }
+    }
+
+    /* Touch pointer overlay for external HDMI mode */
+    #touch-pointer {
+      position: fixed;
+      pointer-events: none;
+      z-index: 10000;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+    }
+
+    .power-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .power-modal.active {
+      display: flex;
+    }
+
+    .power-modal-content {
+      background: rgba(30, 30, 30, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 36px;
+      text-align: center;
+      max-width: 300px;
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .power-modal-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .power-modal-content h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      color: white;
+    }
+
+    .power-modal-content p {
+      margin: 0 0 24px;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 14px;
+    }
+
+    .power-modal-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .modal-btn {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .modal-btn-secondary {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+    }
+
+    @media (hover: hover) {
+      .modal-btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.25);
+      }
+    }
+
+    .modal-btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    @media (hover: hover) {
+      .modal-btn-danger:hover {
+        background: #dc2626;
+      }
+    }
+
+    .fullscreen-btn svg {
+      width: 42px;
+      height: 42px;
+      fill: white;
+      pointer-events: none;
+    }
+
+    /* Control tab - compact by default */
+    .control-tab {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 20, 20, 0.6);
+      backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 30px;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      pointer-events: auto;
+      touch-action: manipulation;
+      z-index: 200;
+    }
+
+    .control-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      cursor: pointer;
+      opacity: 0.9;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    @media (hover: hover) {
+      .control-btn:hover {
+        opacity: 1;
+        transform: scale(1.1);
+        background: rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    .control-btn:active {
+      transform: scale(0.95);
+    }
+
+    .control-btn svg {
+      width: 36px;
+      height: 36px;
+      fill: white;
+      pointer-events: none;
+    }
+
+    .control-btn.play-pause {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, var(--accent-primary, #d4af37), var(--accent-secondary, #cd7f32));
+    }
+
+    @media (hover: hover) {
+      .control-btn.play-pause:hover {
+        box-shadow: 0 0 30px rgba(212, 175, 55, 0.4);
+      }
+    }
+
+    .control-btn.play-pause svg {
+      width: 36px;
+      height: 36px;
+      pointer-events: none;
+    }
+
+    /* Portrait orientation adjustments */
+    @media (orientation: portrait) {
+      .splash-frame { inset: 20px; }
+      .splash-frame-bottom { inset: 20px; }
+      .splash-frame::before, .splash-frame::after { width: 50px; height: 50px; }
+      .splash-frame-bottom::before, .splash-frame-bottom::after { width: 50px; height: 50px; }
+      .splash-logo {
+        font-size: 60px;
+        letter-spacing: 0.15em;
+      }
+
+      .splash-tagline {
+        font-size: 16px;
+        letter-spacing: 0.2em;
+      }
+
+      .splash-line { width: 280px; }
+      .splash-line.short { width: 200px; }
+
+      .loading-bar {
+        width: 200px;
+      }
+
+      .exit-btn {
+        top: 30px;
+        right: 30px;
+      }
+
+      .fullscreen-btn {
+        top: 30px;
+        right: 120px;
+      }
+
+      .control-tab {
+        bottom: 40px;
+      }
+    }
+
+    /* Larger portrait screens (rotated monitor) */
+    @media (orientation: portrait) and (min-height: 1400px) {
+      .splash-frame { inset: 40px; }
+      .splash-frame-bottom { inset: 40px; }
+      .splash-logo {
+        font-size: 90px;
+      }
+
+      .splash-tagline {
+        font-size: 22px;
+      }
+
+      .splash-line { width: 400px; }
+      .splash-line.short { width: 280px; }
+
+      .loading-bar {
+        width: 280px;
+      }
+
+      .exit-btn {
+        top: 50px;
+        right: 50px;
+      }
+
+      .fullscreen-btn {
+        top: 50px;
+        right: 140px;
+      }
+
+      .control-tab {
+        bottom: 60px;
+      }
+    }
+
+    /* Touch-friendly: uniform button size on small screens (Pi 720px, phones) */
+    @media (max-width: 760px) {
+      .exit-btn,
+      .fullscreen-btn,
+      .gallery-power-btn,
+      .control-btn,
+      .control-btn.play-pause {
+        width: 80px;
+        height: 80px;
+      }
+      .exit-btn { font-size: 28px; top: 20px; right: 20px; }
+      .fullscreen-btn { top: 20px; right: 108px; }
+      .fullscreen-btn svg { width: 36px; height: 36px; }
+      .gallery-power-btn { font-size: 28px; }
+      .gallery-power-btn.info-btn { font-size: 24px; }
+      .gallery-power-controls { top: 20px; left: 20px; gap: 12px; }
+      .control-btn svg { width: 36px; height: 36px; }
+      .control-btn.play-pause svg { width: 40px; height: 40px; }
+      .control-tab {
+        padding: 10px 24px;
+        gap: 16px;
+        border-radius: 28px;
+      }
+    }
+  </style>
+</head>
+
+<body class="cursor-hidden">
+  <!-- Splash Screen -->
+  <div id="splash" class="splash-overlay">
+    <div class="splash-frame"></div>
+    <div class="splash-frame-bottom"></div>
+    <div class="splash-content">
+      <div class="splash-diamond"></div>
+      <div class="splash-line"></div>
+      <div class="splash-logo">VERNIS</div>
+      <div class="splash-line short"></div>
+      <div class="splash-tagline">YOUR FOREVER GALLERY</div>
+      <div class="loading-bar">
+        <div class="loading-progress"></div>
+      </div>
+      <div class="splash-status" id="splash-status">Preparing your private gallery...</div>
+    </div>
+  </div>
+
+  <!-- Controls Overlay -->
+  <div id="controls" class="controls-overlay">
+    <div class="fullscreen-btn" id="fullscreenBtn" onclick="event.stopPropagation(); toggleFullscreen()" title="Toggle Fullscreen">
+      <svg viewBox="0 0 24 24" id="fullscreenIcon">
+        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+      </svg>
+    </div>
+    <div class="exit-btn" onclick="event.stopPropagation(); exitGallery()"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></div>
+
+    <!-- Hue Control + Info -->
+    <div class="gallery-power-controls">
+      <button class="gallery-power-btn hue-btn" id="gallery-hue-toggle" title="Toggle Hue Sync"
+        onclick="toggleGalleryHue()" style="display:none;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
+      <button class="gallery-power-btn info-btn" id="gallery-info-toggle" title="Artwork Info"
+        onclick="event.stopPropagation(); toggleInfoPanel()">i</button>
+      <button class="gallery-power-btn" id="gallery-interact-toggle" title="Interact with artwork"
+        onclick="event.stopPropagation(); toggleInteractMode()"
+        style="display:none; font-size:15px; line-height:1;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"></path>
+          <path d="M14 13l4 4 4-4"></path>
+          <path d="M18 13v8"></path>
+        </svg>
+      </button>
+      <button class="gallery-power-btn" id="gallery-fav-btn" title="Favorite"
+        onclick="event.stopPropagation(); toggleFavorite()"
+        style="display:none; font-size:18px; line-height:1;">&#9825;</button>
+    </div>
+
+    <!-- Stats Counter -->
+    <div id="gallery-stats" style="position:absolute; bottom:80px; left:50%; transform:translateX(-50%); font-size:12px; color:rgba(255,255,255,0.6); text-align:center; pointer-events:none;">
+      <span id="stats-counter"></span>
+    </div>
+
+    <!-- Quick Settings Button (hidden - clean gallery mode) -->
+    <button class="gallery-power-btn" id="gallery-settings-btn" title="Quick Settings"
+      onclick="event.stopPropagation(); toggleQuickSettings()"
+      style="display:none; position:absolute; bottom:16px; right:16px; z-index:5100; width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:18px; cursor:pointer; align-items:center; justify-content:center;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+
+    <!-- Quick Settings Panel -->
+    <div id="quick-settings" onclick="event.stopPropagation()" style="display:none; position:absolute; bottom:64px; right:16px; z-index:5100; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); border-radius:14px; padding:20px; width:240px; border:1px solid rgba(255,255,255,0.15); color:#fff;">
+      <div style="font-size:14px; font-weight:600; margin-bottom:14px;">Quick Settings</div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; color:rgba(255,255,255,0.6); display:block; margin-bottom:6px;">Slide Duration: <span id="qs-dur-val">15</span>s</label>
+        <input type="range" id="qs-duration" min="3" max="60" value="15" style="width:100%; accent-color:#6366f1;"
+          oninput="document.getElementById('qs-dur-val').textContent=this.value"
+          onchange="updateQuickSetting('image_duration', parseInt(this.value))">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px; color:rgba(255,255,255,0.6); display:block; margin-bottom:6px;">Crossfade: <span id="qs-fade-val">0.8</span>s</label>
+        <input type="range" id="qs-crossfade" min="0" max="3" step="0.1" value="0.8" style="width:100%; accent-color:#6366f1;"
+          oninput="document.getElementById('qs-fade-val').textContent=this.value"
+          onchange="updateQuickSetting('crossfade_duration', parseFloat(this.value))">
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:13px;">Shuffle</span>
+        <label style="position:relative; width:40px; height:22px; cursor:pointer;">
+          <input type="checkbox" id="qs-shuffle" checked onchange="updateQuickSetting('shuffle', this.checked)" style="display:none;">
+          <span id="qs-shuffle-track" style="position:absolute; inset:0; background:rgba(255,255,255,0.2); border-radius:11px; transition:background 0.2s;"></span>
+          <span id="qs-shuffle-thumb" style="position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:left 0.2s;"></span>
+        </label>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-size:13px;">Frosted BG</span>
+        <label style="position:relative; width:40px; height:22px; cursor:pointer;">
+          <input type="checkbox" id="qs-frosted" onchange="updateQuickSetting('frosted_background', this.checked)" style="display:none;">
+          <span id="qs-frosted-track" style="position:absolute; inset:0; background:rgba(255,255,255,0.2); border-radius:11px; transition:background 0.2s;"></span>
+          <span id="qs-frosted-thumb" style="position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:left 0.2s;"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="control-tab" onclick="event.stopPropagation()"
+      onmouseenter="if(controlsTimer) clearTimeout(controlsTimer)"
+      onmouseleave="if(document.getElementById('controls').classList.contains('active')) controlsTimer = setTimeout(() => { document.getElementById('controls').classList.remove('active'); controlsTimer = null; }, 3000)">
+
+      <button class="control-btn" onclick="event.stopPropagation(); prev()" title="Previous">
+        <svg viewBox="0 0 24 24">
+          <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+        </svg>
+      </button>
+      <button class="control-btn play-pause" id="playPause" onclick="event.stopPropagation(); togglePlayPause()" title="Play/Pause">
+        <svg viewBox="0 0 24 24" id="playPauseIcon">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+        </svg>
+      </button>
+      <button class="control-btn" onclick="event.stopPropagation(); next()" title="Next">
+        <svg viewBox="0 0 24 24">
+          <path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Power Modal for Gallery -->
+  <div class="power-modal" id="gallery-power-modal">
+    <div class="power-modal-content">
+      <div class="power-modal-icon" id="gallery-modal-icon"></div>
+      <h3 id="gallery-modal-title">Shutdown?</h3>
+      <p id="gallery-modal-message">Are you sure?</p>
+      <div class="power-modal-buttons">
+        <button class="modal-btn modal-btn-secondary" onclick="closeGalleryPowerModal()">Cancel</button>
+        <button class="modal-btn modal-btn-danger" id="gallery-modal-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="frosted-bg-a" class="frosted-bg"></div>
+  <div id="frosted-bg-b" class="frosted-bg"></div>
+  <div id="frosted-bg-dither" class="frosted-bg-dither"></div>
+
+  <!-- Artwork Info Panel -->
+  <div id="artwork-info-panel" class="artwork-info-panel" onclick="event.stopPropagation()">
+    <div class="artwork-info-inner" id="artwork-info-content">
+      <div class="info-empty">No metadata available</div>
+    </div>
+  </div>
+
+  <!-- FPS Overlay -->
+  <div id="fps-overlay"
+    style="display: none; position: fixed; top: 12px; left: 12px; z-index: 9000; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); padding: 10px 14px; border-radius: 8px; font-family: monospace; font-size: 13px; color: #fff; pointer-events: none;">
+    <div style="display: flex; gap: 16px;">
+      <div><span style="color: #4ade80;" id="fps-value">--</span> FPS</div>
+      <div><span style="color: #60a5fa;" id="fps-freq">--</span> MHz</div>
+      <div><span style="color: #f59e0b;" id="fps-temp">--</span>°C</div>
+    </div>
+  </div>
+
+
+
+  <!-- Touch pointer for external HDMI mode -->
+  <svg id="touch-pointer" width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 2 L6 22 L11 17 L16 26 L19 24.5 L14 16 L21 16 Z" fill="white" stroke="rgba(0,0,0,0.7)" stroke-width="1.2" stroke-linejoin="round"/>
+  </svg>
+
+  <script>
+    // Theme already applied in <head> to prevent flash of wrong colors
+
+    let files = [], i = 0;
+    let config = {
+      image_duration: 15,
+      video_duration: 30,
+      crossfade_duration: 0.8,
+      frosted_background: false,
+      glow_edge: true,
+      force_horizontal: false,
+      shuffle: true,
+      background_color: ''
+    };
+    let hiddenFiles = [];
+    var generatorUrls = {}; // url -> direct generator URL for live iframe loading
+    var _pixelShiftInterval = null;
+    var _pixelShiftIdx = 0;
+    // 3x3 grid of 2px offsets — cycles through all positions for even coverage
+    var _pxShiftPos = [[0,0],[2,0],[2,2],[0,2],[-2,2],[-2,0],[-2,-2],[0,-2],[2,-2]];
+    let navHistory = []; // URLs of viewed artworks (max 100)
+    let navHistoryPos = -1; // Current position in history (-1 = at head)
+    const NAV_HISTORY_MAX = 100;
+    // Skip splash if gallery was open recently (within 5 minutes)
+    var _lastGallery = parseInt(localStorage.getItem('vernis-gallery-last') || '0');
+    var _skipSplash = (Date.now() - _lastGallery) < 300000;
+    localStorage.setItem('vernis-gallery-last', String(Date.now()));
+    let splashShown = !_skipSplash;
+    if (_skipSplash) { var _sp = document.getElementById('splash'); if (_sp) _sp.remove(); }
+    let playing = true;
+    let nextTimer = null;
+    let controlsTimer = null;
+    let isInteracting = false; // Flag to prevent auto-hide during slider drag
+    let pendingElement = null; // Track element being loaded to cancel if next() called again
+    let _preloadedUrl = null; // URL of the preloaded next image
+    let _preloadImg = null;   // Hidden Image object for preloading
+    let _frostedSlot = 'a';   // Active frosted bg slot ('a' or 'b')
+
+    // Create a tiny blurred snapshot of an image for frosted background.
+    // Drawing to a 48x48 canvas and upscaling creates a natural blur effect
+    // without continuous GPU filter: blur() cost.
+    function frostedSnapshot(img, cb) {
+      var c = document.createElement('canvas');
+      c.width = 48; c.height = 48;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, 48, 48);
+      cb(c.toDataURL('image/jpeg', 0.6));
+    }
+
+    // Update splash status message
+    function updateSplashStatus(message) {
+      const statusEl = document.getElementById('splash-status');
+      if (statusEl) statusEl.textContent = message;
+    }
+
+    // Load and display gallery status (artwork count & pinned %)
+    function loadGalleryStatus() {
+      fetch('/api/status')
+        .then(r => r.json())
+        .then(data => {
+          const artworkCount = document.getElementById('artwork-count');
+          const pinStatus = document.getElementById('pin-status');
+          const pinDot = document.getElementById('pin-dot');
+
+          if (artworkCount) artworkCount.textContent = data.pinned || 0;
+
+          if (data.ipfs_running && data.pinned > 0) {
+            const percent = Math.round((data.ipfs_pinned / data.pinned) * 100);
+            if (pinStatus) pinStatus.textContent = `${percent}% pinned`;
+            if (pinDot) {
+              pinDot.className = 'pin-dot';
+              if (percent === 100) pinDot.classList.add('full');
+              else if (percent > 0) pinDot.classList.add('partial');
+              else pinDot.classList.add('none');
+            }
+          } else if (!data.ipfs_running) {
+            if (pinStatus) pinStatus.textContent = 'IPFS offline';
+            if (pinDot) pinDot.className = 'pin-dot none';
+          } else {
+            if (pinStatus) pinStatus.textContent = '0% pinned';
+            if (pinDot) pinDot.className = 'pin-dot none';
+          }
+        })
+        .catch(() => {
+          const pinStatus = document.getElementById('pin-status');
+          if (pinStatus) pinStatus.textContent = 'offline';
+        });
+    }
+
+    // Load status on page load
+    loadGalleryStatus();
+
+    // Hide splash screen
+    function hideSplash() {
+      if (!splashShown) return;
+      splashShown = false;
+
+      setTimeout(() => {
+        const splash = document.getElementById('splash');
+        if (splash) {
+          splash.classList.add('fade-out');
+          setTimeout(() => splash.remove(), 1000);
+        }
+      }, 1500); // Show splash for at least 1.5 seconds after content loads
+    }
+
+    // Load configuration
+    updateSplashStatus('Loading gallery settings...');
+    fetch('/api/display-config').then(r => r.json()).then(c => {
+      config = c;
+      if (config.glow_edge === false) document.body.classList.add('no-glow');
+      document.documentElement.style.setProperty('--crossfade', (config.crossfade_duration || 0.8) + 's');
+      document.documentElement.style.setProperty('--frosted-blur', (config.frosted_blur != null ? config.frosted_blur : 4) + 'px');
+      if (config.background_color) document.body.style.background = config.background_color;
+      if (config.pixel_shift !== false) startPixelShift();
+      // Show Hue button from backend setting
+      fetch('/api/hue/settings').then(r=>r.json()).then(hs=>{
+        if(hs.show_gallery_btn){var hueBtn=document.getElementById('gallery-hue-toggle');if(hueBtn)hueBtn.style.display='';}
+      }).catch(()=>{});
+      updateSplashStatus('Discovering your collection...');
+    }).catch(() => {
+      updateSplashStatus('Discovering your collection...');
+    });
+
+    // Check for single image mode via URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const singleImage = urlParams.get('single');
+    const previewMode = urlParams.get('preview');
+    let singleImageMode = false;
+
+    // Load list of NFTs
+    function load() {
+      updateSplashStatus('Loading your NFT collection...');
+
+      // If single image mode, display just that image
+      if (singleImage) {
+        singleImageMode = true;
+        files = ['/nfts/' + singleImage];
+        updateSplashStatus('Loading artwork...');
+        if (i === 0) next();
+        return;
+      }
+
+      // Preview mode — show only artworks selected on manage page
+      if (previewMode) {
+        try {
+          const selected = JSON.parse(localStorage.getItem('vernis-gallery-preview') || '[]');
+          if (selected.length > 0) {
+            files = selected.map(f => '/nfts/' + f);
+            if (config.shuffle) files = files.sort(() => Math.random() - 0.5);
+            updateSplashStatus(`Previewing ${files.length} artwork${files.length !== 1 ? 's' : ''}...`);
+            if (i === 0) next();
+            return;
+          }
+        } catch(e) {}
+      }
+
+      fetch('/api/nft-list-detailed').then(r => r.json()).then(data => {
+        const nfts = Array.isArray(data) ? data : (data.nfts || []);
+        hiddenFiles = data.hidden || nfts.filter(nft => nft.hidden).map(nft => nft.filename) || [];
+
+        // Build generator URL map for live iframe loading
+        generatorUrls = {};
+        nfts.forEach(nft => {
+          if (nft.generator_url) generatorUrls[nft.url] = nft.generator_url;
+        });
+
+        // Filter out hidden NFTs
+        const allFiles = nfts.map(nft => nft.url);
+        files = allFiles.filter(url => {
+          const filename = url.split('/').pop();
+          return !hiddenFiles.includes(filename);
+        });
+
+        // Shuffle if enabled
+        if (config.shuffle && files.length > 0) {
+          files = files.sort(() => Math.random() - 0.5);
+        }
+
+        if (files.length > 0) {
+          updateSplashStatus(`Curating ${files.length} masterpiece${files.length !== 1 ? 's' : ''}...`);
+          if (i === 0) next();
+        } else {
+          updateSplashStatus('No artworks found in your collection.');
+          const splashContent = document.querySelector('.splash-content');
+
+          // Only add button if it doesn't already exist
+          if (!splashContent.querySelector('.btn')) {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-premium';
+            btn.style.marginTop = '40px';
+            btn.textContent = 'Go to Library to Add Art';
+            btn.onclick = () => window.location.href = 'library.html';
+            splashContent.appendChild(btn);
+
+            document.querySelector('.loading-bar').style.display = 'none';
+            document.getElementById('splash-status').style.animation = 'none';
+          }
+        }
+      }).catch(err => {
+        updateSplashStatus('Connection error. Retrying...');
+        setTimeout(load, 10000);
+      });
+    }
+
+    // Display previous NFT (walk back through history)
+    function prev() {
+      if (nextTimer) clearTimeout(nextTimer);
+      if (!playing) playing = true, updatePlayPauseUI();
+      if (navHistory.length === 0) return;
+
+      // Move back in history, skip missing files silently
+      let attempts = 0;
+      while (attempts < navHistory.length) {
+        navHistoryPos = Math.min(navHistoryPos + 1, navHistory.length - 1);
+        let histUrl = navHistory[navHistory.length - 1 - navHistoryPos];
+        if (files.indexOf(histUrl) !== -1) {
+          showArtwork(histUrl, true);
+          return;
+        }
+        attempts++;
+      }
+      // All history items gone — just go next
+      navHistoryPos = -1;
+      next();
+    }
+
+    // Preload the next image + frosted background so transitions are instant.
+    // Uses double-buffer with tiny canvas snapshots for pre-blurred backgrounds.
+    function preloadNext() {
+      if (!files.length) return;
+      var nextIdx = i % files.length;
+      var nextUrl = files[nextIdx];
+      if (!nextUrl || nextUrl === _preloadedUrl) return;
+      var lower = nextUrl.toLowerCase();
+      // Only preload static images (not video/html)
+      if (lower.match(/\.(mp4|webm|mov|html?)$/)) return;
+      _preloadedUrl = nextUrl;
+      _preloadImg = new Image();
+      _preloadImg.src = nextUrl;
+      // Preload frosted bg into the INACTIVE slot via tiny canvas snapshot
+      // Skip SVGs and GIFs — they need canvas capture in onReady
+      if (config.frosted_background && !lower.match(/\.(gif|svg)$/)) {
+        _preloadImg.onload = function() {
+          var inactiveId = _frostedSlot === 'a' ? 'frosted-bg-b' : 'frosted-bg-a';
+          var fb = document.getElementById(inactiveId);
+          if (fb) {
+            frostedSnapshot(_preloadImg, function(dataUrl) {
+              fb.style.backgroundImage = 'url("' + dataUrl + '")';
+              fb.style.display = 'block';
+              fb.style.opacity = '0';
+            });
+          }
+        };
+      }
+    }
+
+    // Display next NFT
+    function next() {
+      if (nextTimer) clearTimeout(nextTimer);
+      if (!playing) playing = true, updatePlayPauseUI();
+
+      if (!files.length) {
+        setTimeout(load, 10000);
+        return;
+      }
+
+      // If we went back in history and hit next, go forward through history first
+      if (navHistoryPos > 0) {
+        navHistoryPos--;
+        let histUrl = navHistory[navHistory.length - 1 - navHistoryPos];
+        if (files.indexOf(histUrl) !== -1) {
+          showArtwork(histUrl, true);
+          return;
+        }
+        // File gone, reset and pick fresh
+      }
+      navHistoryPos = -1;
+
+      const url = files[i % files.length];
+      i++;
+      _artworksViewed++;
+      updateGalleryStats();
+
+      // Push to history
+      navHistory.push(url);
+      if (navHistory.length > NAV_HISTORY_MAX) navHistory.shift();
+
+      showArtwork(url, true);
+    }
+
+    // Show a specific artwork URL. addToHistory=false when navigating via prev/next history.
+    var interactMode = false;
+    var currentIsHtml = false;
+
+    function showArtwork(url, autoAdvance) {
+      // Exit interact mode when switching artwork
+      if (interactMode) setInteractMode(false);
+
+      // Cancel any pending element load
+      if (pendingElement) {
+        pendingElement.onload = null;
+        pendingElement.onloadeddata = null;
+        pendingElement.onerror = null;
+        if (pendingElement.tagName === 'VIDEO') pendingElement.pause();
+        if (pendingElement.tagName === 'IFRAME') {
+          // Stop loading and remove early-appended iframe
+          pendingElement.src = 'about:blank';
+          if (pendingElement.parentNode) pendingElement.remove();
+        } else {
+          pendingElement.src = '';
+        }
+        pendingElement = null;
+      }
+
+      const lowerUrl = url.toLowerCase();
+      const isVideo = lowerUrl.match(/\.(mp4|webm|mov)$/);
+      const isHtml = lowerUrl.match(/\.html?$/);
+      currentIsHtml = !!isHtml;
+
+      var interactBtn = document.getElementById('gallery-interact-toggle');
+
+      var el;
+      if (isHtml && generatorUrls[url]) {
+        // Load generator directly in iframe — single nesting, WebGL works
+        // Touch blocked by CSS: pointer-events: none (view only, no interaction)
+        if (interactBtn) interactBtn.style.display = 'none';
+        el = document.createElement('iframe');
+        el.className = 'gallery-artwork';
+        el.allow = 'autoplay';
+        document.body.appendChild(el); // Must be in DOM before src for onload to fire
+        el.src = generatorUrls[url];
+      } else if (isHtml) {
+        // No generator URL — show static preview
+        if (interactBtn) interactBtn.style.display = 'none';
+        el = document.createElement('img');
+        el.src = '/api/thumbnail/' + encodeURIComponent(url.split('/').pop());
+      } else if (isVideo) {
+        if (interactBtn) interactBtn.style.display = 'none';
+        el = document.createElement('video');
+        el.src = url;
+        el.muted = el.loop = true;
+        el.play();
+      } else if (_preloadImg && _preloadedUrl === url && _preloadImg.complete) {
+        if (interactBtn) interactBtn.style.display = 'none';
+        // Use preloaded image — already decoded, transition will be instant
+        el = _preloadImg;
+        _preloadImg = null;
+        _preloadedUrl = null;
+      } else {
+        if (interactBtn) interactBtn.style.display = 'none';
+        el = document.createElement('img');
+        el.src = url;
+      }
+
+      pendingElement = el;
+
+      if (config.force_horizontal && !isHtml) {
+        el.classList.add('force-horizontal');
+      }
+
+      var onReady = () => {
+        if (pendingElement !== el) return;
+        pendingElement = null;
+
+        if (splashShown) {
+          updateSplashStatus('Starting your gallery...');
+          hideSplash();
+        }
+
+        if (config.frosted_background && !isHtml) {
+          var activeId = 'frosted-bg-' + _frostedSlot;
+          var inactiveId = _frostedSlot === 'a' ? 'frosted-bg-b' : 'frosted-bg-a';
+          var activeBg = document.getElementById(activeId);
+          var inactiveBg = document.getElementById(inactiveId);
+          var isAnimated = isVideo || lowerUrl.match(/\.gif$/);
+          var isSvg = lowerUrl.match(/\.svg$/);
+          if (isAnimated || isSvg) {
+            // Animated/SVG: capture single frame via tiny canvas snapshot
+            try {
+              frostedSnapshot(el, function(dataUrl) {
+                inactiveBg.style.backgroundImage = 'url("' + dataUrl + '")';
+              });
+            } catch(e) {
+              inactiveBg.style.backgroundImage = 'url("' + url + '")';
+            }
+          } else if (!inactiveBg.style.backgroundImage || !inactiveBg.style.backgroundImage.includes(encodeURI(url.split('/').pop()))) {
+            // Not preloaded (first image, manual nav, etc) — snapshot directly
+            frostedSnapshot(el, function(dataUrl) {
+              inactiveBg.style.backgroundImage = 'url("' + dataUrl + '")';
+            });
+          }
+          // Swap: fade in preloaded inactive, fade out active
+          inactiveBg.style.display = 'block';
+          inactiveBg.style.opacity = String(config.frosted_opacity != null ? config.frosted_opacity : 0.55);
+          var _dith = document.getElementById('frosted-bg-dither');
+          if (_dith) _dith.style.display = 'block';
+          if (activeBg) {
+            activeBg.style.opacity = '0';
+            setTimeout(function() { activeBg.style.display = 'none'; }, 400);
+          }
+          _frostedSlot = _frostedSlot === 'a' ? 'b' : 'a';
+        } else if (isHtml) {
+          var bgA = document.getElementById('frosted-bg-a');
+          var bgB = document.getElementById('frosted-bg-b');
+          if (bgA) bgA.style.display = 'none';
+          if (bgB) bgB.style.display = 'none';
+          var _dith = document.getElementById('frosted-bg-dither');
+          if (_dith) _dith.style.display = 'none';
+        }
+        // Preload next image + frosted BG for seamless transition
+        preloadNext();
+
+        const oldElements = document.querySelectorAll('body > img, body > video, body > iframe.gallery-artwork');
+        const fadeMs = (config.crossfade_duration || 0.8) * 1000 + 500;
+        oldElements.forEach(old => {
+          if (old !== el) {
+            old.classList.remove('active');
+            setTimeout(() => old.remove(), fadeMs);
+          }
+        });
+
+        el.classList.add('active');
+        if (!el.parentNode) document.body.appendChild(el);
+
+        if (typeof onArtworkChanged === 'function') onArtworkChanged();
+
+        if (autoAdvance && playing && !singleImageMode) {
+          const duration = el.tagName === 'VIDEO' ? config.video_duration * 1000 : config.image_duration * 1000;
+          nextTimer = setTimeout(next, duration);
+        }
+      };
+
+      if (el.complete || (el.tagName === 'VIDEO' && el.readyState >= 2)) {
+        // Preloaded image already complete — onload won't fire again,
+        // so call onReady on next microtask (not setTimeout — avoids race with next() timers)
+        Promise.resolve().then(onReady);
+      } else if (el.tagName === 'IFRAME') {
+        // Iframe onload fires when HTML loads, but WebGL needs time to render.
+        // Delay crossfade so the previous artwork stays visible until generator paints.
+        el.onload = function() { setTimeout(onReady, 3000); };
+      } else {
+        el.onload = el.onloadeddata = onReady;
+      }
+
+      el.onerror = () => {
+        if (pendingElement === el) {
+          pendingElement = null;
+          if (!singleImageMode) setTimeout(next, 1000);
+        }
+      };
+    }
+
+    // --- Interact Mode (for HTML NFTs) ---
+    // Create floating exit button for touch screens (no physical Escape key)
+    var exitInteractBtn = document.createElement('button');
+    exitInteractBtn.id = 'exit-interact-btn';
+    exitInteractBtn.innerHTML = '✕ Exit Interact';
+    exitInteractBtn.style.cssText = 'display:none; position:fixed; top:16px; right:16px; z-index:10; padding:12px 20px; background:rgba(0,0,0,0.8); color:#fff; border:1px solid rgba(255,255,255,0.3); border-radius:10px; font-size:14px; cursor:pointer; backdrop-filter:blur(10px); pointer-events:auto; min-height:44px;';
+    exitInteractBtn.onclick = function(e) { e.stopPropagation(); setInteractMode(false); showControls(); };
+    document.body.appendChild(exitInteractBtn);
+
+    function setInteractMode(on) {
+      interactMode = on;
+      var iframe = document.querySelector('body > iframe.gallery-artwork.active');
+      var btn = document.getElementById('gallery-interact-toggle');
+      if (iframe) {
+        if (on) {
+          iframe.classList.add('interact');
+        } else {
+          iframe.classList.remove('interact');
+        }
+      }
+      if (btn) {
+        btn.style.color = on ? '#6366f1' : '';
+        btn.style.borderColor = on ? '#6366f1' : '';
+        btn.title = on ? 'Exit interact mode' : 'Interact with artwork';
+      }
+      // Show/hide floating exit button for touch screens
+      exitInteractBtn.style.display = on ? 'block' : 'none';
+      // Hide gallery controls overlay when entering interact mode
+      if (on) hideControls();
+      // Pause auto-advance while interacting
+      if (on && nextTimer) {
+        clearTimeout(nextTimer);
+        nextTimer = null;
+      }
+    }
+
+    function toggleInteractMode() {
+      if (!currentIsHtml) return;
+      setInteractMode(!interactMode);
+    }
+
+    // Initialize
+    load();
+
+    // Show back button in single image mode
+    if (singleImage) {
+      const backBtn = document.createElement('button');
+      backBtn.innerHTML = '&larr; Back to Manage';
+      backBtn.style.cssText = 'position:fixed; top:20px; left:20px; z-index:9999; padding:12px 20px; background:rgba(0,0,0,0.7); color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:14px; backdrop-filter:blur(10px);';
+      backBtn.onclick = () => window.location.href = 'manage.html';
+      document.body.appendChild(backBtn);
+    }
+
+    // Refresh list periodically (more frequent for better sync)
+    var _ivLoad = setInterval(load, 30 * 1000); // every 30 seconds
+
+    // Also check for config changes periodically
+    var _ivConfig = setInterval(() => {
+      fetch('/api/display-config').then(r => r.json()).then(newConfig => {
+        // Check if config changed
+        if (JSON.stringify(config) !== JSON.stringify(newConfig)) {
+          console.log('Display config changed, applying new settings:', newConfig);
+          config = newConfig;
+
+          // If shuffle changed and we have files, reshuffle
+          if (config.shuffle && files.length > 0) {
+            files = files.sort(() => Math.random() - 0.5);
+          }
+
+          // Update frosted background visibility (both buffers + dither)
+          var bgA = document.getElementById('frosted-bg-a');
+          var bgB = document.getElementById('frosted-bg-b');
+          var bgD = document.getElementById('frosted-bg-dither');
+          if (!config.frosted_background) {
+            if (bgA) bgA.style.display = 'none';
+            if (bgB) bgB.style.display = 'none';
+            if (bgD) bgD.style.display = 'none';
+          } else {
+            var fBlur = (config.frosted_blur != null ? config.frosted_blur : 4) + 'px';
+            document.documentElement.style.setProperty('--frosted-blur', fBlur);
+            var fOp = String(config.frosted_opacity != null ? config.frosted_opacity : 0.55);
+            if (bgA && bgA.style.display !== 'none') bgA.style.opacity = fOp;
+            if (bgB && bgB.style.display !== 'none') bgB.style.opacity = fOp;
+          }
+
+          // Update glow edge (no-glow when disabled)
+          document.body.classList.toggle('no-glow', config.glow_edge === false);
+
+          // Update crossfade duration
+          document.documentElement.style.setProperty('--crossfade', (config.crossfade_duration || 0.8) + 's');
+
+          // Update background color
+          if (config.background_color) {
+            document.body.style.background = config.background_color;
+          } else {
+            document.body.style.background = '';
+          }
+
+          // Update FPS overlay
+          const newFps = !!config.fps_overlay;
+          if (newFps !== fpsEnabled) {
+            fpsEnabled = newFps;
+            const overlay = document.getElementById('fps-overlay');
+            if (overlay) {
+              overlay.style.display = fpsEnabled ? 'block' : 'none';
+              if (fpsEnabled) {
+                requestAnimationFrame(measureFps);
+                updateSystemStats();
+              }
+            }
+          }
+
+          // Update pixel shift
+          if (config.pixel_shift !== false) startPixelShift();
+          else stopPixelShift();
+        }
+      }).catch(err => {
+        console.log('Error checking config:', err);
+      });
+    }, 10 * 1000); // every 10 seconds for responsive settings sync
+
+    // --- Control Functions ---
+
+    function togglePlayPause() {
+      playing = !playing;
+      updatePlayPauseUI();
+      if (playing) next();
+      else if (nextTimer) clearTimeout(nextTimer);
+    }
+
+    function updatePlayPauseUI() {
+      const pauseIcon = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      const playIcon = '<path d="M8 5v14l11-7z"/>';
+      document.getElementById('playPauseIcon').innerHTML = playing ? pauseIcon : playIcon;
+    }
+
+    function toggleFullscreen() {
+      const enterIcon = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+      const exitIcon = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        // Enter fullscreen
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          elem.webkitRequestFullscreen(); // Safari/iOS
+        }
+        document.getElementById('fullscreenIcon').innerHTML = exitIcon;
+      } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen(); // Safari/iOS
+        }
+        document.getElementById('fullscreenIcon').innerHTML = enterIcon;
+      }
+    }
+
+    // Update fullscreen icon when fullscreen changes (e.g., user presses Escape)
+    document.addEventListener('fullscreenchange', updateFullscreenIcon);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+
+    function updateFullscreenIcon() {
+      const enterIcon = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+      const exitIcon = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+      const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+      document.getElementById('fullscreenIcon').innerHTML = isFullscreen ? exitIcon : enterIcon;
+    }
+
+    // Hide fullscreen button if not supported (e.g., iOS Safari)
+    function checkFullscreenSupport() {
+      const btn = document.getElementById('fullscreenBtn');
+      if (!btn) return;
+      const canFullscreen = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+      if (!canFullscreen) {
+        btn.style.display = 'none';
+      }
+    }
+    // Check on load
+    checkFullscreenSupport();
+
+    function showControls() {
+      const controls = document.getElementById('controls');
+      if (!controls) return;
+      controls.classList.add('active');
+      resetControlsTimer();
+    }
+
+    function hideControls() {
+      if (isInteracting) return; // Don't hide while slider is moving
+      const controls = document.getElementById('controls');
+      if (controls) controls.classList.remove('active');
+      if (controlsTimer) {
+        clearTimeout(controlsTimer);
+        controlsTimer = null;
+      }
+    }
+
+    function resetControlsTimer() {
+      if (controlsTimer) clearTimeout(controlsTimer);
+      // Auto-hide controls after 1 minute of inactivity to prevent image retention
+      controlsTimer = setTimeout(() => {
+        // Only hide if not dragging slider
+        if (!isInteracting) {
+          hideControls();
+        } else {
+          // If interacting, check again in 10s
+          resetControlsTimer();
+        }
+      }, 60000); // 1 minute
+    }
+
+    function toggleControls(e) {
+      if (e) e.stopPropagation();
+
+      // Don't toggle controls when in interact mode (clicks go to iframe)
+      if (interactMode) return;
+
+      // Close info panel if open when tapping artwork area
+      if (infoPanelOpen) {
+        closeInfoPanel();
+        return;
+      }
+
+      const controls = document.getElementById('controls');
+      if (!controls) return;
+
+      if (controls.classList.contains('active')) {
+        hideControls();
+      } else {
+        showControls();
+      }
+    }
+
+
+    document.body.onclick = toggleControls;
+
+    // Also show controls on mouse move if they are already active (reset timer)
+    // Cursor auto-hide after 3 seconds of inactivity
+    let cursorTimer = null;
+
+    function showCursor() {
+      document.body.classList.remove('cursor-hidden');
+      if (cursorTimer) clearTimeout(cursorTimer);
+      cursorTimer = setTimeout(() => {
+        document.body.classList.add('cursor-hidden');
+      }, 3000);
+    }
+
+    // Show cursor initially, then start hide timer
+    showCursor();
+
+    document.addEventListener('mousemove', () => {
+      showCursor();
+      if (document.getElementById('controls').classList.contains('active')) {
+        resetControlsTimer();
+      }
+    });
+
+    // Touch pointer overlay for external HDMI mode
+    let isExternalMode = false;
+    let pointerHideTimer = null;
+    const touchPtr = document.getElementById('touch-pointer');
+
+    function checkDisplayMode() {
+      fetch('/api/display/output')
+        .then(r => r.json())
+        .then(data => {
+          isExternalMode = (data.effective === 'external' || data.effective === 'mirror');
+          if (!isExternalMode && touchPtr) touchPtr.style.opacity = '0';
+        })
+        .catch(() => {});
+    }
+
+    checkDisplayMode();
+    var _ivDisplayMode = setInterval(checkDisplayMode, 30000);
+
+    function moveTouchPointer(x, y) {
+      if (!isExternalMode || !touchPtr) return;
+      touchPtr.style.left = x + 'px';
+      touchPtr.style.top = y + 'px';
+      touchPtr.style.opacity = '1';
+      if (pointerHideTimer) clearTimeout(pointerHideTimer);
+      pointerHideTimer = setTimeout(() => { touchPtr.style.opacity = '0'; }, 3000);
+    }
+
+    // Touch events (real touch input)
+    document.addEventListener('touchstart', function(e) {
+      if (!isExternalMode) return;
+      const t = e.touches[0];
+      moveTouchPointer(t.clientX, t.clientY);
+      showCursor();
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (!isExternalMode) return;
+      const t = e.touches[0];
+      moveTouchPointer(t.clientX, t.clientY);
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+      if (!isExternalMode) return;
+      if (pointerHideTimer) clearTimeout(pointerHideTimer);
+      pointerHideTimer = setTimeout(() => { if (touchPtr) touchPtr.style.opacity = '0'; }, 1500);
+    }, { passive: true });
+
+    // Mouse/click events (touch-to-pointer translation when DPI off)
+    document.addEventListener('mousedown', function(e) {
+      if (!isExternalMode) return;
+      moveTouchPointer(e.clientX, e.clientY);
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!isExternalMode) return;
+      moveTouchPointer(e.clientX, e.clientY);
+    }, { passive: true });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      // In interact mode, only Escape exits interact mode
+      if (interactMode) {
+        if (e.key === 'Escape') { setInteractMode(false); showControls(); }
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === ' ') next();
+      if (e.key === 'ArrowLeft') prev();
+      if (e.key === 'r' || e.key === 'R') load();
+      if (e.key === 'Escape') { if (infoPanelOpen) closeInfoPanel(); else window.location.href = '/'; }
+      if (e.key === 'p' || e.key === 'P') togglePlayPause();
+      if (e.key === 'i' || e.key === 'I') toggleInfoPanel();
+      if (e.key === 't' || e.key === 'T') { if (currentIsHtml) toggleInteractMode(); }
+    });
+
+    // Remote control polling
+    function pollRemoteCommands() {
+      fetch('/api/remote/poll')
+        .then(r => r.json())
+        .then(data => {
+          if (data.command) {
+            console.log('Remote command:', data.command);
+            switch (data.command) {
+              case 'next':
+                next();
+                break;
+              case 'prev':
+                prev();
+                break;
+              case 'play':
+                if (!playing) togglePlayPause();
+                break;
+              case 'pause':
+                if (playing) togglePlayPause();
+                break;
+              case 'toggle':
+                togglePlayPause();
+                break;
+              case 'hue_on':
+                if (!hueEnabled) {
+                  hueEnabled = true;
+                  updateHueButton();
+                  var activeEl = document.querySelector('body > img.active, body > video.active');
+                  if (activeEl) setTimeout(function() { syncHueColor(activeEl); }, 300);
+                }
+                break;
+              case 'hue_off':
+                if (hueEnabled) { hueEnabled = false; updateHueButton(); updateLiveSyncLoop(); fetch('/api/hue/entertainment/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'stop' }) }).catch(() => {}); }
+                break;
+              case 'easter_egg':
+                var params = 'type=' + encodeURIComponent(data.type) + '&id=' + data.id + '&fullscreen=1&return=gallery';
+                if (data.cycle) params += '&cycle=1';
+                window.location.href = 'lab.html?' + params;
+                break;
+            }
+          }
+        })
+        .catch(() => { });
+    }
+
+    // Poll for remote commands every second
+    var _ivRemote = setInterval(pollRemoteCommands, 1000);
+
+    // Gallery Power Controls
+    let galleryPendingAction = null;
+
+
+    function showGalleryPowerModal(action) {
+      galleryPendingAction = action;
+      const modal = document.getElementById('gallery-power-modal');
+      const icon = document.getElementById('gallery-modal-icon');
+      const title = document.getElementById('gallery-modal-title');
+      const message = document.getElementById('gallery-modal-message');
+      const confirmBtn = document.getElementById('gallery-modal-confirm');
+
+      if (action === 'screen') {
+        icon.textContent = '🖥️';
+        title.textContent = 'Turn Off Screen?';
+        message.textContent = 'Touch the screen or press any key to wake.';
+        confirmBtn.textContent = 'Turn Off';
+        confirmBtn.className = 'modal-btn modal-btn-secondary';
+      } else {
+        icon.textContent = '⏻';
+        title.textContent = 'Shutdown?';
+        message.textContent = 'Device will power off completely.';
+        confirmBtn.textContent = 'Shutdown';
+        confirmBtn.className = 'modal-btn modal-btn-danger';
+      }
+
+      modal.classList.add('active');
+    }
+
+    function closeGalleryPowerModal() {
+      document.getElementById('gallery-power-modal').classList.remove('active');
+      galleryPendingAction = null;
+    }
+
+    document.getElementById('gallery-modal-confirm').addEventListener('click', function () {
+      if (galleryPendingAction === 'screen') {
+        fetch('/api/screen/off', { method: 'POST' })
+          .then(() => closeGalleryPowerModal())
+          .catch(err => alert('Failed: ' + err.message));
+      } else if (galleryPendingAction === 'shutdown') {
+        fetch('/api/shutdown')
+          .then(() => {
+            closeGalleryPowerModal();
+            document.body.innerHTML = `
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#000;color:#fff;">
+                <div style="width:60px;height:60px;border:4px solid #333;border-top-color:#fff;border-radius:50%;animation:shutdown-spin 1s linear infinite;margin-bottom:30px;"></div>
+                <div style="font-size:24px;font-weight:600;margin-bottom:10px;">Shutting Down</div>
+                <div style="font-size:14px;color:#888;">Please wait for the device to power off completely</div>
+                <div style="margin-top:30px;font-size:13px;color:#666;">It is safe to unplug once the screen goes dark</div>
+              </div>
+              <style>@keyframes shutdown-spin{to{transform:rotate(360deg)}}</style>
+            `;
+          })
+          .catch(err => alert('Failed: ' + err.message));
+      }
+    });
+
+    document.getElementById('gallery-power-modal').addEventListener('click', function (e) {
+      if (e.target === this) closeGalleryPowerModal();
+    });
+
+    // ========================================
+    // Philips Hue Color Sync (Per-Instance)
+    // Each gallery instance starts with Hue OFF
+    // Turning it ON only affects THIS instance
+    // ========================================
+    let hueEnabled = false;  // Always starts OFF for this instance
+    let hueConnected = false;
+    let hueColorMode = 'dominant';
+    let hueLiveSync = false;
+    let hueLiveSyncInterval = null;
+    let hueLiveSyncMs = 3000;
+
+    // Load Hue settings - only check if bridge is connected, don't auto-enable
+    let hueSettingsLoaded = false;
+    function loadHueSettings() {
+      fetch('/api/hue/settings')
+        .then(r => r.json())
+        .then(settings => {
+          hueConnected = settings.connected || false;
+          // Only force OFF on initial load, not on periodic refreshes
+          if (!hueSettingsLoaded) {
+            hueEnabled = false;
+            hueSettingsLoaded = true;
+          }
+          hueColorMode = settings.color_mode || 'dominant';
+          hueLiveSync = settings.live_sync || false;
+          hueLiveSyncMs = settings.live_sync_interval || 3000;
+          updateHueButton();
+          updateLiveSyncLoop();
+        })
+        .catch(() => {
+          hueConnected = false;
+          updateHueButton();
+        });
+    }
+
+    // Live color sync - continuously sample color from current artwork
+    let _liveSyncActiveMs = 0;
+    let _liveSyncAnimated = false;
+    function updateLiveSyncLoop() {
+      // Always run live sync when Hue is enabled in gallery
+      // (don't require separate live_sync setting - gallery IS for viewing art)
+      if (hueEnabled) {
+        // Determine if current artwork is animated (gif/video) — use faster interval
+        var active = document.querySelector('body > img.active, body > video.active');
+        var isAnimated = active && (active.tagName === 'VIDEO' ||
+          (active.src && active.src.toLowerCase().endsWith('.gif')));
+        var targetMs = isAnimated ? Math.min(hueLiveSyncMs, 1500) : hueLiveSyncMs;
+
+        // Restart if interval or animated state changed
+        if (hueLiveSyncInterval && (_liveSyncActiveMs !== targetMs || _liveSyncAnimated !== isAnimated)) {
+          clearInterval(hueLiveSyncInterval);
+          hueLiveSyncInterval = null;
+        }
+        if (!hueLiveSyncInterval) {
+          _liveSyncActiveMs = targetMs;
+          _liveSyncAnimated = isAnimated;
+          hueLiveSyncInterval = setInterval(() => {
+            if (!hueEnabled) return;
+            // Use specific selector to avoid matching controls-overlay or power-modal
+            const el = document.querySelector('body > img.active, body > video.active');
+            if (el) {
+              syncHueColor(el);
+            }
+          }, targetMs);
+        }
+      } else {
+        if (hueLiveSyncInterval) {
+          clearInterval(hueLiveSyncInterval);
+          hueLiveSyncInterval = null;
+        }
+      }
+    }
+
+    // Update Hue button appearance
+    function updateHueButton() {
+      const btn = document.getElementById('gallery-hue-toggle');
+      if (btn) {
+        // Only show button if Hue is connected
+        btn.style.display = hueConnected ? 'flex' : 'none';
+
+        if (hueEnabled) {
+          btn.classList.add('hue-active');
+          btn.title = 'Hue Sync ON - Click to disable';
+        } else {
+          btn.classList.remove('hue-active');
+          btn.title = 'Hue Sync OFF - Click to enable';
+        }
+      }
+    }
+
+    // Toggle Hue sync - per-instance only (no server persistence)
+    function toggleGalleryHue() {
+      // Toggle local state only - don't persist to server
+      hueEnabled = !hueEnabled;
+      updateHueButton();
+      updateLiveSyncLoop();
+      console.log('Hue sync toggled:', hueEnabled ? 'ON' : 'OFF', '(this instance only)');
+
+      // If turning off, release lights back to normal control
+      if (!hueEnabled) {
+        // Stop entertainment streaming to release DTLS session
+        fetch('/api/hue/entertainment/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'stop' })
+        }).catch(() => {});
+      }
+    }
+
+    // ==========================================
+    // Lifecycle & Hue Exit Logic
+    // ==========================================
+
+    // Prevent multiple instances using BroadcastChannel
+    const galleryChannel = new BroadcastChannel('vernis_gallery_channel');
+    galleryChannel.postMessage({ type: 'new_instance' });
+
+    galleryChannel.onmessage = (event) => {
+      if (event.data.type === 'new_instance') {
+        // Another instance started. We should yield to the new one.
+        console.log('New gallery instance detected. Closing this one.');
+        // Stop any active processes first
+        stopHueSync();
+        // Redirect to home/settings
+        window.location.href = '/';
+      }
+    };
+
+    // ========================================
+    // Artwork Info Panel
+    // ========================================
+    let infoPanelOpen = false;
+    let currentArtworkUrl = '';
+
+    function toggleInfoPanel() {
+      const panel = document.getElementById('artwork-info-panel');
+      const btn = document.getElementById('gallery-info-toggle');
+      if (!panel) return;
+
+      infoPanelOpen = !infoPanelOpen;
+      panel.classList.toggle('visible', infoPanelOpen);
+      if (btn) btn.classList.toggle('info-active', infoPanelOpen);
+
+      // Hide nav controls when info panel is open so they don't cover the text
+      var ctrlTab = document.querySelector('.control-tab');
+      if (ctrlTab) ctrlTab.style.display = infoPanelOpen ? 'none' : '';
+
+      if (infoPanelOpen) {
+        loadArtworkInfo();
+        resetControlsTimer();
+      }
+    }
+
+    function closeInfoPanel() {
+      const panel = document.getElementById('artwork-info-panel');
+      const btn = document.getElementById('gallery-info-toggle');
+      if (panel) panel.classList.remove('visible');
+      if (btn) btn.classList.remove('info-active');
+      infoPanelOpen = false;
+      // Restore nav controls
+      var ctrlTab = document.querySelector('.control-tab');
+      if (ctrlTab) ctrlTab.style.display = '';
+    }
+
+    function loadArtworkInfo() {
+      const activeEl = document.querySelector('body > img.active, body > video.active, body > iframe.gallery-artwork.active');
+      if (!activeEl || !activeEl.src) {
+        showInfoEmpty('No artwork displayed');
+        return;
+      }
+
+      // Extract filename from URL (e.g., /nfts/QmXYZ.gif → QmXYZ.gif)
+      const url = activeEl.src;
+      const filename = url.split('/').pop().split('?')[0];
+      if (!filename) {
+        showInfoEmpty('No metadata available');
+        return;
+      }
+
+      currentArtworkUrl = url;
+      const content = document.getElementById('artwork-info-content');
+      content.innerHTML = '<div class="info-empty">Loading...</div>';
+
+      fetch('/api/nft-artwork-info/' + encodeURIComponent(filename))
+        .then(r => {
+          if (!r.ok) throw new Error('not found');
+          return r.json();
+        })
+        .then(meta => {
+          if (meta.error) {
+            showInfoEmpty('No metadata available for this artwork');
+            return;
+          }
+          renderInfoPanel(meta, filename);
+        })
+        .catch(() => {
+          showInfoEmpty('No metadata available for this artwork');
+        });
+    }
+
+    function showInfoEmpty(msg) {
+      const content = document.getElementById('artwork-info-content');
+      if (content) content.innerHTML = '<div class="info-empty">' + msg + '</div>';
+    }
+
+    function renderInfoPanel(meta, filename) {
+      const content = document.getElementById('artwork-info-content');
+      if (!content) return;
+
+      let html = '';
+
+      // Title
+      const name = meta.name || filename.replace(/\.[^.]+$/, '');
+      html += '<div class="info-title">' + escapeHtml(name) + '</div>';
+
+      // Artist + Year
+      const parts = [];
+      if (meta.artist) parts.push(escapeHtml(meta.artist));
+      if (meta.year && meta.year !== '0' && meta.year !== '') parts.push(escapeHtml(meta.year));
+      if (meta.collection) parts.push(escapeHtml(meta.collection));
+      if (parts.length) {
+        html += '<div class="info-artist">' + parts.join(' · ') + '</div>';
+      }
+
+      // Description
+      if (meta.description) {
+        html += '<div class="info-description">' + escapeHtml(meta.description) + '</div>';
+      }
+
+      // Tags
+      const tags = meta.tags || [];
+      if (tags.length) {
+        html += '<div class="info-tags">';
+        tags.forEach(function(tag) {
+          html += '<span class="info-tag">' + escapeHtml(tag) + '</span>';
+        });
+        html += '</div>';
+      }
+
+      // Attributes
+      const attrs = meta.attributes || [];
+      if (attrs.length) {
+        html += '<div class="info-attrs">';
+        attrs.forEach(function(attr) {
+          if (attr.trait_type && attr.value !== undefined) {
+            html += '<div class="info-attr">';
+            html += '<div class="info-attr-label">' + escapeHtml(attr.trait_type) + '</div>';
+            html += '<div class="info-attr-value">' + escapeHtml(String(attr.value)) + '</div>';
+            html += '</div>';
+          }
+        });
+        html += '</div>';
+      }
+
+      content.innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Update info panel when artwork changes (if panel is open)
+    function onArtworkChanged() {
+      if (infoPanelOpen) {
+        loadArtworkInfo();
+      }
+      updateFavButton();
+    }
+
+    // ========================================
+    // Favorites (N2)
+    // ========================================
+    var _favorites = {};
+    (function loadFavorites() {
+      try { _favorites = JSON.parse(localStorage.getItem('vernis-favorites') || '{}'); } catch(e) { _favorites = {}; }
+    })();
+
+    function getCurrentFilename() {
+      // Extract filename from current artwork URL
+      var el = document.querySelector('body > img.active, body > video.active, body > iframe.gallery-artwork.active');
+      if (!el) return null;
+      var src = el.src || '';
+      var parts = src.split('/');
+      return decodeURIComponent(parts[parts.length - 1].split('?')[0]);
+    }
+
+    function updateFavButton() {
+      var btn = document.getElementById('gallery-fav-btn');
+      if (!btn) return;
+      var fn = getCurrentFilename();
+      if (fn && _favorites[fn]) {
+        btn.innerHTML = '&#9829;';
+        btn.style.color = '#ff3b30';
+      } else {
+        btn.innerHTML = '&#9825;';
+        btn.style.color = '';
+      }
+    }
+
+    function toggleFavorite() {
+      var fn = getCurrentFilename();
+      if (!fn) return;
+      if (_favorites[fn]) {
+        delete _favorites[fn];
+      } else {
+        _favorites[fn] = Date.now();
+      }
+      localStorage.setItem('vernis-favorites', JSON.stringify(_favorites));
+      updateFavButton();
+      // Also save to backend for persistence
+      fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorites: _favorites })
+      }).catch(function(){});
+    }
+
+    // ========================================
+    // Gallery Stats (N3)
+    // ========================================
+    var _galleryStartTime = Date.now();
+    var _artworksViewed = 0;
+    function updateGalleryStats() {
+      var el = document.getElementById('stats-counter');
+      if (!el || files.length === 0) return;
+      var elapsed = Math.floor((Date.now() - _galleryStartTime) / 60000);
+      var timeStr = elapsed < 1 ? '<1 min' : elapsed + ' min';
+      el.textContent = _artworksViewed + ' of ' + files.length + ' viewed \u2022 ' + timeStr;
+    }
+    var _ivGalleryStats = setInterval(updateGalleryStats, 10000);
+
+    // ========================================
+    // Quick Settings (N4)
+    // ========================================
+    var _qsOpen = false;
+    function toggleQuickSettings() {
+      _qsOpen = !_qsOpen;
+      var panel = document.getElementById('quick-settings');
+      panel.style.display = _qsOpen ? 'block' : 'none';
+      if (_qsOpen) syncQuickSettingsUI();
+    }
+
+    function syncQuickSettingsUI() {
+      document.getElementById('qs-duration').value = config.image_duration || 15;
+      document.getElementById('qs-dur-val').textContent = config.image_duration || 15;
+      document.getElementById('qs-crossfade').value = config.crossfade_duration || 0.8;
+      document.getElementById('qs-fade-val').textContent = config.crossfade_duration || 0.8;
+      var shuf = document.getElementById('qs-shuffle');
+      shuf.checked = config.shuffle !== false;
+      document.getElementById('qs-shuffle-track').style.background = shuf.checked ? '#6366f1' : 'rgba(255,255,255,0.2)';
+      document.getElementById('qs-shuffle-thumb').style.left = shuf.checked ? '20px' : '2px';
+      var frost = document.getElementById('qs-frosted');
+      frost.checked = !!config.frosted_background;
+      document.getElementById('qs-frosted-track').style.background = frost.checked ? '#6366f1' : 'rgba(255,255,255,0.2)';
+      document.getElementById('qs-frosted-thumb').style.left = frost.checked ? '20px' : '2px';
+    }
+
+    function updateQuickSetting(key, value) {
+      config[key] = value;
+      // Update toggle visuals
+      if (key === 'shuffle') {
+        document.getElementById('qs-shuffle-track').style.background = value ? '#6366f1' : 'rgba(255,255,255,0.2)';
+        document.getElementById('qs-shuffle-thumb').style.left = value ? '20px' : '2px';
+        if (value && files.length > 0) files = files.sort(function() { return Math.random() - 0.5; });
+      }
+      if (key === 'frosted_background') {
+        document.getElementById('qs-frosted-track').style.background = value ? '#6366f1' : 'rgba(255,255,255,0.2)';
+        document.getElementById('qs-frosted-thumb').style.left = value ? '20px' : '2px';
+        var fbA = document.getElementById('frosted-bg-a');
+        var fbB = document.getElementById('frosted-bg-b');
+        var fbD = document.getElementById('frosted-bg-dither');
+        if (!value) {
+          if (fbA) fbA.style.display = 'none';
+          if (fbB) fbB.style.display = 'none';
+          if (fbD) fbD.style.display = 'none';
+        }
+      }
+      if (key === 'crossfade_duration') {
+        document.documentElement.style.setProperty('--crossfade', value + 's');
+      }
+      // Save to backend
+      fetch('/api/display-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      }).catch(function(){});
+    }
+
+    // --- Pixel Shift (image retention prevention) ---
+    function applyPixelShift() {
+      var p = _pxShiftPos[_pixelShiftIdx % _pxShiftPos.length];
+      _pixelShiftIdx++;
+      var els = document.querySelectorAll('body > img.active, body > video.active, body > iframe.gallery-artwork.active');
+      els.forEach(function(el) { el.style.transform = 'translate(' + p[0] + 'px,' + p[1] + 'px)'; });
+      var fb = document.getElementById('frosted-bg');
+      if (fb && fb.style.display !== 'none') fb.style.transform = 'scale(1.1) translate(' + p[0] + 'px,' + p[1] + 'px)';
+    }
+    function startPixelShift() {
+      if (_pixelShiftInterval) return;
+      _pixelShiftInterval = setInterval(applyPixelShift, 60000);
+    }
+    function stopPixelShift() {
+      if (_pixelShiftInterval) { clearInterval(_pixelShiftInterval); _pixelShiftInterval = null; }
+      document.querySelectorAll('body > img, body > video, body > iframe.gallery-artwork').forEach(function(el) { el.style.transform = ''; });
+      var fb = document.getElementById('frosted-bg');
+      if (fb) fb.style.transform = 'scale(1.1)';
+    }
+
+    function exitGallery() {
+      stopHueSync();
+
+      // Clean up all intervals to prevent memory leaks
+      clearInterval(_ivLoad);
+      clearInterval(_ivConfig);
+      clearInterval(_ivDisplayMode);
+      clearInterval(_ivRemote);
+      clearInterval(_ivHueSettings);
+      if (_ivStats) clearInterval(_ivStats);
+      clearInterval(_ivGalleryStats);
+      if (_pixelShiftInterval) clearInterval(_pixelShiftInterval);
+
+      // Disconnect observer and close channel
+      if (_galleryObserver) _galleryObserver.disconnect();
+      try { galleryChannel.close(); } catch(e) {}
+
+      // Visual feedback
+      const btn = document.querySelector('.exit-btn');
+      if (btn) btn.style.opacity = '0.5';
+
+      // Ensure we leave
+      setTimeout(() => { window.location.href = '/'; }, 100);
+    }
+
+    function stopHueSync() {
+      const wasEnabled = hueEnabled;
+      hueEnabled = false;
+
+      // Clear live sync interval
+      if (hueLiveSyncInterval) {
+        clearInterval(hueLiveSyncInterval);
+        hueLiveSyncInterval = null;
+      }
+
+      // Clear any pending sync timeout
+      if (window.syncTimeout) {
+        clearTimeout(window.syncTimeout);
+        window.syncTimeout = null;
+      }
+
+      if (wasEnabled) {
+        // Release lights back to normal control (don't turn them off)
+        // Stop entertainment streaming if active — this releases the DTLS session
+        // so the Hue app and REST API can control lights again
+        const stopData = JSON.stringify({ action: 'stop' });
+        try {
+          fetch('/api/hue/entertainment/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: stopData,
+            keepalive: true
+          }).catch(() => { });
+        } catch (e) {
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon('/api/hue/entertainment/stream',
+              new Blob([stopData], { type: 'application/json' }));
+          }
+        }
+      }
+    }
+
+    // Stop Hue when page is actually unloaded (navigation away)
+    window.addEventListener('beforeunload', stopHueSync);
+    window.addEventListener('pagehide', stopHueSync);
+
+    // Extract dominant color from an image or video element
+    function extractDominantColor(element) {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Use smaller size for performance
+        const sampleSize = 100;
+        canvas.width = sampleSize;
+        canvas.height = sampleSize;
+
+        try {
+          // Draw the element to canvas
+          if (element.tagName === 'VIDEO') {
+            ctx.drawImage(element, 0, 0, sampleSize, sampleSize);
+          } else {
+            ctx.drawImage(element, 0, 0, sampleSize, sampleSize);
+          }
+
+          // Get pixel data
+          const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+          const pixels = imageData.data;
+
+          if (hueColorMode === 'average') {
+            // Simple average color
+            let r = 0, g = 0, b = 0, count = 0;
+            for (let i = 0; i < pixels.length; i += 4) {
+              r += pixels[i];
+              g += pixels[i + 1];
+              b += pixels[i + 2];
+              count++;
+            }
+            resolve({ r: Math.round(r / count), g: Math.round(g / count), b: Math.round(b / count) });
+          } else {
+            // Dominant color using color bucketing
+            const colorBuckets = {};
+            const bucketSize = 24; // Group similar colors
+
+            for (let i = 0; i < pixels.length; i += 4) {
+              // Skip very dark or very light pixels
+              const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+              if (brightness < 30 || brightness > 240) continue;
+
+              // Bucket the color
+              const r = Math.floor(pixels[i] / bucketSize) * bucketSize;
+              const g = Math.floor(pixels[i + 1] / bucketSize) * bucketSize;
+              const b = Math.floor(pixels[i + 2] / bucketSize) * bucketSize;
+              const key = `${r},${g},${b}`;
+
+              if (!colorBuckets[key]) {
+                colorBuckets[key] = { count: 0, r: 0, g: 0, b: 0 };
+              }
+              colorBuckets[key].count++;
+              colorBuckets[key].r += pixels[i];
+              colorBuckets[key].g += pixels[i + 1];
+              colorBuckets[key].b += pixels[i + 2];
+            }
+
+            // Find the most common color bucket
+            let dominant = null;
+            let maxCount = 0;
+
+            // For 'vibrant' mode, weight by saturation
+            for (const key in colorBuckets) {
+              const bucket = colorBuckets[key];
+              let score = bucket.count;
+
+              if (hueColorMode === 'vibrant') {
+                // Calculate saturation bonus
+                const avgR = bucket.r / bucket.count;
+                const avgG = bucket.g / bucket.count;
+                const avgB = bucket.b / bucket.count;
+                const max = Math.max(avgR, avgG, avgB);
+                const min = Math.min(avgR, avgG, avgB);
+                const saturation = max > 0 ? (max - min) / max : 0;
+                score *= (1 + saturation * 2); // Boost saturated colors
+              }
+
+              if (score > maxCount) {
+                maxCount = score;
+                dominant = bucket;
+              }
+            }
+
+            if (dominant && dominant.count > 0) {
+              resolve({
+                r: Math.round(dominant.r / dominant.count),
+                g: Math.round(dominant.g / dominant.count),
+                b: Math.round(dominant.b / dominant.count)
+              });
+            } else {
+              resolve({ r: 255, g: 255, b: 255 }); // Fallback to white
+            }
+          }
+        } catch (e) {
+          console.log('Color extraction error:', e);
+          resolve({ r: 255, g: 255, b: 255 });
+        }
+      });
+    }
+
+    // Sync color to Hue lights (with concurrency guard + client-side dedup)
+    let _hueSyncBusy = false;
+    let _hueSyncBusySince = 0;
+    let _hueLastSentColor = { r: -1, g: -1, b: -1 };
+
+    function syncHueColor(element) {
+      if (!hueEnabled) return;
+      // Safety reset: if busy for more than 5 seconds, force reset
+      if (_hueSyncBusy && (Date.now() - _hueSyncBusySince > 5000)) {
+        _hueSyncBusy = false;
+      }
+      if (_hueSyncBusy) return;
+      _hueSyncBusy = true;
+      _hueSyncBusySince = Date.now();
+
+      // For animated content (video/gif), use lower delta threshold
+      var isAnimated = element.tagName === 'VIDEO' ||
+        (element.src && element.src.toLowerCase().endsWith('.gif'));
+      var deltaThreshold = isAnimated ? 15 : 30;
+
+      extractDominantColor(element).then(color => {
+        // Client-side dedup: skip if color barely changed
+        var delta = Math.abs(color.r - _hueLastSentColor.r) +
+                    Math.abs(color.g - _hueLastSentColor.g) +
+                    Math.abs(color.b - _hueLastSentColor.b);
+        if (delta < deltaThreshold) {
+          _hueSyncBusy = false;
+          return;
+        }
+        _hueLastSentColor = { r: color.r, g: color.g, b: color.b };
+
+        fetch('/api/hue/set-color', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(color)
+        }).then(function() {
+          _hueSyncBusy = false;
+        }).catch(function(err) {
+          console.log('Hue sync error:', err);
+          _hueSyncBusy = false;
+        });
+      }).catch(function() {
+        _hueSyncBusy = false;
+      });
+    }
+
+    // Hook into artwork display - sync color when new artwork shows
+    const originalOnLoad = null;
+    var _galleryObserver = null;
+    function setupHueSync() {
+      // Override the element onload to also sync Hue
+      const origNext = window.next;
+      if (origNext) {
+        // Observe for new active elements
+        _galleryObserver = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+              if (node.classList && node.classList.contains('active')) {
+                // Small delay to ensure image is fully rendered
+                setTimeout(() => syncHueColor(node), 500);
+                // Re-evaluate sync interval for animated content
+                updateLiveSyncLoop();
+              }
+            });
+          });
+        });
+        _galleryObserver.observe(document.body, { childList: true });
+      }
+    }
+
+    // Initialize Hue sync
+    loadHueSettings();
+    setupHueSync();
+
+    // Reload Hue settings periodically (in case user changes them)
+    var _ivHueSettings = setInterval(loadHueSettings, 60000);
+
+    // ========================================
+    // FPS Overlay
+    // ========================================
+    let fpsEnabled = !!config.fps_overlay;
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
+    let currentFps = 0;
+    var _ivStats = null;
+
+    function initFpsOverlay() {
+      const overlay = document.getElementById('fps-overlay');
+      if (fpsEnabled && overlay) {
+        overlay.style.display = 'block';
+        requestAnimationFrame(measureFps);
+        updateSystemStats();
+        _ivStats = setInterval(updateSystemStats, 5000); // Update CPU stats every 5 seconds
+      }
+    }
+
+    function measureFps(timestamp) {
+      if (!fpsEnabled) return;
+
+      frameCount++;
+      const elapsed = timestamp - lastFpsUpdate;
+
+      if (elapsed >= 1000) {
+        currentFps = Math.round((frameCount * 1000) / elapsed);
+        document.getElementById('fps-value').textContent = currentFps;
+
+        // Color code FPS
+        const fpsEl = document.getElementById('fps-value');
+        if (currentFps >= 30) fpsEl.style.color = '#4ade80'; // Green
+        else if (currentFps >= 20) fpsEl.style.color = '#f59e0b'; // Amber
+        else fpsEl.style.color = '#ef4444'; // Red
+
+        frameCount = 0;
+        lastFpsUpdate = timestamp;
+      }
+
+      requestAnimationFrame(measureFps);
+    }
+
+    function updateSystemStats() {
+      if (!fpsEnabled) return;
+
+      fetch('/api/system/pi-model')
+        .then(r => r.json())
+        .then(data => {
+          if (data.current_freq_mhz) {
+            document.getElementById('fps-freq').textContent = data.current_freq_mhz;
+          }
+          if (data.current_temp_c) {
+            const temp = data.current_temp_c.toFixed(0);
+            document.getElementById('fps-temp').textContent = temp;
+
+            // Color code temperature
+            const tempEl = document.getElementById('fps-temp');
+            if (data.current_temp_c >= 80) tempEl.style.color = '#ef4444'; // Red
+            else if (data.current_temp_c >= 70) tempEl.style.color = '#f59e0b'; // Amber
+            else tempEl.style.color = '#4ade80'; // Green
+          }
+        })
+        .catch(() => { });
+    }
+
+    // FPS overlay synced via config polling (every 30s config check updates fpsEnabled)
+
+    // Initialize FPS overlay
+    initFpsOverlay();
+
+    // No activity reporter in gallery — passive viewing should allow screen saver
+    // to trigger. Use gallery_exempt setting if screen should stay on during gallery.
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vernis • Bluetooth</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <script>
+    (function () {
+      var theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme + '-' + mode);
+    })();
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      height: 100vh; background: var(--bg-primary, #0f0e0c);
+      color: var(--text-primary, #e8e0d4);
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
+    }
+
+    /* Frame decoration */
+    .frame { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+    .frame-border {
+      position: absolute; inset: 16px;
+      border: 1px solid var(--accent-primary, #d4af37); border-radius: 4px; opacity: 0.45;
+    }
+    .frame-border-inner {
+      position: absolute; inset: 26px;
+      border: 0.5px solid var(--accent-primary, #d4af37); border-radius: 2px; opacity: 0.2;
+    }
+    .corner { position: absolute; width: 50px; height: 50px; }
+    .corner::before, .corner::after {
+      content: ''; position: absolute; background: var(--accent-primary, #d4af37); opacity: 0.6;
+    }
+    .corner::before { width: 50px; height: 1px; }
+    .corner::after { width: 1px; height: 50px; }
+    .c-tl { top: 16px; left: 16px; }
+    .c-tl::before { top: 50px; left: 0; }
+    .c-tl::after { top: 0; left: 50px; }
+    .c-tr { top: 16px; right: 16px; }
+    .c-tr::before { top: 50px; right: 0; }
+    .c-tr::after { top: 0; right: 50px; }
+    .c-bl { bottom: 16px; left: 16px; }
+    .c-bl::before { bottom: 50px; left: 0; }
+    .c-bl::after { bottom: 0; left: 50px; }
+    .c-br { bottom: 16px; right: 16px; }
+    .c-br::before { bottom: 50px; right: 0; }
+    .c-br::after { bottom: 0; right: 50px; }
+    .side-line {
+      position: absolute; width: 1px; opacity: 0.18;
+      background: linear-gradient(180deg, transparent 0%, var(--accent-primary, #d4af37) 20%, var(--accent-primary, #d4af37) 80%, transparent 100%);
+    }
+    .sl-l { left: 40px; top: 15%; bottom: 15%; }
+    .sl-r { right: 40px; top: 15%; bottom: 15%; }
+    .vignette {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.25) 100%);
+    }
+
+    /* Back button */
+    .back-btn {
+      position: absolute; top: 76px; left: 24px; z-index: 20;
+      display: flex; align-items: center; gap: 6px;
+      padding: 12px 8px; border: none;
+      background: transparent; color: var(--text-secondary, #999);
+      font-size: 20px; font-weight: 500; cursor: pointer;
+      font-family: 'Cormorant Garamond', 'Georgia', serif; opacity: 0.5; transition: opacity 0.3s ease;
+    }
+    .back-btn:active { opacity: 0.9; }
+    .back-btn svg { width: 22px; height: 22px; }
+
+    /* Page layout */
+    .page {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 80px 40px 40px; text-align: center;
+    }
+
+    /* BT icon */
+    .bt-icon {
+      width: 90px; height: 90px;
+      background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    .bt-icon svg { width: 40px; height: 40px; color: var(--accent-primary, #d4af37); }
+
+    /* Device name */
+    .device-name {
+      font-size: 44px; font-weight: 900; letter-spacing: 0.12em;
+      font-family: 'Playfair Display', 'Georgia', serif; margin-bottom: 24px;
+      background: linear-gradient(135deg, var(--accent-primary, #d4af37), var(--accent-secondary, #f5e6a3), var(--accent-primary, #d4af37));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Steps */
+    .steps { list-style: none; margin-bottom: 24px; text-align: left; max-width: 460px; width: 100%; }
+    .steps li {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 22px; color: var(--text-secondary, #b8b0a0); line-height: 1.5;
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .step-num {
+      width: 30px; height: 30px; background: rgba(212,175,55,0.12); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 600; color: var(--accent-primary, #d4af37); flex-shrink: 0; margin-top: 2px;
+    }
+    .step-done { opacity: 0.35; }
+    .step-active { color: var(--text-primary, #e8e0d4); }
+
+    /* Actions */
+    .actions {
+      display: flex; gap: 16px; margin-bottom: 16px; align-items: center; justify-content: center;
+    }
+    .btn {
+      padding: 14px 28px; border-radius: 12px; font-size: 21px; font-weight: 600;
+      cursor: pointer; border: none; transition: all 0.2s;
+      background: rgba(212,175,55,0.15); color: var(--accent-primary, #d4af37);
+      border: 1px solid rgba(212,175,55,0.25);
+      font-family: 'Cormorant Garamond', 'Georgia', serif; letter-spacing: 0.03em;
+    }
+    .btn:hover { background: rgba(212,175,55,0.25); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-link {
+      color: var(--text-muted, #888); font-size: 21px; text-decoration: none;
+      padding: 14px 0; cursor: pointer; background: none; border: none;
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+    }
+    .btn-link:hover { color: var(--text-secondary, #bbb); }
+
+    /* QR code section */
+    .bt-qr {
+      display: flex; align-items: center; gap: 16px;
+      padding: 12px 16px; border-radius: 14px;
+      background: rgba(212,175,55,0.06); border: 1px solid rgba(212,175,55,0.12);
+    }
+    .bt-qr img {
+      width: 80px; height: 80px; border-radius: 8px;
+    }
+    .bt-qr-text {
+      text-align: left; font-family: 'Cormorant Garamond', 'Georgia', serif;
+    }
+    .bt-qr-url {
+      font-size: 20px; font-weight: 700; color: var(--accent-primary, #d4af37);
+      font-family: 'Playfair Display', 'Georgia', serif;
+    }
+    .bt-qr-hint {
+      font-size: 15px; color: var(--text-muted, #888); margin-top: 2px;
+    }
+
+    /* QR fullscreen overlay */
+    .qr-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: var(--bg-primary, #0f0e0c);
+      flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .qr-overlay.active { display: flex; }
+    .qr-overlay img {
+      width: min(80vw, 80vh); height: min(80vw, 80vh); border-radius: 16px;
+    }
+    .qr-overlay-url {
+      margin-top: 24px; font-size: 32px; font-weight: 700;
+      font-family: 'Playfair Display', 'Georgia', serif;
+      color: var(--accent-primary, #d4af37); letter-spacing: 0.05em;
+    }
+    .qr-overlay-hint {
+      margin-top: 12px; font-size: 18px; color: var(--text-muted, #888);
+      font-family: 'Cormorant Garamond', 'Georgia', serif;
+    }
+
+    /* PIN display */
+    .pin-view { display: none; }
+    .pin-view.active { display: block; }
+    .pin-label { font-size: 21px; color: var(--text-secondary, #b8b0a0); margin-bottom: 20px; font-family: 'Cormorant Garamond', 'Georgia', serif; }
+    .pin-code {
+      font-size: 64px; font-weight: 700; letter-spacing: 16px;
+      color: var(--accent-primary, #d4af37);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      text-shadow: 0 0 40px rgba(212,175,55,0.3); margin-bottom: 16px;
+    }
+    .pin-device { font-size: 18px; color: var(--text-muted, #666); }
+    .pin-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(212,175,55,0.2); border-top-color: var(--accent-primary, #d4af37);
+      border-radius: 50%; margin: 20px auto 0;
+      animation: spin 1s linear infinite;
+    }
+    .pin-timer { font-size: 16px; color: var(--text-muted, #555); margin-top: 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Connected success view */
+    .success-view { display: none; }
+    .success-view.active { display: block; }
+    .success-icon {
+      width: 90px; height: 90px;
+      background: rgba(50,215,75,0.1); border: 1px solid rgba(50,215,75,0.2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 40px; color: #32d74b;
+    }
+    .success-title {
+      font-size: 32px; font-weight: 700; color: #32d74b; margin-bottom: 8px;
+      font-family: 'Playfair Display', 'Georgia', serif; letter-spacing: 0.05em;
+    }
+    .success-device {
+      font-size: 18px; color: var(--text-muted, #888); margin-bottom: 28px;
+    }
+    .next-steps { text-align: left; max-width: 460px; width: 100%; }
+    .next-steps .step-active { color: var(--accent-primary, #d4af37); }
+
+    /* Paired devices sub-view */
+    .paired-view { display: none; position: fixed; inset: 0; flex-direction: column; background: var(--bg-primary, #0f0e0c); z-index: 30; }
+    .paired-view.active { display: flex; }
+    .paired-header {
+      display: flex; align-items: center; gap: 16px; padding: 24px 24px 20px;
+    }
+    .paired-back {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: rgba(30,28,28,0.85);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-primary, #e8e0d4); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .paired-back svg { width: 24px; height: 24px; }
+    .paired-title { font-size: 26px; font-weight: 700; color: var(--text-primary, #e8e0d4); font-family: 'Playfair Display', 'Georgia', serif; letter-spacing: 0.05em; }
+
+    .device-list { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 0 24px; }
+    .device-row {
+      display: flex; align-items: center; padding: 18px 20px;
+      background: rgba(30,28,28,0.85);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; gap: 14px;
+    }
+    .device-row-name { flex: 1; font-size: 20px; color: var(--text-primary, #e8e0d4); }
+    .device-row-badge {
+      font-size: 14px; padding: 6px 14px; border-radius: 8px; font-weight: 500;
+    }
+    .device-row-badge.connected { background: rgba(50,215,75,0.1); color: #32d74b; }
+    .device-row-badge.disconnected { background: rgba(255,255,255,0.05); color: var(--text-muted, #666); }
+    .device-row-unpair {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(255,69,58,0.08); border: 1px solid rgba(255,69,58,0.15);
+      color: #ff453a; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 600;
+    }
+    .device-row-unpair:hover { background: rgba(255,69,58,0.15); }
+
+    .page-nav {
+      display: flex; justify-content: center; gap: 16px; padding: 20px; align-items: center;
+    }
+    .page-btn {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: rgba(30,28,28,0.85);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text-primary, #e8e0d4); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .page-btn:disabled { opacity: 0.3; cursor: default; }
+    .page-info { font-size: 18px; color: var(--text-muted, #888); }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted, #666); }
+    .empty-state p { font-size: 20px; margin-bottom: 10px; }
+    .empty-state .hint { font-size: 16px; }
+  </style>
+</head>
+<body>
+  <!-- Frame decoration -->
+  <div class="frame">
+    <div class="vignette"></div>
+    <div class="frame-border"></div>
+    <div class="frame-border-inner"></div>
+    <div class="corner c-tl"></div>
+    <div class="corner c-tr"></div>
+    <div class="corner c-bl"></div>
+    <div class="corner c-br"></div>
+    <div class="side-line sl-l"></div>
+    <div class="side-line sl-r"></div>
+  </div>
+
+  <!-- Back button -->
+  <button class="back-btn" onclick="goBack()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    Back
+  </button>
+
+  <!-- Main page -->
+  <div class="page" id="main-view">
+    <!-- Default: pairing instructions -->
+    <div id="bt-normal">
+      <div class="device-name" id="bt-device-name">...</div>
+      <ol class="steps" id="bt-steps"></ol>
+      <div class="actions">
+        <button class="btn-link" id="paired-link" onclick="showPairedDevices()">Paired Devices (<span id="paired-count">0</span>)</button>
+        <button class="btn" id="pair-btn" onclick="startPairing()">Pair New Device</button>
+      </div>
+      <div class="bt-qr" id="bt-qr" onclick="document.getElementById('qr-overlay').className='qr-overlay active'" style="cursor:pointer;">
+        <img id="bt-qr-img" src="/api/qrcode?theme=walnut&amp;url=http://10.44.0.1" alt="QR">
+        <div class="bt-qr-text">
+          <div class="bt-qr-url">http://10.44.0.1</div>
+          <div class="bt-qr-hint" id="bt-qr-hint">Scan after connecting to network</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIN display during pairing -->
+    <div class="pin-view" id="pin-view">
+      <div class="pin-label">Confirm this PIN on your device</div>
+      <div class="pin-code" id="pin-code"></div>
+      <div class="pin-device" id="pin-device"></div>
+      <div class="pin-spinner"></div>
+      <div class="pin-timer" id="pin-timer"></div>
+    </div>
+
+    <!-- Success: paired, show next steps -->
+    <div class="success-view" id="success-view">
+      <div class="success-icon">&#10003;</div>
+      <div class="success-title">Paired!</div>
+      <div class="success-device" id="success-device"></div>
+      <ol class="steps next-steps">
+        <li class="step-done"><div class="step-num">1</div><div>Open <strong>Bluetooth settings</strong> on your phone or laptop</div></li>
+        <li class="step-done"><div class="step-num">2</div><div>Pair with device — <strong>Done!</strong></div></li>
+        <li class="step-done"><div class="step-num">3</div><div>Confirm the PIN — <strong>Done!</strong></div></li>
+        <li class="step-active"><div class="step-num">4</div><div>On your phone, tap the paired device in <strong>Bluetooth settings</strong> and choose <strong>"Connect to network"</strong></div></li>
+        <li class="step-active"><div class="step-num">5</div><div>Open your browser and visit <strong style="color:var(--accent-primary, #d4af37);">http://10.44.0.1</strong></div></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Paired devices sub-view -->
+  <div class="paired-view" id="paired-view">
+    <div class="paired-header">
+      <button class="paired-back" onclick="hidePairedDevices()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <div class="paired-title">Paired Devices</div>
+    </div>
+    <div class="device-list" id="device-list"></div>
+    <div class="page-nav" id="page-nav">
+      <button class="page-btn" id="page-up" onclick="changePage(-1)">&#9650;</button>
+      <span class="page-info" id="page-info">1 / 1</span>
+      <button class="page-btn" id="page-down" onclick="changePage(1)">&#9660;</button>
+    </div>
+  </div>
+
+  <script>
+    var _btDeviceName = '';
+    var _pairedPage = 1;
+    var _pairedTotalPages = 1;
+    var _pinTimer = null;
+    var _discoverableTimer = null;
+    var _pollInterval = null;
+    var _returnUrl = '';
+    var _pairedDeviceName = '';
+
+    function escHTML(s) {
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.textContent;
+    }
+
+    function isKiosk() {
+      var h = location.hostname;
+      return h === 'localhost' || h === '127.0.0.1';
+    }
+
+    function goBack() {
+      if (isKiosk()) {
+        location.href = '/index.html#connect';
+      } else if (history.length > 1) {
+        history.back();
+      } else {
+        location.href = '/';
+      }
+    }
+
+    // === Views ===
+    function showView(view) {
+      document.getElementById('bt-normal').style.display = view === 'normal' ? '' : 'none';
+      document.getElementById('pin-view').className = view === 'pin' ? 'pin-view active' : 'pin-view';
+      document.getElementById('success-view').className = view === 'success' ? 'success-view active' : 'success-view';
+    }
+
+    // === Load BT status ===
+    function loadBTStatus() {
+      fetch('/api/bluetooth/status').then(function(r) { return r.json(); }).then(function(d) {
+        _btDeviceName = d.device_name || 'Vernis';
+        document.getElementById('bt-device-name').textContent = _btDeviceName;
+        buildBTSteps(_btDeviceName);
+
+        var hint = document.getElementById('bt-qr-hint');
+        if (!d.enabled) {
+          hint.textContent = 'Bluetooth is off';
+        } else if (d.discoverable) {
+          hint.textContent = 'Discoverable — waiting for pairing...';
+        } else {
+          hint.textContent = 'Scan after connecting to network';
+        }
+      }).catch(function() {
+        document.getElementById('bt-qr-hint').textContent = 'Bluetooth unavailable';
+      });
+
+      fetch('/api/bluetooth/paired-devices?page=1').then(function(r) { return r.json(); }).then(function(d) {
+        document.getElementById('paired-count').textContent = d.total || 0;
+      }).catch(function() {});
+    }
+
+    function buildBTSteps(deviceName) {
+      var steps = [
+        'Open <strong>Bluetooth settings</strong> on your phone or laptop',
+        'Pair with <strong>' + escHTML(deviceName) + '</strong>',
+        'Confirm the PIN shown on this screen',
+        'On your phone, tap <strong>' + escHTML(deviceName) + '</strong> in Bluetooth settings and choose <strong>"Connect to network"</strong>',
+        'Open browser and visit <strong style="color:var(--accent-primary, #d4af37);">http://10.44.0.1</strong>'
+      ];
+      var ol = document.getElementById('bt-steps');
+      ol.textContent = '';
+      for (var i = 0; i < steps.length; i++) {
+        var li = document.createElement('li');
+        var numDiv = document.createElement('div');
+        numDiv.className = 'step-num';
+        numDiv.textContent = String(i + 1);
+        var textDiv = document.createElement('div');
+        textDiv.insertAdjacentHTML('beforeend', steps[i]);
+        li.appendChild(numDiv);
+        li.appendChild(textDiv);
+        ol.appendChild(li);
+      }
+    }
+
+    // === Pairing ===
+    function startPairing() {
+      var btn = document.getElementById('pair-btn');
+      btn.disabled = true;
+      btn.textContent = 'Discoverable...';
+
+      fetch('/api/bluetooth/discoverable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true })
+      }).then(function(r) { return r.json(); }).then(function() {
+        document.getElementById('bt-qr-hint').textContent = 'Discoverable — waiting for pairing...';
+
+        clearTimeout(_discoverableTimer);
+        _discoverableTimer = setTimeout(function() {
+          btn.disabled = false;
+          btn.textContent = 'Pair New Device';
+          document.getElementById('bt-qr-hint').textContent = 'Discoverable timed out';
+          loadBTStatus();
+        }, 60000);
+      }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Pair New Device';
+      });
+
+      startPINPolling();
+    }
+
+    function startPINPolling() {
+      clearInterval(_pollInterval);
+      _pollInterval = setInterval(function() {
+        fetch('/api/bluetooth/pairing').then(function(r) { return r.json(); }).then(function(d) {
+          if (d.active && d.pin) {
+            showPairingPIN(d.pin, d.device);
+          }
+        }).catch(function() {});
+      }, 2000);
+    }
+
+    function showPairingPIN(pin, device) {
+      clearInterval(_pollInterval);
+      _pairedDeviceName = device || 'device';
+
+      var formatted = pin.length === 6 ? pin.slice(0, 3) + ' ' + pin.slice(3) : pin;
+
+      document.getElementById('pin-code').textContent = formatted;
+      document.getElementById('pin-device').textContent = 'Pairing with ' + escHTML(_pairedDeviceName);
+
+      showView('pin');
+
+      var remaining = 30;
+      document.getElementById('pin-timer').textContent = 'PIN expires in ' + remaining + ' seconds';
+      clearInterval(_pinTimer);
+      _pinTimer = setInterval(function() {
+        remaining--;
+        document.getElementById('pin-timer').textContent = 'PIN expires in ' + remaining + ' seconds';
+        if (remaining <= 0) {
+          clearInterval(_pinTimer);
+          showView('normal');
+          document.getElementById('pair-btn').disabled = false;
+          document.getElementById('pair-btn').textContent = 'Pair New Device';
+          loadBTStatus();
+        }
+      }, 1000);
+    }
+
+    // Called by CDP after pairing completes
+    function onPairingComplete() {
+      clearInterval(_pinTimer);
+      clearTimeout(_discoverableTimer);
+      clearInterval(_pollInterval);
+
+      // Show success view with next steps
+      document.getElementById('success-device').textContent = _pairedDeviceName + ' paired successfully';
+      showView('success');
+
+      // If kiosk was auto-navigated here, go back after 15s
+      if (_returnUrl) {
+        setTimeout(function() { location.href = _returnUrl; }, 15000);
+      }
+    }
+
+    // === Paired devices list ===
+    function showPairedDevices() {
+      _pairedPage = 1;
+      document.getElementById('paired-view').className = 'paired-view active';
+      loadPairedDevices();
+    }
+
+    function hidePairedDevices() {
+      document.getElementById('paired-view').className = 'paired-view';
+      loadBTStatus();
+    }
+
+    function loadPairedDevices() {
+      fetch('/api/bluetooth/paired-devices?page=' + _pairedPage).then(function(r) { return r.json(); }).then(function(d) {
+        _pairedTotalPages = d.total_pages || 1;
+        renderDeviceList(d.devices || []);
+        document.getElementById('page-info').textContent = _pairedPage + ' / ' + _pairedTotalPages;
+        document.getElementById('page-up').disabled = _pairedPage <= 1;
+        document.getElementById('page-down').disabled = _pairedPage >= _pairedTotalPages;
+      }).catch(function() {
+        var list = document.getElementById('device-list');
+        list.textContent = '';
+        var p = document.createElement('p');
+        p.style.cssText = 'text-align:center;color:#666;padding:60px;font-size:20px;';
+        p.textContent = 'Failed to load devices';
+        list.appendChild(p);
+      });
+    }
+
+    function renderDeviceList(devices) {
+      var list = document.getElementById('device-list');
+      list.textContent = '';
+
+      if (devices.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'empty-state';
+        var p = document.createElement('p');
+        p.textContent = 'No paired devices';
+        var hint = document.createElement('p');
+        hint.className = 'hint';
+        hint.textContent = 'Use "Pair New Device" to connect a phone or laptop';
+        empty.appendChild(p);
+        empty.appendChild(hint);
+        list.appendChild(empty);
+        return;
+      }
+
+      for (var i = 0; i < devices.length; i++) {
+        var dev = devices[i];
+        var row = document.createElement('div');
+        row.className = 'device-row';
+
+        var nameEl = document.createElement('div');
+        nameEl.className = 'device-row-name';
+        nameEl.textContent = dev.name || 'Unknown';
+
+        var badge = document.createElement('div');
+        badge.className = 'device-row-badge ' + (dev.connected ? 'connected' : 'disconnected');
+        badge.textContent = dev.connected ? 'Connected' : 'Disconnected';
+
+        var unpairBtn = document.createElement('button');
+        unpairBtn.className = 'device-row-unpair';
+        unpairBtn.textContent = '\u2715';
+        unpairBtn.setAttribute('data-address', dev.address);
+        unpairBtn.onclick = function() {
+          var addr = this.getAttribute('data-address');
+          unpairDevice(addr);
+        };
+
+        row.appendChild(nameEl);
+        row.appendChild(badge);
+        row.appendChild(unpairBtn);
+        list.appendChild(row);
+      }
+    }
+
+    function changePage(delta) {
+      var newPage = _pairedPage + delta;
+      if (newPage < 1 || newPage > _pairedTotalPages) return;
+      _pairedPage = newPage;
+      loadPairedDevices();
+    }
+
+    function unpairDevice(address) {
+      fetch('/api/bluetooth/unpair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: address })
+      }).then(function() {
+        loadPairedDevices();
+      }).catch(function() {});
+    }
+
+    // === Init ===
+    (function init() {
+      var params = new URLSearchParams(location.search);
+      if (params.get('return')) _returnUrl = params.get('return');
+
+      loadBTStatus();
+
+      if (params.get('pairing') === '1') {
+        startPINPolling();
+        fetch('/api/bluetooth/pairing').then(function(r) { return r.json(); }).then(function(d) {
+          if (d.active && d.pin) {
+            showPairingPIN(d.pin, d.device);
+          }
+        }).catch(function() {});
+      }
+
+      setInterval(function() {
+        var pinActive = document.getElementById('pin-view').className.indexOf('active') !== -1;
+        var successActive = document.getElementById('success-view').className.indexOf('active') !== -1;
+        if (!pinActive && !successActive) {
+          loadBTStatus();
+        }
+      }, 15000);
+    })();
+  </script>
+
+  <!-- QR fullscreen overlay -->
+  <div class="qr-overlay" id="qr-overlay" onclick="this.className='qr-overlay'">
+    <img src="/api/qrcode?theme=walnut&amp;url=http://10.44.0.1" alt="QR Code">
+    <div class="qr-overlay-url">http://10.44.0.1</div>
+    <div class="qr-overlay-hint">Tap anywhere to close</div>
+  </div>
+</body>
+</html>

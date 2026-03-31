@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" width="1200" height="1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f0e0c"/>
+      <stop offset="50%" stop-color="#1a1815"/>
+      <stop offset="100%" stop-color="#0f0e0c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c9a962"/>
+      <stop offset="50%" stop-color="#e8c874"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+    <linearGradient id="goldLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="15%" stop-color="#c9a962"/>
+      <stop offset="50%" stop-color="#e8c874"/>
+      <stop offset="85%" stop-color="#c9a962"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </linearGradient>
+    <linearGradient id="goldVertL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="20%" stop-color="#c9a962"/>
+      <stop offset="80%" stop-color="#c9a962"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </linearGradient>
+    <linearGradient id="goldVertR" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="20%" stop-color="#d4af37"/>
+      <stop offset="80%" stop-color="#d4af37"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="40%">
+      <stop offset="0%" stop-color="rgba(212,175,55,0.12)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="60%" stop-color="transparent"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.5)"/>
+    </radialGradient>
+    <filter id="textGlow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&amp;family=Cormorant+Garamond:wght@300;400;600&amp;display=swap');
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+
+  <!-- Subtle texture pattern -->
+  <rect width="1200" height="1200" fill="url(#glow)"/>
+  <rect width="1200" height="1200" fill="url(#vignette)"/>
+
+  <!-- Outer border frame -->
+  <rect x="40" y="40" width="1120" height="1120" rx="4" fill="none" stroke="#c9a962" stroke-width="1" opacity="0.4"/>
+  <rect x="55" y="55" width="1090" height="1090" rx="2" fill="none" stroke="#c9a962" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- Corner ornaments (top-left) -->
+  <line x1="40" y1="120" x2="120" y2="120" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+  <line x1="120" y1="40" x2="120" y2="120" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+  <!-- Corner ornaments (top-right) -->
+  <line x1="1080" y1="120" x2="1160" y2="120" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+  <line x1="1080" y1="40" x2="1080" y2="120" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+  <!-- Corner ornaments (bottom-left) -->
+  <line x1="40" y1="1080" x2="120" y2="1080" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+  <line x1="120" y1="1080" x2="120" y2="1160" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+  <!-- Corner ornaments (bottom-right) -->
+  <line x1="1080" y1="1080" x2="1160" y2="1080" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+  <line x1="1080" y1="1080" x2="1080" y2="1160" stroke="#c9a962" stroke-width="1" opacity="0.6"/>
+
+  <!-- Decorative diamond above title -->
+  <g transform="translate(600, 320)" opacity="0.7">
+    <rect x="-6" y="-6" width="12" height="12" transform="rotate(45)" fill="none" stroke="#d4af37" stroke-width="1"/>
+    <rect x="-3" y="-3" width="6" height="6" transform="rotate(45)" fill="#d4af37"/>
+  </g>
+
+  <!-- Top decorative line -->
+  <rect x="200" y="370" width="800" height="1.5" fill="url(#goldLine)" opacity="0.6"/>
+
+  <!-- Main title: VERNIS -->
+  <text x="600" y="500" text-anchor="middle" font-family="'Playfair Display', 'Georgia', serif" font-weight="900" font-size="120" letter-spacing="0.2em" fill="url(#gold)" filter="url(#textGlow)">VERNIS</text>
+
+  <!-- Decorative line below title -->
+  <rect x="300" y="540" width="600" height="1.5" fill="url(#goldLine)" opacity="0.6"/>
+
+  <!-- Small ornamental dots -->
+  <circle cx="290" cy="541" r="3" fill="#c9a962" opacity="0.5"/>
+  <circle cx="910" cy="541" r="3" fill="#c9a962" opacity="0.5"/>
+
+  <!-- Subtitle -->
+  <text x="600" y="620" text-anchor="middle" font-family="'Cormorant Garamond', 'Georgia', serif" font-weight="300" font-size="42" letter-spacing="0.35em" fill="#d4cfc4" opacity="0.9">YOUR FOREVER</text>
+  <text x="600" y="680" text-anchor="middle" font-family="'Cormorant Garamond', 'Georgia', serif" font-weight="300" font-size="42" letter-spacing="0.35em" fill="#d4cfc4" opacity="0.9">GALLERY</text>
+
+  <!-- Decorative separator -->
+  <rect x="350" y="730" width="500" height="0.8" fill="url(#goldLine)" opacity="0.4"/>
+
+  <!-- Bottom decorative line -->
+  <rect x="200" y="790" width="800" height="1" fill="url(#goldLine)" opacity="0.3"/>
+
+  <!-- Bottom decorative diamond -->
+  <g transform="translate(600, 840)" opacity="0.5">
+    <rect x="-4" y="-4" width="8" height="8" transform="rotate(45)" fill="#d4af37"/>
+  </g>
+
+  <!-- Side decorative lines -->
+  <rect x="80" y="200" width="0.8" height="800" fill="url(#goldVertL)" opacity="0.15"/>
+  <rect x="1119" y="200" width="0.8" height="800" fill="url(#goldVertR)" opacity="0.15"/>
+</svg>

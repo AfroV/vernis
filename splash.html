@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vernis</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@900&family=Cormorant+Garamond:wght@400&family=Inter:wght@400&family=Lato:wght@400&display=swap');
+
+    :root {
+      --bg: #0a0a0a;
+      --accent1: #d4af37;
+      --accent2: #f5e6a3;
+      --text-sub: #8b7b68;
+      --bar-bg: #2a2420;
+      --font-logo: 'Playfair Display', serif;
+      --font-tag: 'Cormorant Garamond', serif;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .splash-container {
+      text-align: center;
+      animation: fadeIn 1.5s ease-in-out;
+    }
+
+    .logo {
+      font-family: var(--font-logo);
+      font-size: 120px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent1), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+      letter-spacing: -0.03em;
+      animation: slideUp 1s ease-out;
+    }
+
+    .tagline {
+      font-family: var(--font-tag);
+      font-size: 28px;
+      color: var(--text-sub);
+      font-style: italic;
+      margin-bottom: 60px;
+      animation: slideUp 1s ease-out 0.3s both;
+    }
+
+    .loading-bar {
+      width: 300px;
+      height: 4px;
+      background: var(--bar-bg);
+      border-radius: 2px;
+      margin: 0 auto;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .loading-progress {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent1), var(--accent2));
+      animation: loading 2.5s ease-in-out infinite;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes loading {
+      0% { width: 0%; left: 0; }
+      50% { width: 70%; left: 0; }
+      100% { width: 0%; left: 100%; }
+    }
+  </style>
+  <script>
+    // Theme definitions (must match vernis-themes.css)
+    const themes = {
+      'classic-light': {
+        bg: '#f9f3e3', accent1: '#c9a227', accent2: '#b8860b', textSub: '#9c8564', barBg: '#e0d0a8',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'classic-dark': {
+        bg: '#1c1408', accent1: '#ffc61a', accent2: '#daa520', textSub: '#b8a070', barBg: '#4a3a20',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'minimal-light': {
+        bg: '#f8fafc', accent1: '#2563eb', accent2: '#3b82f6', textSub: '#64748b', barBg: '#e2e8f0',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      },
+      'minimal-dark': {
+        bg: '#020617', accent1: '#3b82f6', accent2: '#60a5fa', textSub: '#64748b', barBg: '#1e293b',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      },
+      'gallery-light': {
+        bg: '#fafaf9', accent1: '#404040', accent2: '#737373', textSub: '#a3a3a3', barBg: '#e5e5e5',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Lato', sans-serif"
+      },
+      'gallery-dark': {
+        bg: '#171717', accent1: '#e5e5e5', accent2: '#a3a3a3', textSub: '#737373', barBg: '#2f2f2f',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Lato', sans-serif"
+      },
+      'luxury-light': {
+        bg: '#fdf8f3', accent1: '#c45a20', accent2: '#e67e22', textSub: '#8b7355', barBg: '#e8ddd0',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'luxury-dark': {
+        bg: '#1a1410', accent1: '#e67e22', accent2: '#f39c12', textSub: '#a08060', barBg: '#2d2520',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'nordic-light': {
+        bg: '#f7f8fa', accent1: '#5e81ac', accent2: '#81a1c1', textSub: '#7b88a0', barBg: '#dde3ec',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      },
+      'nordic-dark': {
+        bg: '#242933', accent1: '#88c0d0', accent2: '#81a1c1', textSub: '#6b7b8f', barBg: '#3b4252',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      },
+      'walnut-light': {
+        bg: '#f7f3ee', accent1: '#d4af37', accent2: '#b8960c', textSub: '#8b7355', barBg: '#e0d5c5',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'walnut-dark': {
+        bg: '#0a0a0a', accent1: '#d4af37', accent2: '#f5e6a3', textSub: '#8b7b68', barBg: '#2a2420',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'xcopy-light': {
+        bg: '#0a0a0a', accent1: '#00ffff', accent2: '#ff00ff', textSub: '#666', barBg: '#1a1a1a',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      },
+      'xcopy-dark': {
+        bg: '#000000', accent1: '#ff00ff', accent2: '#00ffff', textSub: '#555', barBg: '#111',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      },
+      'hackatao-light': {
+        bg: '#faf9f7', accent1: '#c9a962', accent2: '#8b7355', textSub: '#8b7355', barBg: '#e8e0d0',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'hackatao-dark': {
+        bg: '#0f0e0c', accent1: '#d4af37', accent2: '#c9a962', textSub: '#8b7b68', barBg: '#2a2420',
+        fontLogo: "'Playfair Display', serif", fontTag: "'Cormorant Garamond', serif"
+      },
+      'pop-light': {
+        bg: '#f8f8f8', accent1: '#E63946', accent2: '#457B9D', textSub: '#666', barBg: '#e0e0e0',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      },
+      'pop-dark': {
+        bg: '#0a0a0a', accent1: '#E63946', accent2: '#457B9D', textSub: '#777', barBg: '#222',
+        fontLogo: "'Inter', sans-serif", fontTag: "'Inter', sans-serif"
+      }
+    };
+
+    // Apply saved theme
+    (function() {
+      const style = localStorage.getItem('vernis-theme-style') || 'walnut';
+      const mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      const themeKey = style + '-' + mode;
+      const t = themes[themeKey] || themes['walnut-dark'];
+
+      const root = document.documentElement;
+      root.style.setProperty('--bg', t.bg);
+      root.style.setProperty('--accent1', t.accent1);
+      root.style.setProperty('--accent2', t.accent2);
+      root.style.setProperty('--text-sub', t.textSub);
+      root.style.setProperty('--bar-bg', t.barBg);
+      root.style.setProperty('--font-logo', t.fontLogo);
+      root.style.setProperty('--font-tag', t.fontTag);
+      // Sync theme from server
+      fetch('/api/theme').then(function(r){return r.json()}).then(function(d){
+        if(!d.style) return;
+        var k=d.style+'-'+(d.mode||'dark'); var nt=themes[k]||themes['walnut-dark'];
+        root.style.setProperty('--bg',nt.bg);root.style.setProperty('--accent1',nt.accent1);
+        root.style.setProperty('--accent2',nt.accent2);root.style.setProperty('--text-sub',nt.textSub);
+        root.style.setProperty('--bar-bg',nt.barBg);root.style.setProperty('--font-logo',nt.fontLogo);
+        root.style.setProperty('--font-tag',nt.fontTag);
+      }).catch(function(){});
+    })();
+  </script>
+</head>
+
+<body>
+  <div class="splash-container">
+    <div class="logo">Vernis</div>
+    <div class="tagline">Your Forever Gallery</div>
+    <div class="loading-bar">
+      <div class="loading-progress"></div>
+    </div>
+  </div>
+
+  <script>
+    // Check if server is ready using image load (works from file://)
+    function checkServer() {
+      var img = new Image();
+      img.onload = function() {
+        window.location.href = 'http://localhost/gallery.html';
+      };
+      img.onerror = function() {
+        setTimeout(checkServer, 1000);
+      };
+      img.src = 'http://localhost/favicon.svg?' + Date.now();
+    }
+    setTimeout(checkServer, 500);
+  </script>
+</body>
+
+</html>

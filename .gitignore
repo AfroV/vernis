@@ -1,0 +1,24 @@
+# Device-specific
+pi-devices.json
+deploy-now.sh
+todo.txt
+
+# Runtime data
+*.pyc
+__pycache__/
+*.log
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Local testing
+local-test/
+
+# Secrets
+opensea-key.json
+auth-token.json
+stream-renderer.json
+*.pem
+*.key

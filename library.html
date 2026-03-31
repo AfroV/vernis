@@ -1,0 +1,3191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>CSV Library • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <link rel="stylesheet" href="" id="supersize-css">
+  <script src="vernis-notifications.js"></script>
+  <script>
+    // Load supersize settings early
+    (function () {
+      let supersize = localStorage.getItem('vernis-supersize');
+      if (supersize && supersize !== 'normal') {
+        document.getElementById('supersize-css').href = 'vernis-supersize-' + supersize + '.css';
+      }
+    })();
+  </script>
+  <style>
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Scrollbar colors - width controlled by supersize CSS or settings */
+    ::-webkit-scrollbar-track {
+      background: #1a1a1a;
+      background: var(--bg-tertiary, #1a1a1a);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #00ffff;
+      background: var(--accent-primary, #00ffff);
+      border: 3px solid #1a1a1a;
+      border-color: var(--bg-tertiary, #1a1a1a);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #ff00ff;
+      background: var(--accent-secondary, #ff00ff);
+    }
+
+    .main {
+      padding: 130px 50px 80px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 56px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 50px;
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 28px;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 32px;
+      padding-bottom: 42px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card.has-cover {
+      padding-top: 0;
+    }
+
+    .card-cover {
+      width: calc(100% + 64px);
+      margin: 0 -32px 20px -32px;
+      height: 140px;
+      object-fit: cover;
+      border-radius: 16px 16px 0 0;
+    }
+
+    .card-author {
+      font-size: 12px;
+      color: var(--accent-primary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 50px var(--shadow-md);
+      border-color: var(--accent-primary);
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .card h3 {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 12px 0;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .card .meta {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .card .desc {
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 24px;
+      min-height: 60px;
+      font-size: 15px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Primary action button - wider, white */
+    .btn-library-primary {
+      flex: 2;
+      background: white;
+      color: #1a1a1a;
+      border: 2px solid #1a1a1a;
+      padding: 14px 24px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: var(--font-body);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.3s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-library-primary:hover {
+      background: #f5f5f5;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Secondary action button - thinner, black */
+    .btn-library-secondary {
+      flex: 1;
+      background: #1a1a1a;
+      color: white;
+      border: 1px solid #333;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: var(--font-body);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.3s;
+    }
+
+    .btn-library-secondary:hover {
+      background: #2a2a2a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .badge {
+      position: absolute;
+      top: 20px;
+      right: 55px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: white;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* 3-dot menu */
+    .card-menu {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+    }
+
+    .card-menu-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .card-menu-btn:hover {
+      background: var(--bg-tertiary, rgba(0, 0, 0, 0.1));
+    }
+
+    .card-menu-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--text-muted);
+    }
+
+    .card-menu-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px var(--shadow-md);
+      min-width: 180px;
+      display: none;
+      overflow: hidden;
+      z-index: 100;
+    }
+
+    .card-menu-dropdown.open {
+      display: block;
+      animation: menuFadeIn 0.15s ease;
+    }
+
+    @keyframes menuFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: background 0.2s;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+
+    .card-menu-item:hover {
+      background: var(--bg-tertiary, rgba(0, 0, 0, 0.05));
+    }
+
+    .card-menu-item.danger {
+      color: #ef4444;
+    }
+
+    .card-menu-item.danger:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .card-menu-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty h3 {
+      font-family: var(--font-display);
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 100px 20px;
+      color: var(--text-secondary);
+      font-size: 18px;
+    }
+
+    #status {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: var(--bg-secondary);
+      padding: 20px 30px;
+      border-radius: 15px;
+      border: 1px solid var(--accent-primary);
+      box-shadow: 0 8px 30px var(--shadow-md);
+      display: none;
+      animation: slideIn 0.3s;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    /* Progress bar for cards - always visible */
+    .card-progress-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: var(--border-light, #e0e0e0);
+      border-radius: 0 0 16px 16px;
+      overflow: hidden;
+      z-index: 1;
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+
+    .card-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #3b82f6;
+      transition: width 0.3s ease;
+    }
+
+    /* Downloading - blue with pulse animation */
+    .card-progress-container.active .card-progress-bar {
+      background: #3b82f6;
+      animation: pulse-blue 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-blue {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.6;
+      }
+    }
+
+    /* Partial download - solid blue */
+    .card-progress-container.partial .card-progress-bar {
+      background: #3b82f6;
+    }
+
+    /* Complete - green (downloaded AND pinned) */
+    .card-progress-container.complete .card-progress-bar {
+      width: 100%;
+      background: #22c55e;
+    }
+
+    /* Partial completion with failures - amber/orange */
+    .card-progress-container.partial .card-progress-bar {
+      background: #f59e0b;
+    }
+
+    .card-progress-container.partial+.card-progress-text {
+      color: #f59e0b;
+    }
+
+    /* Downloaded but NOT pinned - orange/amber */
+    .card-progress-container.unpinned .card-progress-bar {
+      width: 100%;
+      background: #f59e0b;
+    }
+
+    /* Progress text overlay */
+    .card-progress-text {
+      position: absolute;
+      bottom: 10px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 2;
+      background: linear-gradient(transparent, var(--bg-secondary) 30%);
+      padding: 8px 4px 2px;
+    }
+
+    .card-progress-container.active+.card-progress-text,
+    .card-progress-container.partial+.card-progress-text,
+    .card-progress-container.unpinned+.card-progress-text,
+    .card-progress-container.complete+.card-progress-text,
+    .card.downloading .card-progress-text {
+      opacity: 1;
+    }
+
+    /* Status color indicators for text */
+    .card-progress-container.complete+.card-progress-text {
+      color: #22c55e;
+    }
+
+    .card-progress-container.unpinned+.card-progress-text {
+      color: #f59e0b;
+    }
+
+    .card-progress-container.partial+.card-progress-text,
+    .card-progress-container.active+.card-progress-text {
+      color: #3b82f6;
+    }
+
+    /* Preparing/initializing state - indeterminate shimmer */
+    .card-progress-container.preparing .card-progress-bar {
+      width: 100% !important;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        #3b82f6 20%,
+        #60a5fa 50%,
+        #3b82f6 80%,
+        transparent 100%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.8s ease-in-out infinite;
+      opacity: 0.7;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .card-progress-container.preparing+.card-progress-text {
+      opacity: 1;
+      color: #60a5fa;
+      animation: fade-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes fade-pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    /* Installing button state */
+    .btn-library-primary.installing {
+      opacity: 0.7;
+      pointer-events: none;
+      position: relative;
+    }
+
+    .btn-library-primary.installing::after {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-left: 8px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: btn-spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes btn-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Error state with retry */
+    .card-progress-container.error .card-progress-bar {
+      background: var(--error-color, #ef4444);
+    }
+
+    .card-progress-container.error+.card-progress-text {
+      opacity: 1;
+      color: var(--error-color, #ef4444);
+    }
+
+    .retry-link {
+      color: #60a5fa;
+      text-decoration: underline;
+      cursor: pointer;
+      margin-left: 6px;
+    }
+
+    .retry-link:hover {
+      color: #93bbfd;
+    }
+
+    /* Gallery link button on completed cards */
+    .btn-gallery-link {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-primary, #6366f1);
+      color: var(--text-on-accent, white);
+      border: none;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: var(--font-body);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-decoration: none;
+      transition: all 0.3s;
+    }
+
+    .btn-gallery-link:hover {
+      background: var(--accent-secondary, var(--accent-primary, #6366f1));
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px var(--shadow-md, rgba(0,0,0,0.2));
+    }
+
+    /* Library toolbar with search and sync */
+    .library-toolbar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 32px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .search-container {
+      flex: 1;
+      min-width: 250px;
+      position: relative;
+    }
+
+    input.search-input {
+      width: 100%;
+      padding: 13px 40px;
+      border: 2px solid var(--border-light);
+      border-radius: 12px;
+      font-size: 15px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      transition: all 0.3s;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    input.search-input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 4px rgba(var(--accent-primary-rgb, 59, 130, 246), 0.1);
+    }
+
+    input.search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+
+    .toolbar-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 24px;
+      border: 2px solid var(--border-light);
+      border-radius: 12px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+
+    .toolbar-btn:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-tertiary, rgba(0, 0, 0, 0.02));
+      transform: translateY(-2px);
+    }
+
+    .toolbar-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .toolbar-btn.syncing svg {
+      animation: spin 1s linear infinite;
+    }
+
+    /* Sort dropdown */
+    .sort-dropdown {
+      position: relative;
+    }
+
+    .sort-select {
+      appearance: none;
+      padding: 14px 44px 14px 20px;
+      border: 2px solid var(--border-light);
+      border-radius: 12px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all 0.3s;
+      min-width: 160px;
+    }
+
+    .sort-select:hover {
+      border-color: var(--accent-primary);
+    }
+
+    .sort-select:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 4px rgba(var(--accent-primary-rgb, 59, 130, 246), 0.1);
+    }
+
+    .sort-dropdown::after {
+      content: '';
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid var(--text-muted);
+      pointer-events: none;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(-360deg);
+      }
+    }
+
+    .sync-badge {
+      background: var(--accent-primary);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 4px;
+    }
+
+    /* Storage Ring (donut chart) */
+    .storage-ring-container {
+      position: relative;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+    }
+
+    .storage-ring {
+      width: 48px;
+      height: 48px;
+      transform: rotate(-90deg);
+    }
+
+    .storage-ring-bg {
+      fill: none;
+      stroke: var(--border-light);
+      stroke-width: 3;
+    }
+
+    .storage-ring-fill {
+      fill: none;
+      stroke: var(--accent-primary);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 100, 100;
+      stroke-dashoffset: 100;
+      transition: stroke-dashoffset 0.5s ease, stroke 0.3s;
+    }
+
+    .storage-ring-fill.warning {
+      stroke: #f59e0b;
+    }
+
+    .storage-ring-fill.critical {
+      stroke: #ef4444;
+    }
+
+    .storage-ring-text {
+      position: absolute;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+
+    /* Read-only badge */
+    .readonly-badge {
+      font-size: 14px;
+      vertical-align: middle;
+      margin-left: 6px;
+      cursor: help;
+    }
+
+    .btn-library-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: #888;
+      border-color: #666;
+    }
+
+    .btn-library-primary:disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Add Collection Card */
+    .card.add-card {
+      border: 2px dashed var(--border-light);
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 280px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .card.add-card:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-secondary);
+    }
+
+    .card.add-card::before {
+      display: none;
+    }
+
+    .add-card-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      transition: transform 0.3s;
+    }
+
+    .card.add-card:hover .add-card-icon {
+      transform: scale(1.1);
+    }
+
+    .add-card-icon svg {
+      width: 32px;
+      height: 32px;
+      color: white;
+    }
+
+    .add-card-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .add-card-desc {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Upload modal */
+    .upload-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .upload-modal.open {
+      display: flex;
+    }
+
+    .upload-modal-content {
+      background: var(--bg-primary);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+      animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .upload-modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      color: var(--text-muted);
+      transition: color 0.2s;
+    }
+
+    .upload-modal-close:hover {
+      color: var(--text-primary);
+    }
+
+    .upload-modal h2 {
+      font-family: var(--font-display);
+      font-size: 28px;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .upload-modal p {
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    .upload-drop-zone {
+      border: 2px dashed var(--border-light);
+      border-radius: 16px;
+      padding: 40px 20px;
+      text-align: center;
+      transition: all 0.3s;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    .upload-drop-zone:hover,
+    .upload-drop-zone.dragover {
+      border-color: var(--accent-primary);
+      background: var(--bg-secondary);
+    }
+
+    .upload-drop-zone svg {
+      width: 48px;
+      height: 48px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .upload-drop-zone p {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+
+    .upload-drop-zone .browse-link {
+      color: var(--accent-primary);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .upload-form-group {
+      margin-bottom: 16px;
+    }
+
+    .upload-form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .upload-form-group input,
+    .upload-form-group textarea {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid var(--border-light);
+      border-radius: 10px;
+      font-size: 14px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+    }
+
+    .upload-form-group textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .upload-form-group input:focus,
+    .upload-form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
+    .upload-submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: var(--font-body);
+    }
+
+    .upload-submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(var(--accent-primary-rgb, 59, 130, 246), 0.3);
+    }
+
+    .upload-submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* No results message */
+    .no-results {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      grid-column: 1 / -1;
+    }
+
+    .no-results h3 {
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 768px) {
+      .main {
+        padding: 110px 25px 60px;
+      }
+
+      h1 {
+        font-size: 40px;
+      }
+
+      .subtitle {
+        font-size: 16px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .library-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .search-container {
+        min-width: 100%;
+      }
+
+      .toolbar-btn {
+        justify-content: center;
+      }
+    }
+
+  </style>
+  <script>
+    // Load theme
+    (function () {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      if (mode === 'auto') { var _h = new Date().getHours(); mode = (_h >= 20 || _h < 7) ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+      function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}_syncTheme();setInterval(_syncTheme,5000);
+      // Apply saved UI scale (default 120% for small screens)
+      let scale = localStorage.getItem('vernis-ui-scale');
+      if (!scale) {
+        const isSmallScreen = window.innerWidth <= 720 || window.innerHeight <= 720;
+        scale = isSmallScreen ? '120' : '100';
+        localStorage.setItem('vernis-ui-scale', scale);
+      }
+      if (scale !== '100') document.documentElement.style.fontSize = (scale / 100) * 16 + 'px';
+    })();
+  </script>
+  <script src="vernis-keyboard.js"></script>
+</head>
+
+<body>
+  <!-- Custom scrollbar - only shown when enabled in settings (for touch screens) -->
+  <div id="custom-scrollbar" class="custom-scrollbar-track">
+    <div id="custom-scrollbar-thumb" class="custom-scrollbar-thumb"></div>
+  </div>
+  <script>
+    // Auto-enable thick scrollbar on localhost (Pi)
+    (function() {
+      const setting = localStorage.getItem('vernis-thick-scrollbar');
+      if (setting === null && window.location.hostname === 'localhost') {
+        localStorage.setItem('vernis-thick-scrollbar', 'true');
+      }
+      const enabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+      if (!enabled) {
+        document.getElementById('custom-scrollbar').style.display = 'none';
+      }
+    })();
+  </script>
+  <style>
+    .custom-scrollbar-track {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: var(--scrollbar-track, rgba(128,128,128,0.2));
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .custom-scrollbar-thumb {
+      position: absolute;
+      right: 4px;
+      width: 32px;
+      background: var(--scrollbar-thumb, var(--accent-primary, rgba(150,150,150,0.8)));
+      border-radius: 16px;
+      min-height: 80px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      pointer-events: auto;
+    }
+    .custom-scrollbar-thumb:hover,
+    .custom-scrollbar-thumb:active {
+      background: var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)));
+    }
+  </style>
+  <script>
+    (function() {
+      const scrollbar = document.getElementById('custom-scrollbar');
+      const thumb = document.getElementById('custom-scrollbar-thumb');
+      if (!scrollbar || !thumb) return;
+
+      function updateThumb() {
+        const thickScrollbarEnabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+        if (!thickScrollbarEnabled) { scrollbar.style.display = 'none'; return; }
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        if (docHeight <= winHeight) { scrollbar.style.display = 'none'; return; }
+        scrollbar.style.display = 'block';
+        const scrollable = docHeight - winHeight;
+        const thumbH = Math.max(80, (winHeight / docHeight) * winHeight);
+        const thumbY = (window.scrollY / scrollable) * (winHeight - thumbH);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top = Math.max(0, thumbY) + 'px';
+      }
+      window.addEventListener('scroll', updateThumb);
+      window.addEventListener('resize', updateThumb);
+      setTimeout(updateThumb, 100);
+
+      let dragging = false, dragStartY = 0, dragStartScroll = 0;
+      thumb.addEventListener('touchstart', function(e) {
+        dragging = true;
+        dragStartY = e.touches[0].clientY;
+        dragStartScroll = window.scrollY;
+        e.stopPropagation();
+      }, { passive: true });
+      thumb.addEventListener('mousedown', function(e) {
+        dragging = true;
+        dragStartY = e.clientY;
+        dragStartScroll = window.scrollY;
+      });
+      document.addEventListener('touchmove', function(e) {
+        if (dragging && e.touches.length === 1) {
+          const delta = e.touches[0].clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      }, { passive: true });
+      document.addEventListener('mousemove', function(e) {
+        if (dragging) {
+          const delta = e.clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      });
+      document.addEventListener('touchend', function() { dragging = false; });
+      document.addEventListener('mouseup', function() { dragging = false; });
+    })();
+  </script>
+
+  <div class="header">
+    <a href="index.html" class="logo">Vernis</a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="add.html">Add Art</a>
+      <a href="library.html">Library</a>
+      <a href="manage.html">Manage Art</a>
+      <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
+    <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="library.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
+    <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
+    <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
+    <a href="settings.html" class="settings-parent"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</a>
+    <div class="settings-submenu">
+    <div class="menu-divider">Appearance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-theme'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Theme</div>
+    <div class="menu-divider">Display</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-display'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Display Settings</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-screensaver'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Screen Timeout</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-orientation'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Orientation</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-hue'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg> Ambient Light</div>
+    <div class="menu-divider">Content</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-github'" style="display:none;"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg> GitHub Library</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ethereum'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 3 12 12 22 21 12"/></svg> Ethereum RPC</div>
+    <div class="menu-divider">Storage</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ipfs'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> IPFS Pinning</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-external'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M6 14h2"/></svg> External Drive</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-backup'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Backup</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-storage'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Storage Health</div>
+    <div class="menu-divider">System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-wifi'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> Wi-Fi</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-performance'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Performance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-system'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.6 15H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 6.6V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-about'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About</div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const toggle = document.querySelector('.menu-toggle');
+      menu.classList.toggle('active');
+      toggle.classList.toggle('active');
+      var isOpen = menu.classList.contains('active');
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      var mc = document.querySelector('.main');
+      if (mc) mc.style.visibility = isOpen ? 'hidden' : '';
+      if (!isOpen) void document.body.offsetHeight;
+    }
+    (function(){
+      if(localStorage.getItem('vernis-moon-unlocked')==='true'||localStorage.getItem('vernis-pixels-unlocked')==='true'||localStorage.getItem('vernis-doom-unlocked')==='true'||localStorage.getItem('vernis-burner-unlocked')==='true'){
+        document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }
+      fetch('/api/easter-egg').then(function(r){return r.json();}).then(function(s){
+        if(s.moon||s.pixels||s.doom||s.burner) document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }).catch(function(){});
+    })();
+
+    // Touch scroll helper
+    (function () {
+      let startY = 0;
+      document.addEventListener('touchstart', function (e) {
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+      document.addEventListener('touchmove', function (e) {
+        var menu = document.getElementById('mobileMenu');
+        if (menu && menu.classList.contains('active')) return;
+        if (Math.abs(e.touches[0].clientY - startY) > 10) {
+          document.body.style.touchAction = 'pan-y';
+        }
+      }, { passive: true });
+    })();
+  </script>
+
+  <div class="main">
+    <h1>CSV Library</h1>
+    <div class="subtitle">Browse, search and install curated NFT collections</div>
+
+    <!-- Toolbar with search and sync -->
+    <div class="library-toolbar">
+      <div class="search-container">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <input type="text" class="search-input" id="search-input"
+          placeholder="Search collections by name or description...">
+      </div>
+      <!-- Storage Ring -->
+      <div class="storage-ring-container" id="storage-ring" title="Disk Usage">
+        <svg class="storage-ring" viewBox="0 0 36 36">
+          <circle class="storage-ring-bg" cx="18" cy="18" r="15.9" />
+          <circle class="storage-ring-fill" cx="18" cy="18" r="15.9" id="storage-ring-fill" />
+        </svg>
+        <span class="storage-ring-text" id="storage-ring-text">--</span>
+      </div>
+      <div class="sort-dropdown">
+        <select class="sort-select" id="sort-select" onchange="sortCollections(this.value)">
+          <option value="name-asc">Name (A-Z)</option>
+          <option value="name-desc">Name (Z-A)</option>
+          <option value="installed">Installed First</option>
+          <option value="progress" selected>Progress</option>
+        </select>
+      </div>
+      <button class="toolbar-btn" id="sync-btn" onclick="syncCollections()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+          <path d="M16 16h5v5" />
+        </svg>
+        <span>Sync</span>
+        <span class="sync-badge" id="sync-badge" style="display:none;">0</span>
+      </button>
+    </div>
+
+    <div id="loading" class="loading">Loading collections...</div>
+    <div id="library" class="grid" style="display:none;"></div>
+    <div id="empty" class="empty" style="display:none;">
+      <p style="font-size:80px; opacity:0.2;">📚</p>
+      <h3>No collections available yet</h3>
+      <p>Add your first collection to get started</p>
+      <button class="toolbar-btn" style="margin-top:20px;" onclick="openUploadModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Add Collection
+      </button>
+    </div>
+  </div>
+
+
+  <!-- Upload Modal -->
+  <div class="upload-modal" id="upload-modal">
+    <div class="upload-modal-content">
+      <button class="upload-modal-close" onclick="closeUploadModal()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+      <h2>Add Collection</h2>
+      <p>Upload a CSV file with NFT CIDs to add to your library</p>
+
+      <div class="upload-drop-zone" id="drop-zone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <p>Drag & drop your CSV file here<br>or <span class="browse-link">browse</span></p>
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none;">
+      </div>
+
+      <div id="selected-file"
+        style="display:none; margin-bottom:20px; padding:12px 16px; background:var(--bg-secondary); border-radius:10px; font-size:14px;">
+        <strong>Selected:</strong> <span id="selected-file-name"></span>
+      </div>
+
+      <div class="upload-form-group">
+        <label>Collection Name (optional)</label>
+        <input type="text" id="upload-name" placeholder="e.g., My NFT Collection">
+      </div>
+
+      <div class="upload-form-group">
+        <label>Description (optional)</label>
+        <textarea id="upload-desc" placeholder="Brief description of this collection..."></textarea>
+      </div>
+
+      <button class="upload-submit-btn" id="upload-submit" onclick="uploadCollection()" disabled>
+        Add to Library
+      </button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <script>
+    // HTML escape utility
+    function escHTML(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function truncName(name, max) { max = max || 24; return name.length > max ? name.slice(0, max - 1) + '…' : name; }
+
+    let collections = [];
+    let filteredCollections = [];
+    let searchQuery = '';
+    let currentSort = 'progress';
+    let collectionStatuses = {}; // Store status data for sorting
+    let isReadOnly = false; // Track external storage read-only state
+    let cacheRestored = false;
+
+    // Restore cached state for instant display (no loading flash)
+    (function restoreCache() {
+      try {
+        const cached = localStorage.getItem('vernis-library-cache');
+        if (cached) {
+          const c = JSON.parse(cached);
+          if (c.collections && c.collections.length > 0) {
+            collections = c.collections;
+            collectionStatuses = c.statuses || {};
+            filteredCollections = [...collections];
+            applySorting();
+            document.getElementById('loading').style.display = 'none';
+            renderLibrary();
+            document.getElementById('library').style.display = 'grid';
+            // Re-apply cached statuses to cards
+            requestAnimationFrame(() => {
+              for (const [fn, data] of Object.entries(collectionStatuses)) {
+                const card = document.getElementById('card-' + fn.replace(/\./g, '_'));
+                if (card) updateCardStatus(card, data);
+              }
+            });
+            cacheRestored = true;
+          }
+        }
+      } catch (e) {}
+    })();
+
+    // Fetch available collections
+    async function loadLibrary() {
+      try {
+        const response = await fetch('/api/csv-library');
+        const data = await response.json();
+
+        collections = data.collections || [];
+        filteredCollections = [...collections];
+        applySorting();
+
+        document.getElementById('loading').style.display = 'none';
+
+        // Always show the grid (for Add Collection card), even if empty
+        renderLibrary();
+        document.getElementById('library').style.display = 'grid';
+
+        // Cache for next visit
+        try {
+          localStorage.setItem('vernis-library-cache', JSON.stringify({
+            collections: collections,
+            statuses: collectionStatuses
+          }));
+        } catch (e) {}
+
+        // Check for new collections from GitHub on load
+        checkForNewCollections();
+      } catch (error) {
+        if (!cacheRestored) {
+          document.getElementById('loading').innerHTML = '<p style="color:#f66;">Error loading library</p>';
+        }
+      }
+    }
+
+    function renderLibrary() {
+      const library = document.getElementById('library');
+
+      // Add Collection card (always first)
+      const addCard = `
+        <div class="card add-card" onclick="openUploadModal()">
+          <div class="add-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </div>
+          <div class="add-card-title">Add Collection</div>
+          <div class="add-card-desc">Upload a CSV file to add NFTs</div>
+        </div>
+      `;
+
+      // No results message when search has no matches
+      if (filteredCollections.length === 0 && searchQuery) {
+        library.innerHTML = addCard + `
+          <div class="no-results">
+            <h3>No collections found</h3>
+            <p>Try a different search term</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Render collection cards
+      const collectionCards = filteredCollections.map((col, idx) => {
+        const sourceBadge = col.source === 'github'
+          ? '<span class="badge" style="background: linear-gradient(135deg, #6e5494, #8957A8); right: auto; left: 20px;">GitHub</span>'
+          : '';
+        const featuredBadge = col.featured ? '<span class="badge">Featured</span>' : '';
+        const sf = escHTML(col.filename).replace(/'/g, "&#39;");
+        const hasCover = col.cover_url ? 'has-cover' : '';
+        const coverImg = col.cover_url
+          ? `<img src="${escHTML(col.cover_url)}" class="card-cover" alt="${escHTML(col.name)}" onerror="this.style.display='none'">`
+          : '';
+        const authorLine = col.author
+          ? `<div class="card-author">by ${escHTML(col.author)}</div>`
+          : '';
+
+        return `
+    <div class="card ${hasCover}" id="card-${col.filename.replace(/\./g, '_')}" data-filename="${sf}">
+      ${coverImg}
+      ${featuredBadge}
+      ${sourceBadge}
+      <div class="card-menu">
+        <button class="card-menu-btn" onclick="toggleCardMenu(event, '${sf}')" title="More options">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+        </button>
+        <div class="card-menu-dropdown" id="menu-${col.filename.replace(/\./g, '_')}">
+          <button class="card-menu-item" onclick="renameCollection('${sf}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+            Rename
+          </button>
+          <button class="card-menu-item" onclick="viewCollectionInfo('${sf}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            View Info
+          </button>
+          <button class="card-menu-item" onclick="resyncCollection('${sf}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Re-sync (Re-download All)
+          </button>
+          <button class="card-menu-item" onclick="clearCollectionFiles('${sf}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            Clear Downloaded Files
+          </button>
+          <button class="card-menu-item danger" onclick="deleteCollection('${sf}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            Remove Collection</button>
+        </div>
+      </div>
+      ${authorLine}
+      <h3>${escHTML(col.name)}${isReadOnly ? ' <span class="readonly-badge" title="External storage is read-only. Pinning disabled.">🔒</span>' : ''}</h3>
+      <div class="meta"><span class="nft-count">${col.count || '?'}</span> NFTs</div>
+      <div class="desc">${escHTML(col.description || 'Collection of NFTs')}</div>
+      <div class="actions">
+        <button class="btn-library-primary" onclick="installCollection('${sf}')" ${isReadOnly ? 'disabled title="Storage is read-only"' : ''}>Install</button>
+      </div>
+      <div class="card-progress-container">
+        <div class="card-progress-bar"></div>
+      </div>
+      <div class="card-progress-text"></div>
+    </div>
+  `;
+      }).join('');
+
+      library.innerHTML = addCard + collectionCards;
+    }
+
+    // Search functionality
+    function filterCollections(query) {
+      searchQuery = query.toLowerCase().trim();
+
+      if (!searchQuery) {
+        filteredCollections = [...collections];
+      } else {
+        filteredCollections = collections.filter(col => {
+          const name = (col.name || '').toLowerCase();
+          const desc = (col.description || '').toLowerCase();
+          const author = (col.author || '').toLowerCase();
+          return name.includes(searchQuery) || desc.includes(searchQuery) || author.includes(searchQuery);
+        });
+      }
+
+      applySorting();
+      renderLibrary();
+      loadCollectionStatuses();
+    }
+
+    // Sort collections
+    function sortCollections(sortBy) {
+      currentSort = sortBy;
+      applySorting();
+      renderLibrary();
+      loadCollectionStatuses();
+    }
+
+    function applySorting() {
+      filteredCollections.sort((a, b) => {
+        // Featured items always first
+        if (a.featured && !b.featured) return -1;
+        if (!a.featured && b.featured) return 1;
+
+        const statusA = collectionStatuses[a.filename] || {};
+        const statusB = collectionStatuses[b.filename] || {};
+
+        switch (currentSort) {
+          case 'name-asc':
+            return (a.name || '').localeCompare(b.name || '');
+
+          case 'name-desc':
+            return (b.name || '').localeCompare(a.name || '');
+
+          case 'installed':
+            // Sort by downloaded percentage (descending), then by name
+            const dlA = statusA.percent_downloaded || 0;
+            const dlB = statusB.percent_downloaded || 0;
+            if (dlB !== dlA) return dlB - dlA;
+            return (a.name || '').localeCompare(b.name || '');
+
+          case 'progress':
+            // Sort by download percentage (descending) - fully downloaded first, then partial, then not started
+            const progA = statusA.percent_downloaded || 0;
+            const progB = statusB.percent_downloaded || 0;
+            if (progB !== progA) return progB - progA;
+            return (a.name || '').localeCompare(b.name || '');
+
+          default:
+            return 0;
+        }
+      });
+    }
+
+    // Debounce search input
+    let searchTimeout = null;
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+            filterCollections(e.target.value);
+          }, 300);
+        });
+      }
+
+      // Setup upload modal events
+      setupUploadModal();
+    });
+
+    // Check for new collections from GitHub (badge update)
+    async function checkForNewCollections() {
+      try {
+        const response = await fetch('/api/github-sync');
+        const data = await response.json();
+
+        const badge = document.getElementById('sync-badge');
+        if (data.new_collections && data.new_collections.length > 0) {
+          badge.textContent = data.new_collections.length;
+          badge.style.display = 'inline';
+        } else {
+          badge.style.display = 'none';
+        }
+      } catch (e) {
+        // Silently fail - GitHub sync is optional
+      }
+    }
+
+    // Sync collections from GitHub
+    async function syncCollections() {
+      const btn = document.getElementById('sync-btn');
+      const badge = document.getElementById('sync-badge');
+
+      btn.classList.add('syncing');
+      btn.disabled = true;
+
+      try {
+        const response = await fetch('/api/github-sync');
+        const data = await response.json();
+
+        if (data.new_collections && data.new_collections.length > 0) {
+          showSuccess(`Found ${data.new_collections.length} new collection(s)`);
+          // Reload the library to show new collections
+          await loadLibrary();
+          badge.style.display = 'none';
+        } else {
+          showStatus('Library is up to date', 'info');
+        }
+      } catch (e) {
+        showError('Sync failed. Check GitHub settings.');
+      } finally {
+        btn.classList.remove('syncing');
+        btn.disabled = false;
+      }
+    }
+
+    // Upload modal functions
+    function openUploadModal() {
+      document.getElementById('upload-modal').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeUploadModal() {
+      document.getElementById('upload-modal').classList.remove('open');
+      document.body.style.overflow = '';
+      // Reset form
+      document.getElementById('csv-file-input').value = '';
+      document.getElementById('upload-name').value = '';
+      document.getElementById('upload-desc').value = '';
+      document.getElementById('selected-file').style.display = 'none';
+      document.getElementById('upload-submit').disabled = true;
+    }
+
+    let selectedFile = null;
+
+    function setupUploadModal() {
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('csv-file-input');
+      const modal = document.getElementById('upload-modal');
+
+      // Click to browse
+      dropZone.addEventListener('click', () => fileInput.click());
+
+      // File selected
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          handleFileSelect(e.target.files[0]);
+        }
+      });
+
+      // Drag and drop
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+          handleFileSelect(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Close modal on backdrop click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeUploadModal();
+      });
+
+      // Close on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('open')) {
+          closeUploadModal();
+        }
+      });
+    }
+
+    function handleFileSelect(file) {
+      if (!file.name.endsWith('.csv')) {
+        showError('Please select a CSV file');
+        return;
+      }
+
+      selectedFile = file;
+      document.getElementById('selected-file').style.display = 'block';
+      document.getElementById('selected-file-name').textContent = file.name;
+      document.getElementById('upload-submit').disabled = false;
+    }
+
+    async function uploadCollection() {
+      if (!selectedFile) return;
+
+      const submitBtn = document.getElementById('upload-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading...';
+
+      try {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        const name = document.getElementById('upload-name').value.trim();
+        const desc = document.getElementById('upload-desc').value.trim();
+
+        if (name) formData.append('name', name);
+        if (desc) formData.append('description', desc);
+
+        const response = await fetch('/api/csv-library/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showSuccess(result.message || 'Collection added successfully');
+          closeUploadModal();
+          // Reload library to show new collection
+          await loadLibrary();
+          loadCollectionStatuses();
+        } else {
+          showError(result.error || 'Upload failed');
+        }
+      } catch (error) {
+        showError('Upload failed: ' + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Add to Library';
+      }
+    }
+
+    // Download CSV file only
+    async function downloadCSV(filename) {
+      try {
+        const link = document.createElement('a');
+        link.href = `/api/csv-library/download/${filename}`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Visual feedback on the card
+        const cardId = `card-${filename.replace(/\./g, '_')}`;
+        const card = document.getElementById(cardId);
+        if (card) {
+          const progressContainer = card.querySelector('.card-progress-container');
+          const progressBar = card.querySelector('.card-progress-bar');
+          progressContainer.classList.add('active');
+          progressBar.style.width = '100%';
+          setTimeout(() => {
+            progressContainer.classList.remove('active');
+            progressBar.style.width = '0%';
+          }, 3000);
+        }
+
+        showSuccess(`Downloaded ${filename}`);
+      } catch (error) {
+        showError('Download failed');
+      }
+    }
+
+    // Install and pin the collection
+    async function installCollection(filename) {
+      // Show size estimate and confirm before starting
+      const col = collections.find(c => c.filename === filename);
+      if (col) {
+        const total = parseInt(col.count) || 0;
+        let remaining = total;
+        let isResume = false;
+
+        // Check if partially downloaded
+        const status = collectionStatuses[filename];
+        if (status && status.downloaded > 0) {
+          remaining = total - status.downloaded;
+          isResume = true;
+        }
+
+        let sizeHint = '';
+        if (remaining > 0) {
+          const estMB = Math.round(remaining * 3);
+          sizeHint = `\n\nEstimated download: ~${estMB >= 1000 ? (estMB / 1000).toFixed(1) + ' GB' : estMB + ' MB'} (${remaining} files)`;
+        }
+
+        const action = isResume ? 'Resume' : 'Install';
+        const detail = isResume
+          ? `${status.downloaded} of ${total} already downloaded. Only the remaining ${remaining} files will be downloaded.`
+          : 'This downloads artwork files to your device.';
+        if (!await vernisConfirm(`${action} "${truncName(col.name)}"?${sizeHint}\n\n${detail}`)) return;
+      }
+
+      const cardId = `card-${filename.replace(/\./g, '_')}`;
+      const card = document.getElementById(cardId);
+
+      // === INSTANT FEEDBACK - before any network call ===
+      if (card) {
+        const btn = card.querySelector('.btn-library-primary');
+        const progressContainer = card.querySelector('.card-progress-container');
+        const progressBar = card.querySelector('.card-progress-bar');
+        const progressText = card.querySelector('.card-progress-text');
+
+        // Button: show installing state immediately
+        if (btn) {
+          btn.textContent = 'Starting';
+          btn.classList.add('installing');
+          btn.disabled = true;
+        }
+
+        // Progress bar: show shimmer immediately
+        if (progressContainer) {
+          progressContainer.classList.remove('complete', 'partial', 'unpinned', 'error');
+          progressContainer.classList.add('preparing');
+        }
+
+        // Status text: show warm message immediately
+        if (progressText) {
+          progressText.textContent = 'Preparing art preservation...';
+        }
+
+        card.classList.add('downloading');
+      }
+
+      try {
+        const response = await fetch('/api/csv-library/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // Update status text - backend is now spawning the downloader
+          if (card) {
+            const progressText = card.querySelector('.card-progress-text');
+            if (progressText) {
+              progressText.textContent = 'Starting art preservation engine...';
+            }
+          }
+          startCardProgress(filename);
+        } else {
+          const errorMsg = result.error || 'Installation failed';
+          let hint = '';
+          if (errorMsg.includes('disk space')) {
+            hint = 'Free up storage in Settings.';
+          } else if (errorMsg.includes('not found')) {
+            hint = 'Try syncing your library first.';
+          }
+          resetCardState(card, filename, hint || errorMsg);
+        }
+      } catch (error) {
+        resetCardState(card, filename, 'Backend unreachable — check device connection.');
+      }
+    }
+
+    // Show Gallery button on a card as the natural next step
+    function showGalleryButton(card) {
+      if (!card) return;
+      const galleryBtn = card.querySelector('.btn-gallery-link');
+      if (galleryBtn) {
+        galleryBtn.style.display = '';
+      }
+    }
+
+    // Hide Gallery button (e.g. when resetting card)
+    function hideGalleryButton(card) {
+      if (!card) return;
+      const galleryBtn = card.querySelector('.btn-gallery-link');
+      if (galleryBtn) {
+        galleryBtn.style.display = 'none';
+      }
+    }
+
+    // Reset card to idle state after error
+    function resetCardState(card, filename, errorMsg) {
+      if (!card) return;
+      const btn = card.querySelector('.btn-library-primary');
+      const progressContainer = card.querySelector('.card-progress-container');
+      const progressText = card.querySelector('.card-progress-text');
+
+      card.classList.remove('downloading');
+      if (btn) {
+        btn.textContent = 'Try Again';
+        btn.classList.remove('installing');
+        btn.disabled = false;
+        btn._isStopBtn = false;
+        btn.onclick = () => installCollection(filename);
+      }
+      if (progressContainer) {
+        progressContainer.classList.remove('preparing', 'active');
+        progressContainer.classList.add('error');
+      }
+      if (progressText) {
+        const msg = errorMsg || 'Failed to start';
+        progressText.innerHTML = `${escHTML(msg)} <a class="retry-link" onclick="installCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Retry</a>`;
+      }
+    }
+
+    // Store last download data for error viewing
+    let lastDownloadData = null;
+
+    function startCardProgress(filename) {
+      const cardId = `card-${filename.replace(/\./g, '_')}`;
+      const card = document.getElementById(cardId);
+      if (!card) return;
+
+      const progressContainer = card.querySelector('.card-progress-container');
+      const progressBar = card.querySelector('.card-progress-bar');
+      const progressText = card.querySelector('.card-progress-text');
+      const btn = card.querySelector('.btn-library-primary');
+
+      // Card is already in preparing/shimmer state from installCollection()
+      // Now we start polling and show phase-aware messages
+      let pollCount = 0;
+      let lastPhaseMessage = '';
+
+      const interval = setInterval(async () => {
+        pollCount++;
+        try {
+          const r = await fetch('/api/download-progress');
+          const data = await r.json();
+          lastDownloadData = data;
+
+          const isInitializing = data.status === 'Initializing' || (data.total === 0 && data.active);
+          const hasStartedDownloading = data.total > 0 && data.completed > 0;
+          const hasFoundItems = data.total > 0;
+
+          if (isInitializing) {
+            // Still in startup phase - show warm phase messages
+            // Keep the shimmer animation running
+            const phaseMsg = getStartupPhaseMessage(pollCount);
+            if (progressText && phaseMsg !== lastPhaseMessage) {
+              progressText.textContent = phaseMsg;
+              lastPhaseMessage = phaseMsg;
+            }
+            return; // Don't exit, keep polling
+          }
+
+          // Downloader is running - switch from shimmer to real progress bar
+          progressContainer.classList.remove('preparing');
+          progressContainer.classList.add('active');
+
+          if (hasFoundItems && !hasStartedDownloading) {
+            // Found items but haven't downloaded any yet
+            progressBar.style.width = '1%';
+            if (progressText) {
+              progressText.textContent = `Found ${data.total} artworks — downloading...`;
+            }
+            if (btn) {
+              btn.textContent = 'Downloading';
+            }
+            return;
+          }
+
+          // Normal download progress — use actual files on disk for accurate bar
+          const filesOnDisk = data.actual_files || data.completed;
+          const pct = data.total > 0 ? Math.min(Math.round((filesOnDisk / data.total) * 100), 100) : 0;
+          progressBar.style.width = `${pct}%`;
+
+          if (btn) {
+            if (!btn._isStopBtn) {
+              btn.textContent = 'Stop';
+              btn.classList.remove('installing');
+              btn.disabled = false;
+              btn.style.opacity = '1';
+              btn._isStopBtn = true;
+              btn.onclick = async () => {
+                btn.textContent = 'Stopping...';
+                btn.disabled = true;
+                try { await fetch('/api/stop-download', { method: 'POST' }); } catch(e) {}
+              };
+            }
+          }
+
+          // Build status text with speed and retry info
+          let statusParts = [];
+          if (data.retry_pass > 0) {
+            statusParts.push(`Retrying ${data.failed} timed out (${data.retry_timeout}s timeout)`);
+          } else {
+            const remaining = Math.max(0, data.total - filesOnDisk);
+            if (remaining > 0) {
+              statusParts.push(`${filesOnDisk}/${data.total} · ${remaining} remaining`);
+            } else {
+              statusParts.push(`${filesOnDisk}/${data.total} downloading & pinning`);
+            }
+          }
+          if (data.active && data.speed) {
+            statusParts.push(`${data.speed}`);
+          }
+          if (progressText) {
+            progressText.textContent = statusParts.join(' · ');
+          }
+
+          if (data.active) {
+            if (data.completed >= data.total && data.total > 0) {
+              handleDownloadComplete(card, progressContainer, progressBar, progressText, btn, data, interval, filename);
+            }
+          } else {
+            // Download stopped
+            handleDownloadComplete(card, progressContainer, progressBar, progressText, btn, data, interval, filename);
+          }
+        } catch (e) {
+          // Network error during polling
+          if (pollCount > 60) {
+            // After 60s of errors, give up
+            card.classList.remove('downloading');
+            progressContainer.classList.remove('preparing', 'active');
+            progressContainer.classList.add('error');
+            if (progressText) {
+              progressText.innerHTML = `Lost connection to backend. <a class="retry-link" onclick="installCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Retry</a>`;
+            }
+            if (btn) {
+              btn.textContent = 'Install';
+              btn.classList.remove('installing');
+              btn.disabled = false;
+            }
+            clearInterval(interval);
+          }
+        }
+      }, 1000);
+    }
+
+    // Phase messages during startup (before downloader writes real progress)
+    function getStartupPhaseMessage(pollCount) {
+      if (pollCount <= 3) return 'Preparing art preservation...';
+      if (pollCount <= 8) return 'Starting preservation engine...';
+      if (pollCount <= 15) return 'Detecting IPFS gateway...';
+      if (pollCount <= 25) return 'Scanning collection...';
+      if (pollCount <= 40) return 'Still connecting — hang tight...';
+      return 'Taking longer than usual — please wait...';
+    }
+
+    function handleDownloadComplete(card, progressContainer, progressBar, progressText, btn, data, interval, filename) {
+      card.classList.remove('downloading');
+      progressContainer.classList.remove('preparing', 'active');
+      if (btn) btn._isStopBtn = false;
+
+      if (data.failed > 0 && data.completed > data.failed) {
+        // Partial success - some downloaded, some failed
+        progressContainer.classList.add('partial');
+        const succeeded = data.completed - data.failed;
+        showError(`${data.failed} files failed to download`);
+        if (progressText) {
+          progressText.innerHTML = `${succeeded} preserved, <a href="#" onclick="showFailedItems(event)" style="color: var(--error-color, #ef4444); text-decoration: underline;">${data.failed} failed</a> · <a class="retry-link" onclick="resyncCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Retry failed</a>`;
+        }
+        if (btn) {
+          btn.textContent = 'Retry Failed';
+          btn.classList.remove('installing');
+          btn.disabled = false;
+          btn.onclick = () => resyncCollection(filename);
+        }
+        // Some art is available — show gallery
+        showGalleryButton(card);
+      } else if (data.failed > 0 && data.completed <= data.failed) {
+        // All failed
+        progressContainer.classList.add('error');
+        showError(`Download failed — ${data.failed} errors`);
+        if (progressText) {
+          progressText.innerHTML = `Download failed. <a href="#" onclick="showFailedItems(event)" style="color: var(--error-color, #ef4444); text-decoration: underline;">See errors</a> · <a class="retry-link" onclick="resyncCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Try again</a>`;
+        }
+        if (btn) {
+          btn.textContent = 'Try Again';
+          btn.classList.remove('installing');
+          btn.disabled = false;
+          btn.onclick = () => resyncCollection(filename);
+        }
+      } else if (data.completed >= data.total && data.total > 0) {
+        // Full success
+        progressContainer.classList.add('complete');
+        progressBar.style.width = '100%';
+        if (progressText) {
+          progressText.textContent = `All ${data.total} artworks downloaded & pinned`;
+        }
+        if (btn) {
+          btn.textContent = 'Installed';
+          btn.classList.remove('installing');
+          btn.disabled = true;
+          btn.style.opacity = '0.6';
+        }
+        // Show Gallery button as natural next step
+        showGalleryButton(card);
+        // Refresh statuses to update pin state
+        setTimeout(() => loadCollectionStatuses(), 2000);
+      } else {
+        // Stopped but not complete (user interrupted or stalled)
+        if (progressText) {
+          progressText.innerHTML = `${data.completed}/${data.total} files · <a class="retry-link" onclick="installCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Resume</a>`;
+        }
+        if (btn) {
+          btn.textContent = 'Resume';
+          btn.classList.remove('installing');
+          btn.disabled = false;
+          btn.onclick = () => installCollection(filename);
+        }
+      }
+
+      setTimeout(() => {
+        clearInterval(interval);
+      }, 3000);
+    }
+
+    async function showFailedFromApi() {
+      try {
+        const r = await fetch('/api/download-progress');
+        lastDownloadData = await r.json();
+        if (!lastDownloadData.failed_items || lastDownloadData.failed_items.length === 0) {
+          window.vernisAlert('No failure details available', 'info');
+          return;
+        }
+        showFailedItems({ preventDefault: () => {} });
+      } catch (e) {
+        window.vernisAlert('Could not load failure details', 'error');
+      }
+    }
+
+    async function showFailedItems(event) {
+      event.preventDefault();
+      if (!lastDownloadData || !lastDownloadData.failed_items || lastDownloadData.failed_items.length === 0) {
+        window.vernisAlert('No failure details available', 'info');
+        return;
+      }
+
+      const items = lastDownloadData.failed_items;
+      const totalFailed = lastDownloadData.failed;
+      const errors = items.map(i => (i.error || '').toLowerCase());
+      const hasTimeout = errors.some(e => e.includes('timeout') || e.includes('timed out'));
+      const hasGateway = errors.some(e => e.includes('gateway') || e.includes('502') || e.includes('504'));
+      const hasNotFound = errors.some(e => e.includes('404') || e.includes('not found'));
+      const hasApiError = errors.some(e => e.includes('artwork lookup') || e.includes('metadata api') || e.includes('reservoir') || e.includes('api.reservoir'));
+      const hasConnection = errors.some(e => e.includes('connection') || e.includes('refused') || e.includes('network'));
+
+      // Run live diagnostics
+      var ipfsOk = true, internetOk = true;
+      try {
+        var hc = await fetch('/api/health-check').then(function(r) { return r.json(); });
+        ipfsOk = hc.ipfs;
+        internetOk = hc.internet;
+      } catch(e) {}
+
+      // Build guidance based on actual system state
+      let guidanceHtml = '';
+      if (!internetOk) {
+        guidanceHtml += `<div style="padding: 10px; background: #1a1a3e; border-left: 3px solid #ef4444; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #fca5a5;">
+          <strong>No internet connection.</strong> Connect to a network with internet access and try again.
+        </div>`;
+      } else if (!ipfsOk && !hasApiError) {
+        guidanceHtml += `<div style="padding: 10px; background: #1a1a3e; border-left: 3px solid #ef4444; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #fca5a5;">
+          <strong>IPFS node is not running.</strong> Go to Settings &gt; IPFS to start it.
+        </div>`;
+      } else if (hasApiError) {
+        guidanceHtml += `<div style="padding: 10px; background: #1a1a3e; border-left: 3px solid #f59e0b; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #fbbf24;">
+          Could not look up artwork details — the external service is temporarily unavailable. Try again later.
+        </div>`;
+      } else if (hasTimeout || hasGateway) {
+        guidanceHtml += `<div style="padding: 10px; background: #1a1a3e; border-left: 3px solid #60a5fa; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #93bbfd;">
+          IPFS gateway is busy. Wait a few minutes and try Re-sync — previously downloaded files will be skipped.
+        </div>`;
+      } else if (hasNotFound) {
+        guidanceHtml += `<div style="padding: 10px; background: #1a1a3e; border-left: 3px solid #f59e0b; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #fbbf24;">
+          Some content may no longer be available on IPFS. These items may have been unpinned from all providers.
+        </div>`;
+      } else if (hasConnection) {
+        guidanceHtml += `<div style="padding: 10px; background: #1a1a3e; border-left: 3px solid #60a5fa; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #93bbfd;">
+          Connection errors occurred but internet and IPFS are online. Try Re-sync to retry failed items.
+        </div>`;
+      }
+
+      let reportHtml = `<div style="max-height: 400px; overflow-y: auto; text-align: left;">`;
+      reportHtml += guidanceHtml;
+      reportHtml += `<p style="margin-bottom: 12px; color: var(--text-secondary);"><strong>${totalFailed}</strong> items could not be downloaded:</p>`;
+      reportHtml += `<div style="font-family: monospace; font-size: 12px;">`;
+
+      items.forEach((item, i) => {
+        const id = item.id || item;
+        const error = item.error || 'Unknown error';
+        const shortId = id.length > 30 ? id.substring(0, 27) + '...' : id;
+        reportHtml += `<div style="margin-bottom: 8px; padding: 8px; background: var(--bg-tertiary, #1a1a2e); border-radius: 4px;">`;
+        reportHtml += `<div style="color: var(--text-primary); margin-bottom: 4px;">${i + 1}. ${escHTML(shortId)}</div>`;
+        reportHtml += `<div style="color: var(--error-color, #ef4444); font-size: 11px;">${escHTML(error)}</div>`;
+        reportHtml += `</div>`;
+      });
+
+      if (totalFailed > items.length) {
+        reportHtml += `<p style="color: var(--text-secondary); margin-top: 8px;">...and ${totalFailed - items.length} more</p>`;
+      }
+
+      reportHtml += `</div>`;
+      reportHtml += `<div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-light, #333);">`;
+      reportHtml += `<a href="/api/download-report" download style="display: inline-flex; align-items: center; gap: 6px; color: var(--accent-primary, #c9a84c); text-decoration: none; font-size: 13px; font-weight: 600;">`;
+      reportHtml += `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+      reportHtml += `Download full report (CSV)</a>`;
+      reportHtml += `<p style="color: var(--text-muted, #666); font-size: 11px; margin-top: 6px;">Contains all failed CIDs with IPFS gateway links for manual recovery</p>`;
+      reportHtml += `</div></div>`;
+
+      // Show in a modal-like alert
+      showErrorReport('Download Report', reportHtml);
+    }
+
+    function showErrorReport(title, content) {
+      // Create modal overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'error-report-overlay';
+      overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+
+      const modal = document.createElement('div');
+      modal.style.cssText = 'background: var(--bg-secondary, #1e1e2e); border-radius: 12px; padding: 20px; max-width: 500px; width: 90%; max-height: 80vh; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5);';
+
+      modal.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; color: var(--text-primary);">${escHTML(title)}</h3>
+          <button class="close-error-btn" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+        </div>
+        ${content}
+        <div style="margin-top: 16px; text-align: right;">
+          <button class="close-error-btn btn-library-secondary">Close</button>
+        </div>
+      `;
+
+      overlay.appendChild(modal);
+
+      // Add click handlers for close buttons
+      modal.querySelectorAll('.close-error-btn').forEach(btn => {
+        btn.onclick = () => overlay.remove();
+      });
+
+      // Click on overlay background to close
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+      document.body.appendChild(overlay);
+    }
+
+    function showStatus(message, type = 'info', duration = 3000) {
+      window.vernisAlert(message, type);
+    }
+
+    function showSuccess(message) {
+      window.vernisAlert(message, 'success');
+    }
+
+    function showError(message) {
+      window.vernisAlert(message, 'error');
+    }
+
+
+    // Re-sync: reset progress and re-download
+    async function resyncCollection(filename) {
+      const col = collections.find(c => c.filename === filename);
+      const displayName = col ? truncName(col.name) : filename;
+      if (!await vernisConfirm(`Reset and re-download "${displayName}"? This will re-download all files including ones already downloaded.`)) {
+        return;
+      }
+
+      try {
+        // First reset the download progress
+        await fetch('/api/reset-downloads', { method: 'POST' });
+
+        // Then start the installation — card handles all feedback
+        await installCollection(filename);
+      } catch (error) {
+        // installCollection handles its own error display on the card
+      }
+    }
+
+    // Check if any downloads are in progress on page load
+    async function checkActiveDownloads() {
+      try {
+        const r = await fetch('/api/download-progress');
+        const data = await r.json();
+
+        if (data.active || (data.completed > 0 && data.total > 0)) {
+          const sourceFilename = data.source_csv;
+          if (sourceFilename) {
+            const cardId = `card-${sourceFilename.replace(/\./g, '_')}`;
+            const card = document.getElementById(cardId);
+            if (card) {
+              const progressContainer = card.querySelector('.card-progress-container');
+              const progressBar = card.querySelector('.card-progress-bar');
+              const progressText = card.querySelector('.card-progress-text');
+              const btn = card.querySelector('.btn-library-primary');
+
+              if (progressContainer && progressBar) {
+                const pct = data.total > 0 ? (data.completed / data.total) * 100 : 0;
+                const isInitializing = data.status === 'Initializing' || (data.total === 0 && data.active);
+
+                if (pct >= 100 && !isInitializing) {
+                  progressContainer.classList.add('complete');
+                  progressBar.style.width = '100%';
+                } else if (isInitializing) {
+                  // Page loaded during initialization - show shimmer
+                  progressContainer.classList.add('preparing');
+                  card.classList.add('downloading');
+                  if (progressText) progressText.textContent = 'Starting preservation engine...';
+                  if (btn) {
+                    btn.textContent = 'Starting';
+                    btn.classList.add('installing');
+                    btn.disabled = true;
+                  }
+                  startCardProgress(sourceFilename);
+                } else if (data.active) {
+                  progressContainer.classList.add('active');
+                  progressBar.style.width = `${pct}%`;
+                  card.classList.add('downloading');
+                  if (btn) {
+                    btn.textContent = `${Math.round(pct)}%`;
+                    btn.classList.add('installing');
+                    btn.disabled = true;
+                  }
+                  startGlobalProgressPolling(sourceFilename);
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log('No active downloads');
+      }
+    }
+
+    let globalProgressInterval = null;
+    function startGlobalProgressPolling(targetFilename = null) {
+      if (globalProgressInterval) return;
+
+      globalProgressInterval = setInterval(async () => {
+        try {
+          const r = await fetch('/api/download-progress');
+          const data = await r.json();
+          lastDownloadData = data;
+
+          // Get the source filename from the response or use provided target
+          const sourceFilename = data.source_csv || targetFilename;
+          if (!sourceFilename) {
+            clearInterval(globalProgressInterval);
+            globalProgressInterval = null;
+            return;
+          }
+
+          // Only update the specific card being downloaded
+          const cardId = `card-${sourceFilename.replace(/\./g, '_')}`;
+          const card = document.getElementById(cardId);
+          if (!card) return;
+
+          const progressContainer = card.querySelector('.card-progress-container');
+          const progressBar = card.querySelector('.card-progress-bar');
+          const progressText = card.querySelector('.card-progress-text');
+          const btn = card.querySelector('.btn-library-primary');
+          if (progressContainer && progressBar) {
+            const pct = data.total > 0 ? (data.completed / data.total) * 100 : 0;
+            progressBar.style.width = `${pct}%`;
+
+            // Set up Stop button if download is active
+            if (data.active && btn && !btn._isStopBtn) {
+              btn.textContent = 'Stop';
+              btn.classList.remove('installing');
+              btn.disabled = false;
+              btn.style.opacity = '1';
+              btn._isStopBtn = true;
+              btn.onclick = async () => {
+                btn.textContent = 'Stopping...';
+                btn.disabled = true;
+                try { await fetch('/api/stop-download', { method: 'POST' }); } catch(e) {}
+              };
+            }
+
+            // Update progress text with speed
+            if (progressText && data.active) {
+              let statusParts = [];
+              if (data.retry_pass > 0) {
+                statusParts.push(`Retrying ${data.failed} timed out (${data.retry_timeout}s timeout)`);
+              } else {
+                statusParts.push(`${data.completed}/${data.total} downloading & pinning`);
+              }
+              if (data.speed) {
+                statusParts.push(`${data.speed}`);
+              }
+              progressText.textContent = statusParts.join(' · ');
+            }
+
+            if (!data.active || pct >= 100) {
+              progressContainer.classList.remove('active');
+              card.classList.remove('downloading');
+              handleDownloadComplete(card, progressContainer, progressBar, progressText, btn, data, globalProgressInterval, sourceFilename);
+              globalProgressInterval = null;
+            }
+          }
+        } catch (e) {
+          clearInterval(globalProgressInterval);
+          globalProgressInterval = null;
+        }
+      }, 2000);
+    }
+
+    // Fetch and display status for each collection (progress bar only)
+    async function loadCollectionStatuses() {
+      const cards = document.querySelectorAll('.card[data-filename]');
+
+      for (const card of cards) {
+        const filename = card.dataset.filename;
+        if (!filename) continue;
+
+        try {
+          const r = await fetch(`/api/csv-library/status/${encodeURIComponent(filename)}`);
+          const data = await r.json();
+
+          if (data.error) continue;
+
+          // Store status for sorting
+          collectionStatuses[filename] = data;
+
+          // Don't overwrite active download/preparing/pinning state
+          if (card.classList.contains('downloading') || card.classList.contains('pinning')) continue;
+
+          // Update progress bar at bottom of card
+          const progressContainer = card.querySelector('.card-progress-container');
+          const progressBar = card.querySelector('.card-progress-bar');
+          const progressText = card.querySelector('.card-progress-text');
+          const actionBtn = card.querySelector('.btn-library-primary');
+
+          if (progressContainer && progressBar) {
+            // Clear previous states
+            progressContainer.classList.remove('complete', 'partial', 'unpinned', 'preparing', 'error');
+
+            if (data.percent_downloaded === 100) {
+              progressBar.style.width = '100%';
+              // Show Gallery button — art is downloaded, user can view it
+              showGalleryButton(card);
+
+              const tp = data.total_pinnable || 0;
+              const displayTotal = data.total;
+              if (tp === 0) {
+                // No IPFS CIDs — all HTTP downloads
+                progressContainer.classList.add('complete');
+                if (progressText) {
+                  progressText.textContent = `✓ ${displayTotal} downloaded`;
+                  progressText.style.opacity = '1';
+                  progressText.style.color = '';
+                }
+                if (actionBtn) {
+                  actionBtn.textContent = 'Installed';
+                  actionBtn.classList.remove('installing');
+                  actionBtn.disabled = true;
+                  actionBtn.style.opacity = '0.6';
+                }
+              } else if (data.percent_pinned === 100) {
+                // Fully downloaded AND pinned - green
+                progressContainer.classList.add('complete');
+                if (progressText) {
+                  progressText.textContent = `✓ ${displayTotal} downloaded · ${tp} IPFS pinned`;
+                  progressText.style.opacity = '1';
+                  progressText.style.color = '';
+                }
+                if (actionBtn) {
+                  actionBtn.textContent = 'Installed';
+                  actionBtn.classList.remove('installing');
+                  actionBtn.disabled = true;
+                  actionBtn.style.opacity = '0.6';
+                }
+              } else {
+                // Downloaded but NOT fully pinned - orange
+                progressContainer.classList.add('unpinned');
+                if (progressText) {
+                  progressText.textContent = `✓ ${displayTotal} downloaded · ${data.pinned}/${tp} IPFS pinned`;
+                  progressText.style.opacity = '1';
+                  progressText.style.color = '';
+                }
+                if (actionBtn) {
+                  actionBtn.textContent = 'Pin IPFS Files';
+                  actionBtn.classList.remove('installing');
+                  actionBtn.disabled = false;
+                  actionBtn.style.opacity = '1';
+                  actionBtn.onclick = () => pinDownloaded(filename);
+                }
+              }
+            } else if (data.percent_downloaded > 0) {
+              // Partially downloaded (no active download — card would have 'downloading' class)
+              progressBar.style.width = `${data.percent_downloaded}%`;
+              progressContainer.classList.add('partial');
+              if (progressText) {
+                const missing = data.total - data.downloaded;
+                if (data.failed > 0 && data.failed_summary) {
+                  progressText.textContent = '';
+                  progressText.appendChild(document.createTextNode(`${data.downloaded} of ${data.total} downloaded \u00b7 `));
+                  const failedLink = document.createElement('a');
+                  failedLink.href = '#';
+                  failedLink.style.cssText = 'color: var(--error-color, #ef4444); text-decoration: underline;';
+                  failedLink.textContent = `${data.failed} failed`;
+                  failedLink.onclick = (e) => { e.preventDefault(); showFailedFromApi(); };
+                  progressText.appendChild(failedLink);
+                  progressText.appendChild(document.createTextNode(' \u00b7 '));
+                  const reportLink = document.createElement('a');
+                  reportLink.href = '/api/download-report';
+                  reportLink.download = '';
+                  reportLink.style.cssText = 'color: var(--accent-primary, #c9a84c); text-decoration: underline;';
+                  reportLink.textContent = 'Report';
+                  progressText.appendChild(reportLink);
+                } else if (data.percent_downloaded >= 95) {
+                  progressText.textContent = `${data.downloaded} of ${data.total} downloaded · ${missing} timed out`;
+                } else {
+                  progressText.textContent = `${data.downloaded} of ${data.total} downloaded · ${missing} remaining`;
+                }
+                progressText.style.opacity = '1';
+                progressText.style.color = '';
+              }
+              if (actionBtn) {
+                actionBtn.textContent = 'Retry';
+                actionBtn.classList.remove('installing');
+                actionBtn.disabled = false;
+                actionBtn.style.opacity = '1';
+                actionBtn.onclick = () => installCollection(filename);
+              }
+              // Some art is available — show gallery
+              showGalleryButton(card);
+            } else {
+              progressBar.style.width = '0%';
+              if (progressText) {
+                progressText.style.opacity = '0';
+              }
+            }
+          }
+        } catch (e) {
+          console.log(`Failed to load status for ${filename}:`, e);
+        }
+      }
+
+      // Re-sort and re-render if sorting by progress or installed (now that we have status data)
+      if (currentSort === 'progress' || currentSort === 'installed') {
+        applySorting();
+        renderLibrary();
+        // Re-apply status styling after re-render (without re-fetching)
+        requestAnimationFrame(() => {
+          for (const [filename, data] of Object.entries(collectionStatuses)) {
+            const cardId = `card-${filename.replace(/\./g, '_')}`;
+            const card = document.getElementById(cardId);
+            if (!card) continue;
+            updateCardStatus(card, data);
+          }
+        });
+      }
+
+      // Update cache with latest statuses
+      try {
+        localStorage.setItem('vernis-library-cache', JSON.stringify({
+          collections: collections,
+          statuses: collectionStatuses
+        }));
+      } catch (e) {}
+    }
+
+    // Helper to update card status display
+    function updateCardStatus(card, data) {
+      // Don't overwrite active download or pinning state
+      if (card.classList.contains('downloading') || card.classList.contains('pinning')) return;
+
+      const progressContainer = card.querySelector('.card-progress-container');
+      const progressBar = card.querySelector('.card-progress-bar');
+      const progressText = card.querySelector('.card-progress-text');
+      const actionBtn = card.querySelector('.btn-library-primary');
+      const nftCount = card.querySelector('.nft-count');
+
+      if (!progressContainer || !progressBar) return;
+
+      // Update NFT count to show actual downloadable items
+      if (nftCount && data.total > 0) {
+        nftCount.textContent = data.total;
+      }
+
+      progressContainer.classList.remove('complete', 'partial', 'unpinned', 'preparing', 'error');
+
+      if (data.percent_downloaded === 100) {
+        progressBar.style.width = '100%';
+        showGalleryButton(card);
+        const tp = data.total_pinnable || 0;
+        const displayTotal = data.total;
+        if (tp === 0) {
+          // No IPFS CIDs in this collection — all HTTP downloads
+          progressContainer.classList.add('complete');
+          if (progressText) {
+            progressText.textContent = `✓ ${displayTotal} downloaded`;
+            progressText.style.opacity = '1';
+          }
+          if (actionBtn) {
+            actionBtn.textContent = 'Installed';
+            actionBtn.disabled = true;
+            actionBtn.style.opacity = '0.6';
+          }
+        } else if (data.percent_pinned === 100) {
+          progressContainer.classList.add('complete');
+          if (progressText) {
+            progressText.textContent = `✓ ${displayTotal} downloaded · ${tp} IPFS pinned`;
+            progressText.style.opacity = '1';
+          }
+          if (actionBtn) {
+            actionBtn.textContent = 'Installed';
+            actionBtn.disabled = true;
+            actionBtn.style.opacity = '0.6';
+          }
+        } else {
+          progressContainer.classList.add('unpinned');
+          if (progressText) {
+            progressText.textContent = `✓ ${displayTotal} downloaded · ${data.pinned}/${tp} IPFS pinned`;
+            progressText.style.opacity = '1';
+          }
+          if (actionBtn) {
+            actionBtn.textContent = 'Pin IPFS Files';
+            actionBtn.disabled = false;
+            actionBtn.style.opacity = '1';
+            const fn = card.dataset.filename;
+            if (fn) actionBtn.onclick = () => pinDownloaded(fn);
+          }
+        }
+      } else if (data.percent_downloaded > 0) {
+        progressBar.style.width = `${data.percent_downloaded}%`;
+        progressContainer.classList.add('partial');
+        if (progressText) {
+          const missing = data.total - data.downloaded;
+          if (data.failed > 0 && data.failed_summary) {
+            progressText.textContent = `${data.downloaded} of ${data.total} downloaded · ${data.failed} failed (${data.failed_summary})`;
+          } else if (data.percent_downloaded >= 95) {
+            progressText.textContent = `${data.downloaded} of ${data.total} downloaded · ${missing} timed out`;
+          } else {
+            progressText.textContent = `${data.downloaded} of ${data.total} downloaded · ${missing} remaining`;
+          }
+          progressText.style.opacity = '1';
+        }
+        if (actionBtn) {
+          actionBtn.textContent = 'Resume';
+          actionBtn.classList.remove('installing');
+          actionBtn.disabled = false;
+          actionBtn.style.opacity = '1';
+          const fn = card.dataset.filename;
+          if (fn) actionBtn.onclick = () => installCollection(fn);
+        }
+        // Some art is available — show gallery
+        showGalleryButton(card);
+      } else {
+        progressBar.style.width = '0%';
+        if (progressText) progressText.style.opacity = '0';
+      }
+    }
+
+    // Pin already downloaded files (async with progress polling)
+    async function pinDownloaded(filename) {
+      const cardId = `card-${filename.replace(/\./g, '_')}`;
+      const card = document.getElementById(cardId);
+      const progressContainer = card ? card.querySelector('.card-progress-container') : null;
+      const progressBar = card ? card.querySelector('.card-progress-bar') : null;
+      const progressText = card ? card.querySelector('.card-progress-text') : null;
+      const actionBtn = card ? card.querySelector('.btn-library-primary') : null;
+
+      // Mark card as pinning so status polls don't overwrite the UI
+      if (card) card.classList.add('pinning');
+
+      // Immediate UI feedback
+      if (actionBtn) {
+        actionBtn.textContent = 'Pinning...';
+        actionBtn.disabled = true;
+      }
+      if (progressContainer) {
+        progressContainer.classList.remove('complete', 'partial', 'unpinned', 'error');
+        progressContainer.classList.add('active');
+      }
+      if (progressText) {
+        progressText.textContent = 'Starting IPFS pinning...';
+        progressText.style.opacity = '1';
+      }
+
+      try {
+        const response = await fetch('/api/csv-library/pin-downloaded', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename })
+        });
+        const result = await response.json();
+
+        if (!result.success) {
+          if (card) card.classList.remove('pinning');
+          if (actionBtn) { actionBtn.textContent = 'Pin Downloaded'; actionBtn.disabled = false; }
+          if (progressText) progressText.textContent = result.error || 'Pinning failed';
+          if (progressContainer) { progressContainer.classList.remove('active'); progressContainer.classList.add('error'); }
+          return;
+        }
+
+        // Poll pin progress
+        const pollInterval = setInterval(async () => {
+          try {
+            const pr = await fetch(`/api/csv-library/pin-progress/${encodeURIComponent(filename)}`);
+            const pd = await pr.json();
+
+            if (pd.status === 'idle') {
+              // Thread hasn't created progress file yet, keep waiting
+              if (progressText) progressText.textContent = 'Starting IPFS pinning...';
+            } else if (pd.status === 'running') {
+              const processed = pd.processed || 0;
+              const total = pd.total || 1;
+              const pct = Math.round((processed / total) * 100);
+              if (progressBar) progressBar.style.width = `${pct}%`;
+              if (actionBtn) actionBtn.textContent = `${pct}%`;
+              if (progressText) {
+                const pinned = pd.pinned || 0;
+                const skipped = pd.skipped || 0;
+                progressText.textContent = `${pd.phase || 'Pinning...'} · ${pinned} pinned, ${skipped} already done`;
+              }
+            } else if (pd.status === 'complete') {
+              clearInterval(pollInterval);
+              if (card) card.classList.remove('pinning');
+              if (progressBar) progressBar.style.width = '100%';
+              if (progressContainer) { progressContainer.classList.remove('active'); progressContainer.classList.add('complete'); }
+
+              const msg = [];
+              if (pd.pinned > 0) msg.push(`${pd.pinned} pinned`);
+              if (pd.skipped > 0) msg.push(`${pd.skipped} already pinned`);
+              if (pd.not_found > 0) msg.push(`${pd.not_found} not downloaded`);
+              if (pd.errors > 0) msg.push(`${pd.errors} errors`);
+              if (progressText) progressText.textContent = msg.join(' · ') || 'All files pinned';
+              if (actionBtn) { actionBtn.textContent = 'Installed'; actionBtn.disabled = true; actionBtn.style.opacity = '0.6'; }
+
+              if (pd.pinned > 0) showSuccess(`Pinned ${pd.pinned} files to IPFS`);
+              loadCollectionStatuses();
+            } else if (pd.status === 'error') {
+              clearInterval(pollInterval);
+              if (card) card.classList.remove('pinning');
+              if (progressContainer) { progressContainer.classList.remove('active'); progressContainer.classList.add('error'); }
+              if (progressText) progressText.textContent = pd.error || 'Pinning failed';
+              if (actionBtn) { actionBtn.textContent = 'Pin Downloaded'; actionBtn.disabled = false; }
+              showError(pd.error || 'Pinning failed');
+            }
+          } catch (e) {
+            // Network error polling, keep trying
+          }
+        }, 1000);
+      } catch (error) {
+        if (card) card.classList.remove('pinning');
+        if (actionBtn) { actionBtn.textContent = 'Pin Downloaded'; actionBtn.disabled = false; }
+        showError('Pinning failed: ' + error.message);
+      }
+    }
+
+    // 3-dot menu functions
+    let openMenu = null;
+
+    function toggleCardMenu(event, filename) {
+      event.stopPropagation();
+      const menuId = `menu-${filename.replace(/\./g, '_')}`;
+      const menu = document.getElementById(menuId);
+
+      // Close any other open menu
+      if (openMenu && openMenu !== menu) {
+        openMenu.classList.remove('open');
+      }
+
+      menu.classList.toggle('open');
+      openMenu = menu.classList.contains('open') ? menu : null;
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (openMenu && !e.target.closest('.card-menu')) {
+        openMenu.classList.remove('open');
+        openMenu = null;
+      }
+    });
+
+    async function renameCollection(filename) {
+      closeAllMenus();
+      const col = collections.find(c => c.filename === filename);
+      if (!col) return;
+
+      const newName = await vernisPrompt('Rename collection', col.name);
+      if (!newName || !newName.trim() || newName.trim() === col.name) return;
+
+      try {
+        const r = await fetch('/api/csv-library/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename, name: newName.trim() })
+        });
+        const data = await r.json();
+        if (data.success) {
+          col.name = data.name;
+          renderLibrary();
+          loadCollectionStatuses();
+          showSuccess('Collection renamed');
+        } else {
+          showError(data.error || 'Rename failed');
+        }
+      } catch (e) {
+        showError('Rename failed');
+      }
+    }
+
+    function viewCollectionInfo(filename) {
+      closeAllMenus();
+      const col = collections.find(c => c.filename === filename);
+      if (!col) return;
+
+      // Fetch status info
+      fetch(`/api/csv-library/status/${encodeURIComponent(filename)}`)
+        .then(r => r.json())
+        .then(data => {
+          const info = `
+Collection: ${col.name}
+Filename: ${col.filename}
+Total NFTs: ${col.count || '?'}
+Downloaded: ${data.downloaded || 0} files
+Pinned: ${data.pinned || 0} files
+Progress: ${data.percent_downloaded || 0}%
+Source: ${col.source || 'local'}
+          `.trim();
+          vernisAlert(info, 'info');
+        })
+        .catch(() => {
+          vernisAlert(`Collection: ${col.name}\nNFTs: ${col.count || '?'}`, 'info');
+        });
+    }
+
+    async function clearCollectionFiles(filename) {
+      closeAllMenus();
+
+      const col = collections.find(c => c.filename === filename);
+      const name = col ? col.name : filename;
+
+      if (!await vernisConfirm(`Clear all downloaded files for "${truncName(name)}"?\n\nThis removes the artwork files from your device. The CSV card will remain in your collection so you can re-download anytime.`)) {
+        return;
+      }
+
+      try {
+        showStatus('Clearing files...', 'info');
+
+        const response = await fetch('/api/csv-library/clear-files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showSuccess(result.message || 'Files cleared');
+          // Reset the progress bar and buttons on the card
+          const cardId = `card-${filename.replace(/\./g, '_')}`;
+          const card = document.getElementById(cardId);
+          if (card) {
+            const progressContainer = card.querySelector('.card-progress-container');
+            const progressBar = card.querySelector('.card-progress-bar');
+            const progressText = card.querySelector('.card-progress-text');
+            const actionBtn = card.querySelector('.btn-library-primary');
+            if (progressContainer && progressBar) {
+              progressContainer.classList.remove('complete', 'partial', 'active', 'unpinned', 'error');
+              progressBar.style.width = '0%';
+            }
+            if (progressText) progressText.style.opacity = '0';
+            hideGalleryButton(card);
+            if (actionBtn) {
+              actionBtn.textContent = 'Install';
+              actionBtn.classList.remove('installing');
+              actionBtn.disabled = false;
+              actionBtn.style.opacity = '1';
+              actionBtn.onclick = () => installCollection(filename);
+            }
+          }
+        } else {
+          showError(result.error || 'Clear failed');
+        }
+      } catch (error) {
+        showError('Clear failed: ' + error.message);
+      }
+    }
+
+    async function deleteCollection(filename) {
+      closeAllMenus();
+
+      const col = collections.find(c => c.filename === filename);
+      const name = col ? col.name : filename;
+
+      if (!await vernisConfirm(`Remove "${truncName(name)}" from library and delete all its files?\n\nThis cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        showStatus('Deleting collection...', 'info');
+
+        const response = await fetch('/api/csv-library/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showSuccess(result.message || 'Collection deleted');
+          // Remove card from UI
+          const cardId = `card-${filename.replace(/\./g, '_')}`;
+          const card = document.getElementById(cardId);
+          if (card) {
+            card.style.transition = 'opacity 0.3s, transform 0.3s';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.9)';
+            setTimeout(() => card.remove(), 300);
+          }
+          // Remove from local array
+          collections = collections.filter(c => c.filename !== filename);
+        } else {
+          showError(result.error || 'Delete failed');
+        }
+      } catch (error) {
+        showError('Delete failed: ' + error.message);
+      }
+    }
+
+    function closeAllMenus() {
+      document.querySelectorAll('.card-menu-dropdown.open').forEach(m => m.classList.remove('open'));
+      openMenu = null;
+    }
+
+    // Update storage ring donut chart
+    async function updateStorageRing() {
+      try {
+        const r = await fetch('/api/status');
+        const data = await r.json();
+
+        if (data.storage) {
+          const ringFill = document.getElementById('storage-ring-fill');
+          const ringText = document.getElementById('storage-ring-text');
+          const ringContainer = document.getElementById('storage-ring');
+
+          // Parse storage values (e.g., "5.5 GB" -> 5.5)
+          const parseSize = (str) => parseFloat(str) || 0;
+          const used = parseSize(data.storage.used);
+          const total = parseSize(data.storage.total);
+          const free = parseSize(data.storage.free);
+
+          // Calculate percentage used
+          const pctUsed = total > 0 ? Math.round((used / total) * 100) : 0;
+          const pctFree = 100 - pctUsed;
+
+          // Update ring (stroke-dashoffset controls fill amount)
+          // 100 = empty, 0 = full
+          const dashOffset = 100 - pctUsed;
+          ringFill.style.strokeDashoffset = dashOffset;
+
+          // Color based on usage
+          ringFill.classList.remove('warning', 'critical');
+          if (pctUsed >= 90) {
+            ringFill.classList.add('critical');
+          } else if (pctUsed >= 75) {
+            ringFill.classList.add('warning');
+          }
+
+          // Update text
+          ringText.textContent = `${pctFree}%`;
+
+          // Update tooltip
+          ringContainer.title = `Storage: ${data.storage.used} used / ${data.storage.total} total (${data.storage.free} free)`;
+        }
+      } catch (e) {
+        console.log('Failed to load storage info');
+      }
+    }
+
+    // Check if external storage is read-only
+    async function checkReadOnlyStatus() {
+      try {
+        const r = await fetch('/api/external-storage');
+        const data = await r.json();
+
+        if (data.is_read_only) {
+          isReadOnly = true;
+          // Re-render library to show lock icons
+          renderLibrary();
+          loadCollectionStatuses();
+        }
+      } catch (e) {
+        // External storage not available or error - ignore
+      }
+    }
+
+    // === Easter Eggs (reveal Lab page on index) ===
+    let moonUnlocked = false;
+    let pixelsUnlocked = false;
+
+    // Check server-side easter egg state on load
+    (function checkEasterEggState() {
+      fetch('/api/easter-egg').then(r => r.json()).then(function(state) {
+        if (state.moon) moonUnlocked = true;
+        if (state.pixels) pixelsUnlocked = true;
+      }).catch(function() {
+        if (localStorage.getItem('vernis-moon-unlocked') === 'true') moonUnlocked = true;
+        if (localStorage.getItem('vernis-pixels-unlocked') === 'true') pixelsUnlocked = true;
+      });
+    })();
+
+    function showEasterEggToast(msg) {
+      var toast = document.createElement('div');
+      toast.textContent = msg;
+      toast.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);color:#00ff88;padding:20px 32px;border-radius:12px;font-size:18px;font-weight:600;z-index:99999;border:1px solid rgba(0,255,136,0.4);box-shadow:0 0 40px rgba(0,255,136,0.2);text-align:center;pointer-events:none;animation:eggFadeIn 0.3s ease;';
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; }, 2000);
+      setTimeout(function() { toast.remove(); }, 2500);
+    }
+
+    function unlockMoon() {
+      moonUnlocked = true;
+      localStorage.setItem('vernis-moon-unlocked', 'true');
+      fetch('/api/easter-egg', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ moon: true }) }).catch(function(){});
+      showEasterEggToast('Gazer unlocked! Visit the Atelier.');
+    }
+
+    function lockMoon() {
+      moonUnlocked = false;
+      localStorage.removeItem('vernis-moon-unlocked');
+      fetch('/api/easter-egg', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ moon: false }) }).catch(function(){});
+      showEasterEggToast('Gazer hidden.');
+    }
+
+    function unlockPixels() {
+      pixelsUnlocked = true;
+      localStorage.setItem('vernis-pixels-unlocked', 'true');
+      fetch('/api/easter-egg', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ pixels: true }) }).catch(function(){});
+      showEasterEggToast('PixelChain unlocked! Visit the Atelier.');
+    }
+
+    function lockPixels() {
+      pixelsUnlocked = false;
+      localStorage.removeItem('vernis-pixels-unlocked');
+      fetch('/api/easter-egg', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ pixels: false }) }).catch(function(){});
+      showEasterEggToast('PixelChain hidden.');
+    }
+
+    function unlockDoom() {
+      localStorage.setItem('vernis-doom-unlocked', 'true');
+      fetch('/api/easter-egg', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ doom: true }) }).catch(function(){});
+      showEasterEggToast('AfroViking\u2019s DOOM Party unlocked! Visit the Atelier.');
+    }
+
+    function lockDoom() {
+      localStorage.removeItem('vernis-doom-unlocked');
+      localStorage.removeItem('vernis-punks-unlocked');
+      localStorage.removeItem('vernis-autoglyphs-unlocked');
+      fetch('/api/easter-egg', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ doom: false, punks: false, autoglyphs: false }) }).catch(function(){});
+      showEasterEggToast('DOOM Party + CryptoPunks + Autoglyphs hidden.');
+    }
+
+    function lockBurner() {
+      localStorage.removeItem('vernis-burner-unlocked');
+      fetch('/api/easter-egg', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ burner: false }) }).catch(function(){});
+      showEasterEggToast('BURNER hidden.');
+    }
+
+    // Hidden keypress listener
+    (function() {
+      var buffer = '';
+      var timeout;
+      document.addEventListener('keydown', function(e) {
+        buffer += e.key.toLowerCase();
+        if (buffer.length > 50) buffer = buffer.slice(-50);
+        clearTimeout(timeout);
+        timeout = setTimeout(function() { buffer = ''; }, 5000);
+        if (buffer.includes('hidethemoon')) {
+          buffer = '';
+          lockMoon();
+        } else if (buffer.includes('whereisthemoon')) {
+          buffer = '';
+          unlockMoon();
+        } else if (buffer.includes('hidepixelsonchain')) {
+          buffer = '';
+          lockPixels();
+        } else if (buffer.includes('pixelsonchain')) {
+          buffer = '';
+          unlockPixels();
+        } else if (buffer.includes('hidedoomparty')) {
+          buffer = '';
+          lockDoom();
+        } else if (buffer.includes('doomparty')) {
+          buffer = '';
+          unlockDoom();
+        } else if (buffer.includes('hideburner')) {
+          buffer = '';
+          lockBurner();
+        }
+      });
+    })();
+
+    // Secret code entry for touch devices (tap storage ring 5 times)
+    (function() {
+      var tapCount = 0, tapTimer;
+      var ring = document.getElementById('storage-ring');
+      if (!ring) return;
+      ring.addEventListener('click', function(e) {
+        e.stopPropagation();
+        tapCount++;
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(function() { tapCount = 0; }, 2000);
+        if (tapCount >= 5) {
+          tapCount = 0;
+          var existing = document.getElementById('secret-code-panel');
+          if (existing) { existing.remove(); return; }
+          var panel = document.createElement('div');
+          panel.id = 'secret-code-panel';
+          panel.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.95);border:1px solid rgba(0,255,136,0.3);border-radius:14px;padding:16px 20px;z-index:9999;display:flex;gap:10px;align-items:center;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.placeholder = 'Enter code...';
+          input.autocomplete = 'off';
+          input.style.cssText = 'background:#111;border:1px solid #333;color:#00ff88;padding:10px 14px;border-radius:8px;font-size:15px;font-family:monospace;width:200px;outline:none;';
+          var btn = document.createElement('button');
+          btn.textContent = 'Go';
+          btn.style.cssText = 'background:#00ff88;color:#000;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;';
+          function submitCode() {
+            var code = input.value.toLowerCase().trim();
+            if (code === 'whereisthemoon') unlockMoon();
+            else if (code === 'hidethemoon') lockMoon();
+            else if (code === 'pixelsonchain') unlockPixels();
+            else if (code === 'hidepixelsonchain') lockPixels();
+            else if (code === 'doomparty') unlockDoom();
+            else if (code === 'hidedoomparty') lockDoom();
+            else if (code === 'hideburner') lockBurner();
+            else { input.style.borderColor = '#ff3b30'; setTimeout(function() { input.style.borderColor = '#333'; }, 1000); return; }
+            input.value = '';
+            setTimeout(function() { panel.remove(); }, 1500);
+          }
+          btn.addEventListener('click', submitCode);
+          input.addEventListener('keydown', function(e) { if (e.key === 'Enter') submitCode(); });
+          panel.appendChild(input);
+          panel.appendChild(btn);
+          document.body.appendChild(panel);
+          input.focus();
+        }
+      });
+    })();
+
+    // Load on page load
+    loadLibrary();
+    updateStorageRing();
+    checkReadOnlyStatus();
+
+    // Check for active downloads first, then load statuses
+    // (await ensures downloading card gets 'downloading' class before
+    // loadCollectionStatuses runs, which skips cards with that class)
+    setTimeout(async () => {
+      await checkActiveDownloads();
+      loadCollectionStatuses();
+    }, 1000);
+  </script>
+  <script>(function(){var t=0;function r(){var n=Date.now();if(n-t<30000)return;t=n;fetch('/api/screen/activity',{method:'POST'}).catch(function(){});}document.addEventListener('touchstart',r,{passive:true});})();</script>
+</body>
+
+</html>

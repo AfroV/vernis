@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Vernis Remote</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #0a0a0a !important;
+      color: #ffffff !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .remote-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      padding: 20px;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .title {
+      font-family: var(--font-display, 'Bodoni Moda', serif);
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-primary, #d4af37), var(--accent-secondary, #cd7f32));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      font-size: 14px;
+      color: var(--text-muted, #666);
+      text-align: center;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .control-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0, 0, 0, 0.3);
+      color: white;
+      font-size: 32px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .control-btn svg {
+      pointer-events: none;
+    }
+
+    .control-btn:hover {
+      background: rgba(0, 0, 0, 0.5);
+      transform: scale(1.05);
+    }
+
+    .control-btn:active {
+      background: var(--accent-primary, #d4af37);
+      transform: scale(0.95);
+    }
+
+    .control-btn.play-pause {
+      width: 100px;
+      height: 100px;
+      font-size: 40px;
+      background: linear-gradient(135deg, var(--accent-primary, #d4af37), var(--accent-secondary, #cd7f32));
+    }
+
+    .control-btn.play-pause:hover {
+      transform: scale(1.1);
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.4);
+    }
+
+    .control-btn.play-pause:active {
+      transform: scale(0.95);
+    }
+
+    .feedback {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 80px;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+
+    .feedback.show {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+
+    .feedback.hide {
+      transform: translate(-50%, -50%) scale(1.5);
+      opacity: 0;
+    }
+
+    .top-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      padding: 0;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      color: white;
+      touch-action: manipulation;
+      z-index: 1000;
+    }
+
+    .top-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
+    }
+
+    .top-btn:active {
+      transform: scale(0.95);
+    }
+
+    .top-btn svg {
+      width: 22px;
+      height: 22px;
+      stroke: white;
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .power-btn.screen-off {
+      background: rgba(255, 100, 100, 0.3);
+      border-color: rgba(255, 100, 100, 0.4);
+    }
+
+    .power-btn.screen-off:hover {
+      background: rgba(255, 100, 100, 0.5);
+    }
+
+    .hue-btn.hue-active {
+      background: rgba(255, 180, 50, 0.3);
+      border-color: rgba(255, 180, 50, 0.6);
+      box-shadow: 0 0 12px rgba(255, 180, 50, 0.3);
+    }
+
+    .hue-btn.hue-active:hover {
+      background: rgba(255, 180, 50, 0.5);
+    }
+
+    /* SVG icons for buttons */
+    .control-btn svg {
+      width: 28px;
+      height: 28px;
+      fill: white;
+    }
+
+    .control-btn.play-pause svg {
+      width: 36px;
+      height: 36px;
+    }
+
+    .info-row {
+      display: flex;
+      gap: 30px;
+      font-size: 13px;
+      color: var(--text-secondary, #999);
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-primary, #d4af37);
+    }
+
+    .dot.offline {
+      background: #666;
+    }
+
+    .start-gallery-btn {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent-primary, #d4af37), var(--accent-secondary, #cd7f32));
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .start-gallery-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.4);
+    }
+
+    .start-gallery-btn:active {
+      transform: scale(0.95);
+      opacity: 0.8;
+    }
+  </style>
+</head>
+
+<body>
+  <button class="top-btn hue-btn" id="hueBtn" ontouchstart="toggleRemoteHue(event)" onclick="toggleRemoteHue(event)" title="Toggle Hue Sync" style="position: fixed; top: 20px; left: 80px; display: none;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" style="width: 20px; height: 20px;">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </button>
+
+  <button class="top-btn power-btn" id="powerBtn" ontouchstart="toggleScreen(event)" onclick="toggleScreen(event)" title="Screen On/Off" style="position: fixed; top: 20px; left: 20px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" style="width: 24px; height: 24px;">
+      <path d="M12 2v10"></path>
+      <path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path>
+    </svg>
+  </button>
+
+  <button class="top-btn" title="Exit Remote" style="position: fixed; top: 20px; right: 20px;" ontouchstart="exitRemote(event)" onclick="exitRemote(event)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" style="width: 24px; height: 24px;">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+
+  <div class="remote-container">
+    <div>
+      <div class="title">Vernis Remote</div>
+      <div class="status" id="status">Connecting...</div>
+    </div>
+
+    <div class="controls">
+      <button class="control-btn" ontouchstart="sendCommand('prev', event)" onclick="sendCommand('prev', event)" title="Previous">
+        <svg viewBox="0 0 24 24" fill="white"><path d="M4 12l12-8v16z"/></svg>
+      </button>
+      <button class="control-btn play-pause" ontouchstart="sendCommand('toggle', event)" onclick="sendCommand('toggle', event)" id="playPauseBtn" title="Play/Pause">
+        <svg viewBox="0 0 24 24" fill="white" id="playPauseIcon"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+      <button class="control-btn" ontouchstart="sendCommand('next', event)" onclick="sendCommand('next', event)" title="Next">
+        <svg viewBox="0 0 24 24" fill="white"><path d="M20 12L8 4v16z"/></svg>
+      </button>
+    </div>
+
+    <div class="info-row">
+      <div class="info-item">
+        <span class="dot" id="connectionDot"></span>
+        <span id="connectionStatus">Connected</span>
+      </div>
+      <div class="info-item" id="nftCount">-- artworks</div>
+    </div>
+
+    <button class="start-gallery-btn" id="galleryBtn" ontouchstart="toggleGallery(event)" onclick="toggleGallery(event)">
+      Start Gallery
+    </button>
+  </div>
+
+  <div class="feedback" id="feedback"></div>
+
+  <script>
+    // Load theme
+    (function () {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      const mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+      function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}_syncTheme();setInterval(_syncTheme,5000);
+    })();
+
+    let isPlaying = true;
+    let lastCommandTime = 0;
+
+    const pauseIcon = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+    const playIcon = '<path d="M8 5v14l11-7z"/>';
+
+    function showFeedback(type) {
+      const fb = document.getElementById('feedback');
+      fb.className = 'feedback show';
+      setTimeout(() => {
+        fb.className = 'feedback hide';
+      }, 200);
+      setTimeout(() => {
+        fb.className = 'feedback';
+      }, 500);
+    }
+
+    function sendCommand(cmd, event) {
+      // Prevent double-firing from touch + click
+      const now = Date.now();
+      if (now - lastCommandTime < 300) return;
+      lastCommandTime = now;
+
+      // Prevent default touch behavior
+      if (event) event.preventDefault();
+
+      // Visual feedback
+      showFeedback(cmd);
+
+      // Haptic feedback on mobile
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+
+      // Toggle play state locally for UI
+      if (cmd === 'toggle') {
+        isPlaying = !isPlaying;
+        document.getElementById('playPauseIcon').innerHTML = isPlaying ? pauseIcon : playIcon;
+      }
+
+      // Send to API
+      fetch('/api/remote/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            console.error('Command error:', data.error);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to send command:', err);
+        });
+    }
+
+    function updateStatus() {
+      fetch('/api/remote/status')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('status').textContent = 'Control your gallery display';
+          document.getElementById('connectionDot').className = 'dot';
+          document.getElementById('connectionStatus').textContent = 'Connected';
+          document.getElementById('nftCount').textContent = `${data.nft_count || 0} artworks`;
+        })
+        .catch(() => {
+          document.getElementById('status').textContent = 'Connection lost - retrying...';
+          document.getElementById('connectionDot').className = 'dot offline';
+          document.getElementById('connectionStatus').textContent = 'Offline';
+        });
+    }
+
+    // Initial status check
+    updateStatus();
+
+    // Poll status every 5 seconds
+    setInterval(updateStatus, 5000);
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'n') sendCommand('next');
+      if (e.key === 'ArrowLeft' || e.key === 'b') sendCommand('prev');
+      if (e.key === ' ' || e.key === 'p') {
+        e.preventDefault();
+        sendCommand('toggle');
+      }
+      if (e.key === 'g') toggleGallery();
+    });
+
+    let galleryRunning = false;
+
+    function updateGalleryButton(text) {
+      const btn = document.getElementById('galleryBtn');
+      btn.textContent = text || (galleryRunning ? 'Stop Gallery' : 'Start Gallery');
+    }
+
+    function checkGalleryState() {
+      fetch('/api/remote/gallery-state')
+        .then(r => r.json())
+        .then(data => {
+          galleryRunning = data.running;
+          updateGalleryButton();
+        })
+        .catch(() => {});
+    }
+
+    let lastGalleryToggle = 0;
+    function toggleGallery(event) {
+      const now = Date.now();
+      if (now - lastGalleryToggle < 500) return;
+      lastGalleryToggle = now;
+      if (event) event.preventDefault();
+
+      // Immediate visual feedback
+      const btn = document.getElementById('galleryBtn');
+      const originalText = btn.textContent;
+      btn.textContent = 'Loading...';
+      btn.style.opacity = '0.7';
+
+      if (navigator.vibrate) navigator.vibrate(50);
+
+      const endpoint = galleryRunning ? '/api/remote/stop-gallery' : '/api/remote/start-gallery';
+
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+        .then(r => r.json())
+        .then(data => {
+          btn.style.opacity = '1';
+          if (data.success) {
+            galleryRunning = data.running;
+            updateGalleryButton();
+            document.getElementById('status').textContent = galleryRunning ? 'Gallery started!' : 'Gallery stopped';
+          } else {
+            updateGalleryButton(originalText);
+            document.getElementById('status').textContent = data.error || 'Failed';
+          }
+        })
+        .catch(err => {
+          btn.style.opacity = '1';
+          updateGalleryButton(originalText);
+          console.error('Failed to toggle gallery:', err);
+          document.getElementById('status').textContent = 'Connection error';
+        });
+    }
+
+    // Check gallery state on load and periodically
+    checkGalleryState();
+    setInterval(checkGalleryState, 5000);
+
+    // Screen power control
+    let screenOn = true;
+
+    function updatePowerButton() {
+      const btn = document.getElementById('powerBtn');
+      if (screenOn) {
+        btn.classList.remove('screen-off');
+        btn.title = 'Turn Screen Off';
+      } else {
+        btn.classList.add('screen-off');
+        btn.title = 'Turn Screen On';
+      }
+    }
+
+    function checkScreenStatus() {
+      fetch('/api/screen/status')
+        .then(r => r.json())
+        .then(data => {
+          screenOn = data.screen_on !== false;
+          updatePowerButton();
+        })
+        .catch(() => {});
+    }
+
+    let lastScreenToggle = 0;
+
+    function toggleScreen(event) {
+      // Prevent double-firing
+      const now = Date.now();
+      if (now - lastScreenToggle < 500) return;
+      lastScreenToggle = now;
+
+      if (event) event.preventDefault();
+
+      const btn = document.getElementById('powerBtn');
+      btn.style.opacity = '0.5';
+
+      if (navigator.vibrate) navigator.vibrate(50);
+
+      const endpoint = screenOn ? '/api/screen/off' : '/api/screen/on';
+
+      fetch(endpoint, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          btn.style.opacity = '1';
+          if (data.success) {
+            screenOn = !screenOn;
+            updatePowerButton();
+            document.getElementById('status').textContent = screenOn ? 'Screen turned on' : 'Screen turned off';
+          } else {
+            document.getElementById('status').textContent = data.error || 'Failed to toggle screen';
+          }
+        })
+        .catch(err => {
+          btn.style.opacity = '1';
+          console.error('Failed to toggle screen:', err);
+          document.getElementById('status').textContent = 'Connection error';
+        });
+    }
+
+    // Check screen status on load
+    checkScreenStatus();
+
+    // Hue sync toggle
+    let hueActive = false;
+    let lastHueToggle = 0;
+
+    function checkHueStatus() {
+      fetch('/api/hue/settings')
+        .then(r => r.json())
+        .then(data => {
+          if (data.connected) {
+            document.getElementById('hueBtn').style.display = 'flex';
+          }
+        })
+        .catch(() => {});
+    }
+
+    function toggleRemoteHue(event) {
+      const now = Date.now();
+      if (now - lastHueToggle < 500) return;
+      lastHueToggle = now;
+      if (event) event.preventDefault();
+      if (navigator.vibrate) navigator.vibrate(50);
+
+      hueActive = !hueActive;
+      const btn = document.getElementById('hueBtn');
+      btn.classList.toggle('hue-active', hueActive);
+
+      sendCommand(hueActive ? 'hue_on' : 'hue_off');
+      document.getElementById('status').textContent = hueActive ? 'Hue Sync ON' : 'Hue Sync OFF';
+    }
+
+    checkHueStatus();
+
+    let lastExitTime = 0;
+    function exitRemote(event) {
+      const now = Date.now();
+      if (now - lastExitTime < 500) return;
+      lastExitTime = now;
+      if (event) event.preventDefault();
+
+      window.location.href = '/';
+    }
+  </script>
+  <script>(function(){var t=0;function r(){var n=Date.now();if(n-t<30000)return;t=n;fetch('/api/screen/activity',{method:'POST'}).catch(function(){});}document.addEventListener('touchstart',r,{passive:true});})();</script>
+</body>
+
+</html>
