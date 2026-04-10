@@ -187,9 +187,19 @@ else
     xsetroot -cursor_name left_ptr 2>/dev/null
 fi
 
+# Wait for Flask API to be ready (up to 30 seconds)
+echo "[$(date)] Waiting for API..."
+for _wait in $(seq 1 30); do
+    if curl -s --max-time 2 http://localhost:5000/api/setup/status >/dev/null 2>&1; then
+        echo "[$(date)] API ready after ${_wait}s"
+        break
+    fi
+    sleep 1
+done
+
 # Check if gallery has art — if so, start in gallery mode
 START_PAGE="index.html"
-HAS_ART=$(curl -s http://localhost:5000/api/setup/status 2>/dev/null | grep -o '"has_art": *true')
+HAS_ART=$(curl -s --max-time 5 http://localhost:5000/api/setup/status 2>/dev/null | grep -o '"has_art": *true')
 if [ -n "$HAS_ART" ]; then
     START_PAGE="gallery.html"
     echo "[$(date)] Art found — starting in gallery mode"

@@ -1,0 +1,18 @@
+{
+  "version": "3.3.0",
+  "build_date": "2026-04-10",
+  "codename": "Preserve",
+  "changelog": [
+    "Auto-retry all download failures with backoff",
+    "Arweave ar:// URL support for downloads and metadata",
+    "Accurate IPFS pin counting (media files only)",
+    "WiFi scan shows all networks (sudo rescan fix)",
+    "Kiosk: View Art button auto-shows when art is downloaded",
+    "Kiosk: gallery redirects to add.html on computer when no art",
+    "Slideshow presets use server-side whitelist (no leaked files)",
+    "Collection status deduplication and validation",
+    "WiFi power save disabled by default (prevents CPU spikes)",
+    "Kiosk waits for API before checking art status on boot",
+    "Version-aware update system with GitHub integration"
+  ]
+}

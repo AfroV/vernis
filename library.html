@@ -1997,9 +1997,9 @@
             return;
           }
 
-          // Normal download progress — use actual files on disk for accurate bar
-          const filesOnDisk = data.actual_files || data.completed;
-          const pct = data.total > 0 ? Math.min(Math.round((filesOnDisk / data.total) * 100), 100) : 0;
+          // Normal download progress
+          const completed = data.completed || 0;
+          const pct = data.total > 0 ? Math.min(Math.round((completed / data.total) * 100), 100) : 0;
           progressBar.style.width = `${pct}%`;
 
           if (btn) {
@@ -2022,11 +2022,11 @@
           if (data.retry_pass > 0) {
             statusParts.push(`Retrying ${data.failed} timed out (${data.retry_timeout}s timeout)`);
           } else {
-            const remaining = Math.max(0, data.total - filesOnDisk);
+            const remaining = Math.max(0, data.total - completed);
             if (remaining > 0) {
-              statusParts.push(`${filesOnDisk}/${data.total} · ${remaining} remaining`);
+              statusParts.push(`${completed}/${data.total} · ${remaining} remaining`);
             } else {
-              statusParts.push(`${filesOnDisk}/${data.total} downloading & pinning`);
+              statusParts.push(`${completed}/${data.total} · verifying & pinning`);
             }
           }
           if (data.active && data.speed) {
@@ -2124,6 +2124,8 @@
         }
         // Show Gallery button as natural next step
         showGalleryButton(card);
+        // Mark card as just-completed so status refresh doesn't overwrite
+        card.dataset.justCompleted = 'true';
         // Refresh statuses to update pin state
         setTimeout(() => loadCollectionStatuses(), 2000);
       } else {
@@ -2450,8 +2452,9 @@
           // Store status for sorting
           collectionStatuses[filename] = data;
 
-          // Don't overwrite active download/preparing/pinning state
+          // Don't overwrite active download/preparing/pinning state or just-completed
           if (card.classList.contains('downloading') || card.classList.contains('pinning')) continue;
+          if (card.dataset.justCompleted === 'true') { delete card.dataset.justCompleted; continue; }
 
           // Update progress bar at bottom of card
           const progressContainer = card.querySelector('.card-progress-container');
@@ -2470,25 +2473,14 @@
 
               const tp = data.total_pinnable || 0;
               const displayTotal = data.total;
-              if (tp === 0) {
-                // No IPFS CIDs — all HTTP downloads
+
+              if (tp === 0 || data.percent_pinned === 100) {
+                // All done — no IPFS to pin, or all IPFS pinned
                 progressContainer.classList.add('complete');
                 if (progressText) {
-                  progressText.textContent = `✓ ${displayTotal} downloaded`;
-                  progressText.style.opacity = '1';
-                  progressText.style.color = '';
-                }
-                if (actionBtn) {
-                  actionBtn.textContent = 'Installed';
-                  actionBtn.classList.remove('installing');
-                  actionBtn.disabled = true;
-                  actionBtn.style.opacity = '0.6';
-                }
-              } else if (data.percent_pinned === 100) {
-                // Fully downloaded AND pinned - green
-                progressContainer.classList.add('complete');
-                if (progressText) {
-                  progressText.textContent = `✓ ${displayTotal} downloaded · ${tp} IPFS pinned`;
+                  let text = `✓ ${displayTotal} preserved`;
+                  if (tp > 0) text += ` · ${tp} IPFS pinned`;
+                  progressText.textContent = text;
                   progressText.style.opacity = '1';
                   progressText.style.color = '';
                 }
@@ -2499,7 +2491,7 @@
                   actionBtn.style.opacity = '0.6';
                 }
               } else {
-                // Downloaded but NOT fully pinned - orange
+                // Downloaded but IPFS not fully pinned
                 progressContainer.classList.add('unpinned');
                 if (progressText) {
                   progressText.textContent = `✓ ${displayTotal} downloaded · ${data.pinned}/${tp} IPFS pinned`;
@@ -2520,26 +2512,25 @@
               progressContainer.classList.add('partial');
               if (progressText) {
                 const missing = data.total - data.downloaded;
-                if (data.failed > 0 && data.failed_summary) {
-                  progressText.textContent = '';
-                  progressText.appendChild(document.createTextNode(`${data.downloaded} of ${data.total} downloaded \u00b7 `));
+                progressText.textContent = '';
+                progressText.appendChild(document.createTextNode(`${data.downloaded} of ${data.total} downloaded`));
+                if (data.failed > 0) {
+                  progressText.appendChild(document.createTextNode(' · '));
                   const failedLink = document.createElement('a');
                   failedLink.href = '#';
                   failedLink.style.cssText = 'color: var(--error-color, #ef4444); text-decoration: underline;';
                   failedLink.textContent = `${data.failed} failed`;
                   failedLink.onclick = (e) => { e.preventDefault(); showFailedFromApi(); };
                   progressText.appendChild(failedLink);
-                  progressText.appendChild(document.createTextNode(' \u00b7 '));
+                  progressText.appendChild(document.createTextNode(' · '));
                   const reportLink = document.createElement('a');
                   reportLink.href = '/api/download-report';
                   reportLink.download = '';
                   reportLink.style.cssText = 'color: var(--accent-primary, #c9a84c); text-decoration: underline;';
                   reportLink.textContent = 'Report';
                   progressText.appendChild(reportLink);
-                } else if (data.percent_downloaded >= 95) {
-                  progressText.textContent = `${data.downloaded} of ${data.total} downloaded · ${missing} timed out`;
-                } else {
-                  progressText.textContent = `${data.downloaded} of ${data.total} downloaded · ${missing} remaining`;
+                } else if (missing > 0) {
+                  progressText.appendChild(document.createTextNode(` · ${missing} remaining`));
                 }
                 progressText.style.opacity = '1';
                 progressText.style.color = '';

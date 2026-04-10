@@ -1713,13 +1713,7 @@ def _find_ipfs_path():
             return path
     if os.path.isdir("/root/.ipfs"):
         return "/root/.ipfs"
-    # Fallback: check common user home directories
-    import pwd
-    for u in pwd.getpwall():
-        p = os.path.join(u.pw_dir, ".ipfs")
-        if os.path.isdir(p):
-            return p
-    return os.path.expanduser("~/.ipfs")
+    return "/home/afrol/.ipfs"  # fallback
 
 IPFS_ENV = {**os.environ, "IPFS_PATH": _find_ipfs_path()}
 
@@ -2140,8 +2134,8 @@ def ipfs_garbage_collection():
 def wifi_scan():
     """Scan for available Wi-Fi networks using nmcli"""
     try:
-        # Trigger a fresh scan first (may take a moment)
-        subprocess.run(["nmcli", "device", "wifi", "rescan"],
+        # Trigger a fresh scan first (needs sudo for full channel scan)
+        subprocess.run(["sudo", "nmcli", "device", "wifi", "rescan"],
                       capture_output=True, timeout=10)
         import time
         time.sleep(2)  # Give scan time to complete
@@ -2615,6 +2609,9 @@ def csv_collection_status(filename):
                 url = row.get('image_url') or ''
                 if cid:
                     cid = cid.replace('ipfs://', '').strip()
+                # Convert ar:// to https gateway URL
+                if url and url.startswith('ar://'):
+                    url = 'https://arweave.net/' + url[5:]
                 # Only count entries with valid IPFS CIDs or HTTP URLs
                 valid_cid = cid and (cid.startswith('Qm') or cid.startswith('bafy'))
                 valid_url = url and (url.startswith('http://') or url.startswith('https://'))
@@ -2644,80 +2641,89 @@ def csv_collection_status(filename):
         # Check which files exist locally for THIS collection
         active_nft_dir = get_active_nft_dir()
         downloaded = 0
+        MEDIA_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.mp4', '.html', '.avif'}
 
-        # Method 1: Source map — count files tagged to this collection
+        # Source map — find media files tagged to this collection
         source_map_file = active_nft_dir / "nft-source-map.json"
-        source_map_count = 0
+        collection_media_files = []
+        source_map = {}
         if source_map_file.exists():
             try:
                 with open(source_map_file, 'r') as smf:
                     source_map = json.load(smf)
-                source_map_count = sum(1 for src in source_map.values() if src == filename)
+                for fname, src in source_map.items():
+                    if src == filename:
+                        ext = Path(fname).suffix.lower()
+                        if ext in MEDIA_EXTS:
+                            collection_media_files.append(fname)
             except:
                 pass
 
-        # Method 2: CID matching — count unique CIDs that have files on disk
+        # CID matching — count unique CIDs that have media files on disk
         downloaded_cids = 0
         if cids:
             local_stems = set()
             for f in active_nft_dir.iterdir():
-                stem = f.stem.split('_')[0] if '_' in f.stem else f.stem
-                local_stems.add(stem)
+                if f.suffix.lower() in MEDIA_EXTS:
+                    stem = f.stem.split('_')[0] if '_' in f.stem else f.stem
+                    local_stems.add(stem)
             unique_cids = set(cids)
             for cid in unique_cids:
-                # Match base CID (before /) for directory-wrapped CIDs
                 base_cid = cid.split('/')[0]
                 if base_cid in local_stems or cid in local_stems:
                     downloaded_cids += 1
 
-        # Use whichever method found more (source map is more accurate but may be incomplete)
-        downloaded = max(source_map_count, downloaded_cids)
-
-        # Check which are pinned to IPFS
-        pinned = 0
-        ipfs_available = False
-
-        # First check pin progress file (most accurate — tracks actual ipfs add results)
-        safe_fn = re.sub(r'[^\w\-\.]', '_', filename)
-        pin_progress_file = TMP_DIR / f"pin_progress_{safe_fn.replace('.', '_')}.json"
-        pin_progress_used = False
-        pin_complete = False  # True when all available files are pinned
+        # Also check download progress file for this CSV's completed count
+        progress_completed = 0
         try:
-            if pin_progress_file.exists():
-                with open(pin_progress_file) as ppf:
-                    pp = json.load(ppf)
-                if pp.get('status') == 'complete':
-                    pinned = (pp.get('pinned', 0) or 0) + (pp.get('skipped', 0) or 0)
-                    ipfs_available = True
-                    pin_progress_used = True
-                    # If no errors, all available files are pinned (not_found = never downloaded)
-                    if (pp.get('errors', 0) or 0) == 0:
-                        pin_complete = True
-        except Exception:
+            progress_file = active_nft_dir / "download_progress.json"
+            if not progress_file.exists() and active_nft_dir != NFT_DIR:
+                progress_file = NFT_DIR / "download_progress.json"
+            if progress_file.exists():
+                with open(progress_file, 'r') as pf:
+                    pdata = json.load(pf)
+                if pdata.get('source_csv', '') == filename:
+                    progress_completed = pdata.get('completed', 0)
+        except:
             pass
 
-        # Fallback: check CIDs against ipfs pin ls
-        if not pin_progress_used:
-            try:
-                result = subprocess.run(
-                    ["ipfs", "pin", "ls", "--type=recursive", "-q"],
-                    env=IPFS_ENV,
-                    capture_output=True, text=True, timeout=30
-                )
-                if result.returncode == 0:
-                    ipfs_available = True
-                    pinned_cids = set(result.stdout.strip().split('\n'))
-                    for cid in cids:
-                        base_cid = cid.split('/')[0]
-                        if base_cid in pinned_cids:
-                            pinned += 1
-            except:
-                pass
+        # Use best available count
+        downloaded = max(len(collection_media_files), downloaded_cids, progress_completed)
+
+        # Count IPFS files in this collection (media only, by CID-like filename)
+        # A file is "IPFS" if its stem starts with Qm or bafy
+        ipfs_media_in_collection = []
+        for fname in collection_media_files:
+            stem = Path(fname).stem
+            base = stem.split('_')[0] if '_' in stem else stem
+            if base.startswith('Qm') or base.startswith('bafy'):
+                ipfs_media_in_collection.append(base)
+        # Also add CIDs from CSV that we know about
+        for cid in cids:
+            base_cid = cid.split('/')[0]
+            if base_cid not in ipfs_media_in_collection:
+                ipfs_media_in_collection.append(base_cid)
+        total_pinnable = len(set(ipfs_media_in_collection))
+
+        # Check which are pinned
+        pinned = 0
+        ipfs_available = False
+        try:
+            result = subprocess.run(
+                ["ipfs", "pin", "ls", "--type=recursive", "-q"],
+                env=IPFS_ENV,
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode == 0:
+                ipfs_available = True
+                pinned_cids = set(result.stdout.strip().split('\n'))
+                for base_cid in set(ipfs_media_in_collection):
+                    if base_cid in pinned_cids:
+                        pinned += 1
+        except:
+            pass
 
         total = effective_total
-
-        # If IPFS isn't available, treat downloaded files as "pinned" for display purposes
-        # This matches the home page behavior
         effective_pinned = pinned if ipfs_available else downloaded
 
         # Check for last download failure info from progress file
@@ -2755,11 +2761,7 @@ def csv_collection_status(filename):
             except:
                 pass
 
-        # Pin denominator = IPFS CID count (only content-addressed files can be pinned)
-        total_pinnable = len(cids)
-
-        # If pin completed with no errors, all available IPFS files are pinned → 100%
-        pct_pinned = 100 if pin_complete else (
+        pct_pinned = (
             min(round((effective_pinned / total_pinnable) * 100), 100) if total_pinnable > 0 else (
                 100 if total_pinnable == 0 else 0
             )
@@ -3868,6 +3870,14 @@ def nft_visibility():
             hidden = list(set(hidden + filenames))
         elif action == 'show':
             hidden = [f for f in hidden if f not in filenames]
+        elif action == 'show_only':
+            # Whitelist mode: hide ALL files except the given list
+            visible_set = set(filenames)
+            active_nft_dir = get_active_nft_dir()
+            all_files = []
+            for ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'html', 'avif']:
+                all_files.extend(f.name for f in active_nft_dir.glob(f"*.{ext}"))
+            hidden = [f for f in all_files if f not in visible_set]
 
         # Save
         with open(HIDDEN_NFTS_FILE, 'w') as f:
@@ -4820,7 +4830,7 @@ def download_status():
         return jsonify({"error": str(e)}), 500
 
 OPENSEA_KEY_FILE = Path("/opt/vernis/opensea-key.json")
-_OPENSEA_DEFAULT_KEY = ""  # Set your OpenSea API key in /opt/vernis/opensea-key.json
+_OPENSEA_DEFAULT_KEY = "8639ad6fa0d04b2e8ddc5e8d522d8616"
 _WALLET_CHAINS = {"ethereum", "base", "optimism", "polygon", "arbitrum", "zora", "shape"}
 
 
@@ -6711,71 +6721,96 @@ def update_config():
 
 @app.route("/api/system/update", methods=["POST"])
 def system_update():
-    """Trigger system package update and reboot"""
+    """Trigger Vernis app update + system package update + reboot"""
     try:
-        # Simple system package update - apt upgrade and reboot
-        # Run in background so API can respond
-        update_script = """#!/bin/bash
-        apt-get update
-        DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
-        echo "Updates installed, rebooting..."
-        sleep 3
-        reboot
-        """
+        config = get_update_config()
+        repo = (config.get("github_repo") or "").strip() or "AfroV/vernis"
+        branch = (config.get("github_branch") or "").strip() or "main"
 
-        # Write and execute the script
-        script_path = Path("/tmp/system-update.sh")
-        script_path.write_text(update_script)
-        script_path.chmod(0o755)
+        script_path = SCRIPTS_DIR / "github-update.sh"
+        if not script_path.exists():
+            return jsonify({"error": "Update script not found"}), 500
 
-        subprocess.Popen(["sudo", "bash", str(script_path)])
+        # github-update.sh does: clone repo, copy files, apt upgrade, restart, reboot
+        subprocess.Popen(["sudo", "bash", str(script_path), repo, branch])
 
         return jsonify({
             "success": True,
-            "message": "System update started. Device will reboot when complete."
+            "message": "Update started. Device will reboot when complete."
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/system/check-updates", methods=["GET"])
 def check_updates():
-    """Check for available system package updates"""
+    """Check for available system package updates AND Vernis app updates"""
+    result = {
+        "system": {"updates_available": False, "update_count": 0, "message": "System packages up to date"},
+        "vernis": {"update_available": False, "current_version": "unknown", "remote_version": "unknown"}
+    }
+
+    # --- System package check ---
     try:
-        # First run apt update to refresh package list
-        subprocess.run(
-            ["sudo", "apt-get", "update"],
-            capture_output=True,
-            timeout=60
-        )
-
-        # Check for upgradable packages
-        result = subprocess.run(
+        subprocess.run(["sudo", "apt-get", "update"], capture_output=True, timeout=60)
+        apt_result = subprocess.run(
             ["apt", "list", "--upgradable"],
-            capture_output=True,
-            text=True,
-            timeout=30
+            capture_output=True, text=True, timeout=30
         )
-
-        lines = [l for l in result.stdout.split('\n') if l and not l.startswith('Listing')]
+        lines = [l for l in apt_result.stdout.split('\n') if l and not l.startswith('Listing')]
         update_count = len(lines)
-
         if update_count > 0:
             sample_packages = [l.split('/')[0] for l in lines[:5]]
-            return jsonify({
+            result["system"] = {
                 "updates_available": True,
                 "update_count": update_count,
                 "sample_packages": sample_packages,
                 "message": f"{update_count} system package(s) can be upgraded"
-            })
-        else:
-            return jsonify({
-                "updates_available": False,
-                "message": "System is up to date"
-            })
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Update check timed out"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            }
+    except Exception:
+        result["system"]["message"] = "Could not check system packages"
+
+    # --- Vernis version check ---
+    try:
+        local_version = "unknown"
+        version_file = Path("/var/www/vernis/version.json")
+        if version_file.exists():
+            with open(version_file, 'r') as f:
+                local_data = json.load(f)
+            local_version = local_data.get("version", "unknown")
+
+        config = get_update_config()
+        repo = (config.get("github_repo") or "").strip() or "AfroV/vernis"
+        branch = (config.get("github_branch") or "").strip() or "main"
+
+        raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/version.json"
+        resp = requests.get(raw_url, timeout=10)
+        resp.raise_for_status()
+        remote_data = resp.json()
+        remote_version = remote_data.get("version", "unknown")
+
+        def parse_ver(v):
+            try:
+                return tuple(int(x) for x in v.split('.'))
+            except Exception:
+                return (0,)
+
+        update_available = parse_ver(remote_version) > parse_ver(local_version)
+
+        result["vernis"] = {
+            "update_available": update_available,
+            "current_version": local_version,
+            "remote_version": remote_version,
+            "remote_codename": remote_data.get("codename", ""),
+            "remote_changelog": remote_data.get("changelog", []) if update_available else []
+        }
+    except Exception:
+        result["vernis"]["message"] = "Could not check for Vernis updates"
+
+    # Backward compatibility
+    result["updates_available"] = result["system"]["updates_available"] or result["vernis"]["update_available"]
+    result["message"] = "Updates available" if result["updates_available"] else "Everything is up to date"
+
+    return jsonify(result)
 
 # Remote control state file
 REMOTE_CONTROL_FILE = Path("/opt/vernis/remote-control.json")

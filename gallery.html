@@ -1404,21 +1404,14 @@
           updateSplashStatus(`Curating ${files.length} masterpiece${files.length !== 1 ? 's' : ''}...`);
           if (i === 0) next();
         } else {
-          updateSplashStatus('No artworks found in your collection.');
-          const splashContent = document.querySelector('.splash-content');
-
-          // Only add button if it doesn't already exist
-          if (!splashContent.querySelector('.btn')) {
-            const btn = document.createElement('button');
-            btn.className = 'btn btn-premium';
-            btn.style.marginTop = '40px';
-            btn.textContent = 'Go to Library to Add Art';
-            btn.onclick = () => window.location.href = 'library.html';
-            splashContent.appendChild(btn);
-
-            document.querySelector('.loading-bar').style.display = 'none';
-            document.getElementById('splash-status').style.animation = 'none';
+          const isKiosk = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+          if (!isKiosk) {
+            // Computer browser: redirect to add art page
+            window.location.replace('add.html');
+            return;
           }
+          // Pi kiosk: shouldn't reach here (View Art hidden), but just in case
+          window.location.replace('index.html');
         }
       }).catch(err => {
         updateSplashStatus('Connection error. Retrying...');

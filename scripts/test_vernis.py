@@ -6,7 +6,7 @@ Tests downloading, NFT management, carousels, and count consistency.
 
 Usage:
   python3 test_vernis.py                    # Test against localhost
-  python3 test_vernis.py --host 192.168.1.100    # Test against specific Pi
+  python3 test_vernis.py --host 10.2.0.9    # Test against specific Pi
   python3 test_vernis.py --verbose          # Show detailed output
   python3 test_vernis.py --quick            # Skip slow tests
 """

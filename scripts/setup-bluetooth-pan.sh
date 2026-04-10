@@ -35,7 +35,7 @@ echo "[2/5] Configuring Bluetooth adapter..."
 sudo systemctl enable bluetooth
 sudo systemctl start bluetooth
 
-# Set device name to match hostname (e.g. "vernis1")
+# Set device name to match hostname (e.g. "afrol")
 HOSTNAME=$(hostname)
 sudo bluetoothctl system-alias "Vernis-${HOSTNAME}" 2>/dev/null || true
 

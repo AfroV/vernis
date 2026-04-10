@@ -7136,30 +7136,82 @@
       }
 
       function checkForUpdates() {
-        const statusEl = document.getElementById("update-check-status");
+        var statusEl = document.getElementById("update-check-status");
         statusEl.textContent = "Checking for updates...";
         statusEl.style.display = "block";
         statusEl.style.background = "var(--bg-tertiary)";
+        statusEl.style.color = "var(--text-primary)";
         document.getElementById("update-info").style.display = "none";
 
         fetch("/api/system/check-updates")
-          .then((r) => r.json())
-          .then((data) => {
-            if (data.updates_available) {
-              statusEl.textContent = data.message;
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var hasUpdates = false;
+            var detailsEl = document.getElementById("update-details");
+            detailsEl.textContent = '';
+
+            // Vernis app update
+            if (data.vernis) {
+              var vDiv = document.createElement('div');
+              vDiv.style.marginBottom = '12px';
+              if (data.vernis.update_available) {
+                hasUpdates = true;
+                var title = document.createElement('strong');
+                title.textContent = 'Vernis v' + data.vernis.remote_version;
+                vDiv.appendChild(title);
+                if (data.vernis.remote_codename) {
+                  var cn = document.createElement('em');
+                  cn.textContent = ' "' + data.vernis.remote_codename + '"';
+                  vDiv.appendChild(cn);
+                }
+                vDiv.appendChild(document.createTextNode(' available (current: v' + data.vernis.current_version + ')'));
+                if (data.vernis.remote_changelog && data.vernis.remote_changelog.length > 0) {
+                  var ul = document.createElement('ul');
+                  ul.style.cssText = 'margin:8px 0 0 16px;padding:0;font-size:13px;color:var(--text-secondary);';
+                  data.vernis.remote_changelog.forEach(function(item) {
+                    var li = document.createElement('li');
+                    li.textContent = item;
+                    ul.appendChild(li);
+                  });
+                  vDiv.appendChild(ul);
+                }
+              } else {
+                vDiv.style.color = 'var(--text-secondary)';
+                vDiv.textContent = 'Vernis v' + data.vernis.current_version + ' — up to date';
+              }
+              detailsEl.appendChild(vDiv);
+            }
+
+            // System packages
+            var sDiv = document.createElement('div');
+            if (data.system && data.system.updates_available) {
+              hasUpdates = true;
+              var count = document.createElement('strong');
+              count.textContent = data.system.update_count;
+              sDiv.appendChild(count);
+              sDiv.appendChild(document.createTextNode(' system package(s) can be upgraded'));
+            } else {
+              sDiv.style.color = 'var(--text-secondary)';
+              sDiv.textContent = 'System packages up to date';
+            }
+            detailsEl.appendChild(sDiv);
+
+            document.getElementById("update-info").style.display = "block";
+            var installBtn = document.getElementById("update-info").querySelector("button");
+
+            if (hasUpdates) {
+              statusEl.textContent = "Updates available";
               statusEl.style.background = "#fff3cd";
               statusEl.style.color = "#856404";
-              document.getElementById(
-                "update-details",
-              ).innerHTML = `<strong>${data.update_count}</strong> package(s) can be upgraded`;
-              document.getElementById("update-info").style.display = "block";
+              if (installBtn) installBtn.style.display = "";
             } else {
-              statusEl.textContent = "Your system is up to date";
+              statusEl.textContent = "Everything is up to date";
               statusEl.style.background = "#d4edda";
               statusEl.style.color = "#155724";
+              if (installBtn) installBtn.style.display = "none";
             }
           })
-          .catch(() => {
+          .catch(function() {
             statusEl.textContent = "Failed to check for updates";
             statusEl.style.background = "#f8d7da";
             statusEl.style.color = "#721c24";
@@ -7167,7 +7219,7 @@
       }
 
       async function performUpdate() {
-        if (!(await vernisConfirm("Install updates and reboot? The device will restart when complete."))) return;
+        if (!(await vernisConfirm("Install all updates (Vernis + system) and reboot? The device will restart when complete."))) return;
         var statusEl = document.getElementById("update-check-status");
         statusEl.style.display = "block";
         statusEl.textContent = "Installing updates... Device will reboot when done.";

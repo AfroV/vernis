@@ -385,7 +385,17 @@ else
     echo "Playfair Display font already installed"
 fi
 
-# Step 10.7: Setup Bluetooth PAN (Personal Area Network)
+# Step 10.7: Disable WiFi power save (prevents kworker CPU spikes from brcmfmac interrupt storms)
+echo "Disabling WiFi power save..."
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/wifi-powersave.conf << 'WIFIEOF'
+[connection]
+wifi.powersave = 2
+WIFIEOF
+iw wlan0 set power_save off 2>/dev/null || true
+echo "WiFi power save disabled"
+
+# Step 10.8: Setup Bluetooth PAN (Personal Area Network)
 echo "Setting up Bluetooth PAN..."
 if [ -f /opt/vernis/scripts/setup-bluetooth-pan.sh ]; then
     bash /opt/vernis/scripts/setup-bluetooth-pan.sh

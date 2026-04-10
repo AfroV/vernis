@@ -753,6 +753,10 @@ class AdvancedNFTDownloader:
                         return True
                     print(f"  ⚠ IPFS image download failed, trying gateway URL...")
 
+                # Convert ar:// to https://arweave.net/ gateway URL
+                if image_field.startswith('ar://'):
+                    image_field = f"https://arweave.net/{image_field[5:]}"
+
                 # Try as HTTP URL
                 if image_field.startswith(('http://', 'https://')):
                     img_data = self._download_with_retry(image_field)
@@ -957,14 +961,19 @@ class AdvancedNFTDownloader:
                 # Get name for filename
                 name = (row.get("name") or row.get("Name") or "").strip()
 
+                # Convert ar:// to https gateway URL
+                if image_url and image_url.startswith('ar://'):
+                    image_url = f"https://arweave.net/{image_url[5:]}"
+
                 if cid and cid not in ["See CSV", "On-Chain", "Arweave", "--"]:
                     items.append(('ipfs', cid))
-                elif contract and token_id:
-                    # On-chain resolution first, image_url as fallback
-                    items.append(('nft', (contract, token_id, chain, image_url)))
                 elif image_url and image_url.startswith(('http://', 'https://')):
-                    # Direct HTTP URL only if no contract+token for on-chain lookup
-                    items.append(('url', (image_url, name or token_id or '')))
+                    if contract and token_id:
+                        # On-chain resolution first, HTTP image_url as fallback
+                        items.append(('nft', (contract, token_id, chain, image_url)))
+                    else:
+                        # Direct HTTP URL only
+                        items.append(('url', (image_url, name or token_id or '')))
 
         self.total_items = len(items)
         self._retry_pass = 0
@@ -1007,53 +1016,75 @@ class AdvancedNFTDownloader:
         # Run download pass
         self._run_download_pass(items)
 
-        # Auto-retry timeout failures with increasing timeout (up to 300s / 5 min)
-        max_timeout = 300
-        timeout_steps = [120, 180, 300]  # Progressive base timeouts for retries
+        # Auto-retry ALL failures with increasing timeout and backoff
+        # Pass 1-3: retry all failures (timeout, HTTP errors, connection errors)
+        # with progressive timeouts and 30s backoff between passes
+        max_retry_passes = 3
+        timeout_steps = [120, 180, 300]
 
-        for retry_timeout in timeout_steps:
+        for pass_idx in range(max_retry_passes):
             if self._check_stop_signal():
                 print("\n⏹ Download stopped by user")
                 break
 
-            # Check for timeout failures worth retrying
-            timeout_failures = {
-                k: v for k, v in self.failed.items()
-                if 'timeout' in str(v).lower() or 'timed out' in str(v).lower()
-            }
+            if not self.failed:
+                break  # No failures, done
 
-            if not timeout_failures:
-                break  # No timeout failures, done
+            retry_timeout = timeout_steps[min(pass_idx, len(timeout_steps) - 1)]
 
-            if self.download_timeout >= max_timeout:
-                break  # Already at max timeout
-
-            # Increase timeout and retry failed items
-            self._retry_pass += 1
-            self.download_timeout = retry_timeout
+            # Build retry list from ALL failed items
             retry_items = []
             for item_type, item_data in items:
                 if item_type == 'ipfs':
                     _, safe_id = self._parse_cid_path(item_data.strip())
-                    if safe_id in timeout_failures:
+                    if safe_id in self.failed:
                         retry_items.append((item_type, item_data))
                 elif item_type == 'url':
                     url_data = item_data[0] if isinstance(item_data, tuple) else item_data
                     safe_id = re.sub(r'[^\w\-.]', '_', str(url_data))[:80]
-                    if safe_id in timeout_failures:
+                    if safe_id in self.failed:
                         retry_items.append((item_type, item_data))
                 elif item_type == 'nft':
                     contract = item_data[0] if isinstance(item_data, tuple) else item_data
                     token = item_data[1] if isinstance(item_data, tuple) and len(item_data) > 1 else ''
                     safe_id = f"{contract}_{token}"
-                    if safe_id in timeout_failures:
+                    if safe_id in self.failed:
                         retry_items.append((item_type, item_data))
 
             if not retry_items:
                 break
 
-            print(f"\n🔄 Auto-retry pass {self._retry_pass}: {len(retry_items)} timeout failures with {retry_timeout}s timeout")
-            # Reset completed count for accurate progress during retry
+            # Backoff before retry — let IPFS gateways recover
+            backoff = 30 * (pass_idx + 1)
+            self._retry_pass += 1
+            self.download_timeout = retry_timeout
+            print(f"\n⏳ Waiting {backoff}s before retry pass {self._retry_pass}...")
+            self._save_progress()
+            for _ in range(backoff):
+                if self._check_stop_signal():
+                    break
+                time.sleep(1)
+
+            if self._check_stop_signal():
+                print("\n⏹ Download stopped by user")
+                break
+
+            # Clear failed entries for items we're retrying
+            with self.lock:
+                for item_type, item_data in retry_items:
+                    if item_type == 'ipfs':
+                        _, safe_id = self._parse_cid_path(item_data.strip())
+                    elif item_type == 'url':
+                        url_data = item_data[0] if isinstance(item_data, tuple) else item_data
+                        safe_id = re.sub(r'[^\w\-.]', '_', str(url_data))[:80]
+                    elif item_type == 'nft':
+                        contract = item_data[0] if isinstance(item_data, tuple) else item_data
+                        token = item_data[1] if isinstance(item_data, tuple) and len(item_data) > 1 else ''
+                        safe_id = f"{contract}_{token}"
+                    self.failed.pop(safe_id, None)
+                    self.downloaded.discard(safe_id)
+
+            print(f"🔄 Auto-retry pass {self._retry_pass}: {len(retry_items)} failed items with {retry_timeout}s timeout")
             self.completed_items = self.total_items - len(retry_items)
             self._save_progress()
             self._run_download_pass(retry_items)
@@ -1070,15 +1101,29 @@ class AdvancedNFTDownloader:
         print(f"Files saved to: {self.output_dir.resolve()}")
 
         # Write persistent source map (filename -> source CSV) for metadata scan
-        if self.source_csv and self.saved_files:
+        # Include ALL downloaded items (both newly saved and pre-existing on disk)
+        if self.source_csv and self.downloaded:
             map_file = self.output_dir / "nft-source-map.json"
             try:
                 source_map = json.loads(map_file.read_text()) if map_file.exists() else {}
+                mapped_count = 0
+                extensions = [".gif", ".png", ".jpg", ".mp4", ".glb", ".html", ".bin", ".webp", ".svg", ".avif"]
+                for identifier in self.downloaded:
+                    if identifier in self.failed:
+                        continue
+                    # Find actual filename on disk
+                    for ext in extensions:
+                        fpath = self.output_dir / f"{identifier}{ext}"
+                        if fpath.exists():
+                            source_map[fpath.name] = self.source_csv
+                            mapped_count += 1
+                            break
+                # Also include explicitly saved files (may have different names from identifier)
                 for fname in self.saved_files:
                     source_map[fname] = self.source_csv
                 with open(map_file, 'w') as f:
                     json.dump(source_map, f)
-                print(f"  📋 Source map: {len(self.saved_files)} files tagged as {self.source_csv}")
+                print(f"  📋 Source map: {mapped_count} files tagged as {self.source_csv}")
             except Exception as e:
                 print(f"  ⚠ Could not write source map: {e}")
 

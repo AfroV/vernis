@@ -425,11 +425,11 @@
       background: var(--accent-primary);
       box-shadow: 0 4px 20px rgba(var(--accent-primary-rgb, 99,102,241), 0.3);
     }
-    .kiosk-btn-connect {
-      background: var(--bg-tertiary); color: var(--text-primary);
-      border: 1px solid var(--border-light);
+    .kiosk-btn-connect, .kiosk-btn-wifi {
+      background: var(--accent-primary);
+      box-shadow: 0 4px 20px rgba(var(--accent-primary-rgb, 99,102,241), 0.3);
     }
-    .kiosk-btn-wifi {
+    .kiosk-btn-connect-dim, .kiosk-btn-wifi-dim {
       background: var(--bg-tertiary); color: var(--text-primary);
       border: 1px solid var(--border-light);
     }
@@ -619,7 +619,7 @@
     <div class="kiosk-diamond"></div>
     <div class="kiosk-line"></div>
     <div class="kiosk-buttons">
-      <a href="gallery.html" class="kiosk-btn kiosk-btn-gallery">
+      <a href="gallery.html" id="kiosk-view-art" class="kiosk-btn kiosk-btn-gallery">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
         View Art
       </a>
@@ -1475,14 +1475,24 @@
       // Cache for next page load
       localStorage.setItem('vernis-home-status', JSON.stringify({ statusText, dotColor, ip: d.ip_address, storage: d.storage }));
 
-      // Show setup card if not dismissed
-      if (!localStorage.getItem('vernis-setup-dismissed')) {
+      // Check art status — hide/show kiosk View Art button
+      function checkArtStatus() {
         fetch('/api/setup/status').then(function(r){return r.json();}).then(function(s){
-          _showSetupCard(s);
+          if (!localStorage.getItem('vernis-setup-dismissed')) _showSetupCard(s);
+          var viewArtBtn = document.getElementById('kiosk-view-art');
+          if (viewArtBtn) viewArtBtn.style.display = s.has_art ? '' : 'none';
+          // When View Art is visible, dim Connect/WiFi buttons; when hidden, make them primary
+          var connectBtn = document.querySelector('.kiosk-btn-connect');
+          var wifiBtn = document.querySelector('.kiosk-btn-wifi');
+          if (connectBtn) connectBtn.className = 'kiosk-btn ' + (s.has_art ? 'kiosk-btn-connect-dim' : 'kiosk-btn-connect');
+          if (wifiBtn) wifiBtn.className = 'kiosk-btn ' + (s.has_art ? 'kiosk-btn-wifi-dim' : 'kiosk-btn-wifi');
         }).catch(function(){
-          _showSetupCard({});
+          if (!localStorage.getItem('vernis-setup-dismissed')) _showSetupCard({});
         });
       }
+      checkArtStatus();
+      // Re-check every 15 seconds so View Art appears when download finishes
+      setInterval(checkArtStatus, 15000);
 
       // Show storage warning if needed
       if (d.storage_warning) {

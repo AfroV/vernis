@@ -1511,31 +1511,18 @@
 
       const dismissLoading = showLoading('Creating slideshow...');
       try {
-        // Hide everything not selected
-        const toHide = allNFTs.map(n => n.filename).filter(f => !selectedNFTs.has(f));
-        // Show everything selected (in case some were hidden)
         const toShow = Array.from(selectedNFTs);
 
-        // First show selected ones
-        if (toShow.length > 0) {
-          await fetch('/api/nft-visibility', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'show', filenames: toShow })
-          });
-        }
-
-        // Then hide the rest
-        if (toHide.length > 0) {
-          await fetch('/api/nft-visibility', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'hide', filenames: toHide })
-          });
-        }
+        // Backend scans ALL files on disk and hides everything not in list
+        await fetch('/api/nft-visibility', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'show_only', filenames: toShow })
+        });
 
         // Update local state
-        hiddenNFTs = new Set(toHide);
+        const allFiles = allNFTs.map(n => n.filename);
+        hiddenNFTs = new Set(allFiles.filter(f => !selectedNFTs.has(f)));
         selectedNFTs.clear();
         renderNFTs();
         dismissLoading();
@@ -1738,7 +1725,8 @@
 
     // Save current carousel
     async function saveCarouselPrompt() {
-      const name = await vernisPrompt('Name this slideshow');
+      const selected = document.getElementById('savedCarousels').value || '';
+      const name = await vernisPrompt('Name this slideshow', selected);
       if (!name || !name.trim()) return;
 
       try {
@@ -1779,29 +1767,33 @@
           return;
         }
 
-        // Compute hidden list: if carousel has visible list, hide everything else
+        // Use server-side whitelist: hide ALL files on disk except visible list
         const allFiles = allNFTs.map(n => n.filename);
         let hiddenNFTsList;
         if (data.visible && data.visible.length > 0) {
+          // Whitelist mode — backend scans all files on disk and hides everything not in list
+          await fetch('/api/nft-visibility', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'show_only', filenames: data.visible })
+          });
           const visibleSet = new Set(data.visible);
           hiddenNFTsList = allFiles.filter(f => !visibleSet.has(f));
         } else {
           hiddenNFTsList = data.hidden || [];
-        }
-
-        // First show all, then hide the computed list
-        await fetch('/api/nft-visibility', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'show', filenames: allFiles })
-        });
-
-        if (hiddenNFTsList.length > 0) {
+          // Legacy mode: show all then hide
           await fetch('/api/nft-visibility', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'hide', filenames: hiddenNFTsList })
+            body: JSON.stringify({ action: 'show', filenames: allFiles })
           });
+          if (hiddenNFTsList.length > 0) {
+            await fetch('/api/nft-visibility', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'hide', filenames: hiddenNFTsList })
+            });
+          }
         }
 
         hiddenNFTs = new Set(hiddenNFTsList);
