@@ -1,0 +1,100 @@
+# Vernis v3 — Caddy
+# Serves the admin web UI and proxies API/NFTs to Flask.
+# Admin web is LAN-only; IPFS swarm (port 4001) is handled by the IPFS
+# daemon directly — Caddy is NOT involved in IPFS traffic.
+
+{
+    auto_https off
+}
+
+# Reusable: gate everything by source IP. Only LAN clients get the real
+# response; everyone else gets a closed TCP connection (no banner, no
+# information disclosure to scanners).
+#
+# remote_ip ranges, in order:
+#   127.0.0.1      — the kiosk on this device
+#   ::1            — IPv6 loopback (also kiosk)
+#   10.0.0.0/8     — common consumer LAN range used across this fleet
+#   172.16.0.0/12  — RFC1918 private
+#   192.168.0.0/16 — RFC1918 private
+#   fc00::/7       — IPv6 ULA
+#   fe80::/10      — IPv6 link-local
+#
+# IMPORTANT: do NOT set trusted_proxies. Without it, Caddy ignores any
+# client-supplied X-Forwarded-For and overrides with the real client IP.
+(lan_only) {
+    @lan {
+        remote_ip 127.0.0.1 ::1 \
+                  10.0.0.0/8 \
+                  172.16.0.0/12 \
+                  192.168.0.0/16 \
+                  fc00::/7 \
+                  fe80::/10
+    }
+    handle @lan {
+        root * /var/www/vernis
+        file_server
+
+        reverse_proxy /api/* localhost:5000 {
+            header_up X-Forwarded-For {client_ip}
+            header_up X-Real-IP {client_ip}
+        }
+        reverse_proxy /nfts/* localhost:5000 {
+            header_up X-Forwarded-For {client_ip}
+            header_up X-Real-IP {client_ip}
+        }
+
+        encode gzip
+        header /assets/* Cache-Control "public, max-age=31536000"
+        header {
+            X-Content-Type-Options nosniff
+            X-Frame-Options DENY
+            Referrer-Policy no-referrer-when-downgrade
+        }
+    }
+    handle {
+        # Non-LAN source. Close the TCP connection without any response.
+        # Equivalent in effect to nginx's 444 — invisible to port scanners.
+        abort
+    }
+}
+
+# HTTP→HTTPS redirect, but only for LAN clients. Non-LAN gets nothing.
+# Used by the :80 block when the owner enables HTTPS via Settings → HTTPS.
+(lan_only_redir) {
+    @lan_r {
+        remote_ip 127.0.0.1 ::1 \
+                  10.0.0.0/8 \
+                  172.16.0.0/12 \
+                  192.168.0.0/16 \
+                  fc00::/7 \
+                  fe80::/10
+    }
+    handle @lan_r {
+        redir https://{host}{uri} permanent
+    }
+    handle {
+        abort
+    }
+}
+
+# Hostname-based access (vernis.local on the LAN)
+http://vernis.local {
+    import lan_only
+    log {
+        output file /var/log/caddy/vernis.log
+        format json
+    }
+}
+
+# Direct-IP access on port 80 (LAN clients without mDNS)
+http://:80 {
+    import lan_only
+}
+
+# Note: this Vernis fleet uses HTTP only on the LAN. Kiosk-launcher.sh
+# launches Chromium with http://localhost/; admins reach the device via
+# http://vernis.local or http://<lan-ip>/. No HTTPS block — the per-device
+# Caddy internal CA was unreliable under our config combination and gives
+# zero security benefit on the LAN-only admin path (ufw already gates :443
+# off from the internet).

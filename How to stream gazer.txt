@@ -1,0 +1,8 @@
+Flow
+User enables Remote Rendering on Pi (toggle)
+User starts Docker container: docker run --rm -e PI_IP=10.0.0.28 -p 8555:8555 vernis-renderer
+Container prints "Waiting for pairing..."
+User taps "Pair" in Settings
+Container registers, receives RTSP auth, prints "Registered"
+Streaming works with authenticated RTSP
+Docker image needs a rebuild when Docker Desktop is running: docker build -t vernis-renderer scripts/vernis-renderer/

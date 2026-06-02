@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Help & Guide • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <style>
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .main {
+      padding: 120px 50px 80px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 42px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 18px;
+      margin-bottom: 48px;
+    }
+
+    .device-toggle {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .device-btn {
+      padding: 12px 28px;
+      border-radius: 30px;
+      border: 2px solid var(--border-light);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .device-btn:hover {
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+    }
+
+    .device-btn.active {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: white;
+      border-color: transparent;
+    }
+
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section h2 {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section h2 .step-num {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .section h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 24px 0 12px;
+    }
+
+    .section p {
+      color: var(--text-secondary);
+      line-height: 1.8;
+      margin-bottom: 16px;
+    }
+
+    .steps {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 24px;
+      margin: 16px 0;
+    }
+
+    .steps ol {
+      margin: 0;
+      padding-left: 24px;
+    }
+
+    .steps li {
+      color: var(--text-secondary);
+      line-height: 2;
+      padding-left: 8px;
+    }
+
+    .steps li::marker {
+      color: var(--accent-primary);
+      font-weight: 700;
+    }
+
+    .code-block {
+      background: var(--bg-tertiary, #1a1a1a);
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 14px;
+      color: var(--accent-primary);
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+
+    .tip {
+      background: rgba(var(--accent-primary-rgb, 74, 222, 128), 0.1);
+      border-left: 4px solid var(--success, #22c55e);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .tip-title {
+      font-weight: 700;
+      color: var(--success, #22c55e);
+      margin-bottom: 8px;
+    }
+
+    .tip p {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+
+    .warning {
+      background: rgba(var(--warning-rgb, 234, 179, 8), 0.1);
+      border-left: 4px solid var(--warning, #eab308);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 16px 0;
+    }
+
+    .warning-title {
+      font-weight: 700;
+      color: var(--warning, #eab308);
+      margin-bottom: 8px;
+    }
+
+    .warning p {
+      margin: 0;
+      color: var(--text-secondary);
+    }
+
+    .led-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+
+    .led-table th,
+    .led-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .led-table th {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .led-table td {
+      color: var(--text-secondary);
+    }
+
+    .led-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+
+    .led-green { background: #22c55e; }
+    .led-blue { background: #3b82f6; }
+    .led-red { background: #ef4444; }
+    .led-green-blink { background: #22c55e; animation: blink 1s infinite; }
+    .led-blue-blink { background: #3b82f6; animation: blink 1s infinite; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    .quick-ref {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .quick-ref-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .quick-ref-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .quick-ref-card .url {
+      font-family: 'SF Mono', monospace;
+      font-size: 14px;
+      color: var(--accent-primary);
+      word-break: break-all;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border-light);
+      margin: 48px 0;
+    }
+
+    /* Petit-specific content hidden by default */
+    .petit-only {
+      display: none;
+    }
+
+    .standard-only {
+      display: block;
+    }
+
+    body.petit-mode .petit-only {
+      display: block;
+    }
+
+    body.petit-mode .standard-only {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .main {
+        padding: 100px 20px 60px;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      .section h2 {
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Custom scrollbar - only shown when enabled in settings (for touch screens) -->
+  <div id="custom-scrollbar" class="custom-scrollbar-track">
+    <div id="custom-scrollbar-thumb" class="custom-scrollbar-thumb"></div>
+  </div>
+  <script>
+    // Auto-enable thick scrollbar on localhost (Pi)
+    (function() {
+      const setting = localStorage.getItem('vernis-thick-scrollbar');
+      if (setting === null && window.location.hostname === 'localhost') {
+        localStorage.setItem('vernis-thick-scrollbar', 'true');
+      }
+      const enabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+      if (!enabled) {
+        document.getElementById('custom-scrollbar').style.display = 'none';
+      }
+    })();
+  </script>
+  <style>
+    .custom-scrollbar-track {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: var(--scrollbar-track, rgba(128,128,128,0.2));
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .custom-scrollbar-thumb {
+      position: absolute;
+      right: 4px;
+      width: 32px;
+      background: var(--scrollbar-thumb, var(--accent-primary, rgba(150,150,150,0.8)));
+      border-radius: 16px;
+      min-height: 80px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      pointer-events: auto;
+    }
+    .custom-scrollbar-thumb:hover,
+    .custom-scrollbar-thumb:active {
+      background: var(--scrollbar-thumb-hover, var(--accent-secondary, rgba(180,180,180,0.9)));
+    }
+  </style>
+  <script>
+    (function() {
+      const scrollbar = document.getElementById('custom-scrollbar');
+      const thumb = document.getElementById('custom-scrollbar-thumb');
+      if (!scrollbar || !thumb) return;
+
+      function updateThumb() {
+        const thickScrollbarEnabled = localStorage.getItem('vernis-thick-scrollbar') === 'true';
+        if (!thickScrollbarEnabled) { scrollbar.style.display = 'none'; return; }
+        const docHeight = document.documentElement.scrollHeight;
+        const winHeight = window.innerHeight;
+        if (docHeight <= winHeight) { scrollbar.style.display = 'none'; return; }
+        scrollbar.style.display = 'block';
+        const scrollable = docHeight - winHeight;
+        const thumbH = Math.max(80, (winHeight / docHeight) * winHeight);
+        const thumbY = (window.scrollY / scrollable) * (winHeight - thumbH);
+        thumb.style.height = thumbH + 'px';
+        thumb.style.top = Math.max(0, thumbY) + 'px';
+      }
+      window.addEventListener('scroll', updateThumb);
+      window.addEventListener('resize', updateThumb);
+      setTimeout(updateThumb, 100);
+
+      let dragging = false, dragStartY = 0, dragStartScroll = 0;
+      thumb.addEventListener('touchstart', function(e) {
+        dragging = true;
+        dragStartY = e.touches[0].clientY;
+        dragStartScroll = window.scrollY;
+        e.stopPropagation();
+      }, { passive: true });
+      thumb.addEventListener('mousedown', function(e) {
+        dragging = true;
+        dragStartY = e.clientY;
+        dragStartScroll = window.scrollY;
+      });
+      document.addEventListener('touchmove', function(e) {
+        if (dragging && e.touches.length === 1) {
+          const delta = e.touches[0].clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      }, { passive: true });
+      document.addEventListener('mousemove', function(e) {
+        if (dragging) {
+          const delta = e.clientY - dragStartY;
+          const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+          window.scrollTo(0, dragStartScroll + (delta / window.innerHeight) * scrollable);
+        }
+      });
+      document.addEventListener('touchend', function() { dragging = false; });
+      document.addEventListener('mouseup', function() { dragging = false; });
+    })();
+  </script>
+
+  <div class="header">
+    <div class="logo">Vernis</div>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="library.html">Library</a>
+      <a href="gallery.html">Gallery</a>
+      <a href="settings.html">Settings</a>
+      <a href="help.html" class="active">Help</a>
+    </nav>
+  </div>
+
+  <div class="main">
+    <h1>Getting Started</h1>
+    <p class="subtitle">Everything you need to know about your Vernis digital art frame</p>
+
+    <div class="device-toggle">
+      <button class="device-btn active" onclick="setMode('standard')">Vernis (with Display)</button>
+      <button class="device-btn" onclick="setMode('petit')">Vernis Petit (Headless)</button>
+    </div>
+
+    <!-- Section 1: First Setup -->
+    <div class="section">
+      <h2><span class="step-num">1</span> First Setup</h2>
+
+      <div class="standard-only">
+        <h3>Option A: Ethernet (Easiest)</h3>
+        <div class="steps">
+          <ol>
+            <li>Plug ethernet cable into your Vernis</li>
+            <li>Device automatically connects to your network</li>
+            <li>IP address appears on the Connect card on home screen</li>
+          </ol>
+        </div>
+
+        <h3>Option B: Bluetooth Setup (Recommended)</h3>
+        <div class="steps">
+          <ol>
+            <li>On first boot (or when no WiFi), device shows <span class="led-indicator led-blue-blink"></span> <strong>blinking blue LED</strong></li>
+            <li>On your phone, open <a href="setup.html" style="color: var(--accent-primary);">setup.html</a> in Chrome</li>
+            <li>Tap <strong>"Connect via Bluetooth"</strong> and select <strong>Vernis-Setup</strong></li>
+            <li>Enter your WiFi network name and password</li>
+            <li>Tap Connect — device joins your network automatically</li>
+            <li>Note the IP address shown on success</li>
+          </ol>
+        </div>
+        <div class="tip">
+          <div class="tip-title">Requires Chrome/Edge</div>
+          <p>Web Bluetooth only works in Chrome, Edge, or Opera browsers. Safari and Firefox are not supported.</p>
+        </div>
+
+        <h3>Option C: WiFi Hotspot (Fallback)</h3>
+        <div class="steps">
+          <ol>
+            <li>If Bluetooth fails, device creates hotspot: <strong>Vernis-Setup</strong></li>
+            <li>Connect your phone or laptop to this hotspot</li>
+            <li>Open browser and go to <code>http://192.168.4.1</code></li>
+            <li>Select your WiFi network and enter password</li>
+            <li>Device reboots and connects to your network</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="petit-only">
+        <h3>Bluetooth Setup (Recommended)</h3>
+        <div class="steps">
+          <ol>
+            <li>Power on your Vernis Petit</li>
+            <li>Wait for <span class="led-indicator led-blue-blink"></span> <strong>blinking blue LED</strong> (setup mode)</li>
+            <li>On your phone, open <a href="setup.html" style="color: var(--accent-primary);">vernis.io/setup</a> in Chrome</li>
+            <li>Tap <strong>"Connect via Bluetooth"</strong> and select <strong>Vernis-Setup</strong></li>
+            <li>Enter your WiFi network name and password</li>
+            <li>Note the IP address shown on success</li>
+            <li><span class="led-indicator led-green"></span> <strong>Solid green LED</strong> = connected successfully</li>
+          </ol>
+        </div>
+
+        <h3>Hotspot Fallback</h3>
+        <div class="steps">
+          <ol>
+            <li>If Bluetooth isn't available, connect to hotspot: <strong>Vernis-Setup</strong></li>
+            <li>Open browser and go to <code>http://192.168.4.1</code></li>
+            <li>Enter WiFi credentials and connect</li>
+          </ol>
+        </div>
+
+        <div class="tip">
+          <div class="tip-title">Tip</div>
+          <p>Write down the IP address! You'll need it to access your Petit from other devices.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Accessing the Interface (Petit only) -->
+    <div class="section petit-only">
+      <h2><span class="step-num">2</span> Accessing the Interface</h2>
+      <p>From any device on the same network, open your browser and go to:</p>
+      <div class="code-block">http://[device-ip]</div>
+      <p>Or use the friendly name:</p>
+      <div class="code-block">http://vernis.local</div>
+
+      <div class="quick-ref">
+        <div class="quick-ref-card">
+          <h4>Home</h4>
+          <div class="url">http://[ip]</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>Library</h4>
+          <div class="url">http://[ip]/library.html</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>Remote Control</h4>
+          <div class="url">http://[ip]/remote.html</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>Settings</h4>
+          <div class="url">http://[ip]/settings.html</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2/3: Getting Art -->
+    <div class="section">
+      <h2><span class="step-num standard-only">2</span><span class="petit-only">3</span> Getting Art Collections</h2>
+      <div class="steps">
+        <ol>
+          <li>Navigate to <strong>Library</strong> <span class="petit-only">(or go to <code>http://[ip]/library.html</code>)</span></li>
+          <li>Browse available collections from GitHub and local storage</li>
+          <li>Each card shows: Collection name, NFT count, and download progress</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Section 3/4: Downloading -->
+    <div class="section">
+      <h2><span class="step-num standard-only">3</span><span class="petit-only">4</span> Downloading & Pinning</h2>
+      <div class="steps">
+        <ol>
+          <li>Find a collection you want (e.g., "AfroViking&rsquo;s DOOM Party")</li>
+          <li>Tap <strong>"Install"</strong></li>
+          <li>Watch the progress bar fill blue as files download</li>
+          <li>Bar turns <strong style="color: #22c55e;">green</strong> when complete</li>
+        </ol>
+      </div>
+      <div class="tip">
+        <div class="tip-title">Auto-Pin Enabled</div>
+        <p>Files are automatically pinned to IPFS as they download, ensuring your art is preserved on the decentralized network.</p>
+      </div>
+    </div>
+
+    <!-- Section 4/5: Viewing Art -->
+    <div class="section">
+      <h2><span class="step-num standard-only">4</span><span class="petit-only">5</span> Viewing Your Art</h2>
+
+      <div class="standard-only">
+        <div class="steps">
+          <ol>
+            <li>Tap <strong>"Fullscreen Gallery"</strong> on home screen</li>
+            <li>Art cycles automatically in beautiful fullscreen mode</li>
+            <li>Tap screen to show controls: Next, Previous, Pause, Exit</li>
+          </ol>
+        </div>
+
+        <h3>Remote Control</h3>
+        <p>Control your gallery from your phone:</p>
+        <div class="code-block">http://[device-ip]/remote.html</div>
+      </div>
+
+      <div class="petit-only">
+        <h3>With HDMI Display</h3>
+        <div class="steps">
+          <ol>
+            <li>Connect HDMI cable to your TV or monitor</li>
+            <li>From your phone, open <code>http://[ip]/remote.html</code></li>
+            <li>Tap <strong>"Start Gallery"</strong></li>
+            <li>Control playback from your phone</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5/6: Backup -->
+    <div class="section">
+      <h2><span class="step-num standard-only">5</span><span class="petit-only">6</span> Backup to Computer</h2>
+      <div class="steps">
+        <ol>
+          <li>Go to <strong>Settings</strong> <span class="petit-only">(<code>http://[ip]/settings.html</code>)</span></li>
+          <li>Scroll to <strong>Storage & Backup</strong> section</li>
+          <li>Click <strong>"Download Backup"</strong></li>
+          <li>Save the ZIP file to your Mac or PC</li>
+        </ol>
+      </div>
+      <p>The backup contains all your pinned artwork files that can be restored later.</p>
+    </div>
+
+    <!-- Section 6/7: Network Change -->
+    <div class="section">
+      <h2><span class="step-num standard-only">6</span><span class="petit-only">7</span> Network Changed?</h2>
+      <p>If you change your WiFi network or move locations:</p>
+
+      <div class="standard-only">
+        <h3>Method 1: Bluetooth (Easiest)</h3>
+        <div class="steps">
+          <ol>
+            <li>When WiFi is unavailable, device automatically enters Bluetooth setup mode</li>
+            <li>Open <a href="setup.html" style="color: var(--accent-primary);">setup.html</a> in Chrome on your phone</li>
+            <li>Connect and enter new WiFi credentials</li>
+          </ol>
+        </div>
+
+        <h3>Method 2: With Ethernet</h3>
+        <div class="steps">
+          <ol>
+            <li>Connect ethernet cable temporarily</li>
+            <li>Go to <strong>Settings → WiFi</strong></li>
+            <li>Select new network and enter password</li>
+            <li>Remove ethernet cable</li>
+          </ol>
+        </div>
+
+        <h3>Method 3: Hotspot Fallback</h3>
+        <div class="steps">
+          <ol>
+            <li>After ~90 seconds without WiFi, device creates hotspot</li>
+            <li>Connect to <strong>Vernis-Setup</strong> hotspot</li>
+            <li>Configure new WiFi at <code>http://192.168.4.1</code></li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="petit-only">
+        <h3>Method 1: Bluetooth (Easiest)</h3>
+        <div class="steps">
+          <ol>
+            <li>When WiFi is unavailable, LED turns <span class="led-indicator led-blue-blink"></span> blinking blue</li>
+            <li>Open <a href="setup.html" style="color: var(--accent-primary);">vernis.io/setup</a> in Chrome</li>
+            <li>Connect via Bluetooth and enter new credentials</li>
+          </ol>
+        </div>
+
+        <h3>Method 2: Ethernet</h3>
+        <div class="steps">
+          <ol>
+            <li>Plug ethernet into Petit</li>
+            <li>Find new IP from your router's admin page</li>
+            <li>Access <code>http://[new-ip]/settings.html</code></li>
+            <li>Configure new WiFi</li>
+          </ol>
+        </div>
+
+        <h3>Method 3: Hotspot Fallback</h3>
+        <div class="steps">
+          <ol>
+            <li>After ~90 seconds, device creates <strong>Vernis-Setup</strong> hotspot</li>
+            <li>Connect and configure at <code>http://192.168.4.1</code></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 7/8: Updates -->
+    <div class="section">
+      <h2><span class="step-num standard-only">7</span><span class="petit-only">8</span> Software Updates</h2>
+      <div class="steps">
+        <ol>
+          <li>Go to <strong>Settings → System</strong></li>
+          <li>Click <strong>"Check for Updates"</strong></li>
+          <li>If available, click <strong>"Install Update"</strong></li>
+          <li>Device will reboot with the new version</li>
+        </ol>
+      </div>
+
+      <div class="petit-only">
+        <h3>Alternative: USB Update</h3>
+        <div class="steps">
+          <ol>
+            <li>Download update file from vernis.io</li>
+            <li>Copy to USB drive (FAT32 formatted)</li>
+            <li>Insert USB into Petit</li>
+            <li>Hold button for 3 seconds → Update installs automatically</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- LED Status Guide (Petit only) -->
+    <div class="section petit-only">
+      <h2>LED Status Guide</h2>
+      <table class="led-table">
+        <thead>
+          <tr>
+            <th>LED</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="led-indicator led-green-blink"></span> Blinking Green</td>
+            <td>Booting up</td>
+          </tr>
+          <tr>
+            <td><span class="led-indicator led-green"></span> Solid Green</td>
+            <td>Connected & Running</td>
+          </tr>
+          <tr>
+            <td><span class="led-indicator led-blue-blink"></span> Blinking Blue</td>
+            <td>Setup Mode (Hotspot active)</td>
+          </tr>
+          <tr>
+            <td><span class="led-indicator led-blue"></span> Solid Blue</td>
+            <td>Gallery Playing</td>
+          </tr>
+          <tr>
+            <td><span class="led-indicator led-red"></span> Red</td>
+            <td>Error (check logs in Settings)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Quick Reference -->
+    <div class="section">
+      <h2>Quick Reference</h2>
+      <div class="quick-ref">
+        <div class="quick-ref-card">
+          <h4>View Library</h4>
+          <div class="url standard-only">Tap "Library" on home screen</div>
+          <div class="url petit-only">http://[ip]/library.html</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>Start Gallery</h4>
+          <div class="url standard-only">Tap "Fullscreen Gallery"</div>
+          <div class="url petit-only">http://[ip]/remote.html → Start</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>Remote Control</h4>
+          <div class="url">http://[ip]/remote.html</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>Download Backup</h4>
+          <div class="url">Settings → Storage & Backup</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>Check Updates</h4>
+          <div class="url">Settings → System</div>
+        </div>
+        <div class="quick-ref-card">
+          <h4>WiFi Setup</h4>
+          <div class="url">Bluetooth: setup.html in Chrome</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section" style="text-align: center; padding: 40px 0;">
+      <p style="color: var(--text-muted); font-size: 14px;">
+        Need more help? Visit <a href="https://vernis.io/support" style="color: var(--accent-primary);">vernis.io/support</a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // Load theme
+    (function() {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      if (mode === 'auto') { var _h = new Date().getHours(); mode = (_h >= 20 || _h < 7) ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+      function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}_syncTheme();setInterval(_syncTheme,5000);
+    })();
+
+    // Device mode toggle
+    function setMode(mode) {
+      const buttons = document.querySelectorAll('.device-btn');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (mode === 'petit') {
+        document.body.classList.add('petit-mode');
+      } else {
+        document.body.classList.remove('petit-mode');
+      }
+
+      // Save preference
+      localStorage.setItem('vernis-help-mode', mode);
+    }
+
+    // Load saved preference
+    (function() {
+      const savedMode = localStorage.getItem('vernis-help-mode');
+      if (savedMode === 'petit') {
+        document.body.classList.add('petit-mode');
+        document.querySelectorAll('.device-btn')[1].classList.add('active');
+        document.querySelectorAll('.device-btn')[0].classList.remove('active');
+      }
+    })();
+  </script>
+  <script>(function(){var t=0;function r(){var n=Date.now();if(n-t<30000)return;t=n;fetch('/api/screen/activity',{method:'POST'}).catch(function(){});}document.addEventListener('touchstart',r,{passive:true});})();</script>
+</body>
+
+</html>

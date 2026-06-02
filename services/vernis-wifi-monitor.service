@@ -1,0 +1,15 @@
+[Unit]
+Description=Vernis WiFi Monitor
+After=network.target bluetooth.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/vernis/scripts/wifi_monitor.py
+Restart=always
+RestartSec=10
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

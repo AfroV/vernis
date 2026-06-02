@@ -1,0 +1,6 @@
+{
+  "mode": "production",
+  "dev_server": "",
+  "github_repo": "yourusername/vernis",
+  "github_branch": "main"
+}

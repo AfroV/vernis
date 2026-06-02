@@ -1,0 +1,12 @@
+[Unit]
+Description=Vernis Wi-Fi AP Monitor Timer
+After=network-online.target
+Wants=network-online.target
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=5min
+Unit=vernis-ap-check.service
+
+[Install]
+WantedBy=timers.target

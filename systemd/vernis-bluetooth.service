@@ -1,0 +1,14 @@
+[Unit]
+Description=Vernis BLE Wi-Fi Provisioning Service
+After=bluetooth.target network.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/vernis/scripts/wifi_provision.py
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

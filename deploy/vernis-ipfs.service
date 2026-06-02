@@ -1,0 +1,35 @@
+[Unit]
+Description=Vernis IPFS Daemon (Kubo)
+Documentation=https://docs.ipfs.tech/
+After=network.target
+
+[Service]
+Type=notify
+User=pi
+Group=pi
+Environment="IPFS_PATH=/opt/vernis/.ipfs"
+
+# Start IPFS daemon
+ExecStart=/usr/local/bin/ipfs daemon --enable-gc --migrate
+
+# Restart on failure
+Restart=on-failure
+RestartSec=10s
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vernis-ipfs
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!--
+Vernis v3 - Avahi/mDNS Service Advertisement
+Makes vernis.local accessible on the network
+Place in: /etc/avahi/services/vernis.service
+-->
+<service-group>
+  <name replace-wildcards="yes">Vernis on %h</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>80</port>
+    <txt-record>path=/</txt-record>
+  </service>
+  <service>
+    <type>_vernis._tcp</type>
+    <port>80</port>
+  </service>
+</service-group>

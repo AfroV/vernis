@@ -1,0 +1,13 @@
+[Unit]
+Description=Vernis Screen Watchdog
+After=graphical.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/opt/vernis/scripts/watchdog.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=graphical.target

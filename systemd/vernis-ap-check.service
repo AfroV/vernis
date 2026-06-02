@@ -1,0 +1,12 @@
+[Unit]
+Description=Vernis AP Fallback Check
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/vernis/scripts/enable-setup-ap.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

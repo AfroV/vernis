@@ -1,0 +1,66 @@
+Vernis Headless Installation
+=============================
+
+What you need:
+- Raspberry Pi 5 (or Pi 4)
+- MicroSD card (32GB+)
+- Computer with Raspberry Pi Imager
+- WiFi network name and password
+
+
+STEP 1: Flash Pi OS
+-------------------
+1. Open Raspberry Pi Imager
+2. Choose: Raspberry Pi OS (64-bit) - Desktop version
+3. Click the gear/settings icon and set:
+   - Hostname: pick a name (e.g. "vernis")
+   - Username and password: pick something you'll remember
+   - WiFi: enter your network name and password
+   - Enable SSH: yes (use password authentication)
+4. Flash to SD card and put it in the Pi
+5. Power on the Pi and wait 2-3 minutes for first boot
+
+
+STEP 2: Find the Pi on your network
+------------------------------------
+From your computer, try:
+
+   ping vernis.local
+
+If that doesn't work, check your router's device list
+for the Pi's IP address.
+
+
+STEP 3: Copy and install Vernis
+--------------------------------
+From your computer, run these 3 commands.
+Replace USERNAME and HOSTNAME with what you set in Step 1.
+
+   scp vernis-install.zip USERNAME@HOSTNAME.local:~/
+
+   ssh USERNAME@HOSTNAME.local
+
+   unzip vernis-install.zip && bash vernis-install/setup.sh
+
+That's it. The script installs everything and reboots.
+After reboot Vernis is running.
+
+
+STEP 4: Access Vernis
+---------------------
+Open a browser and go to:
+
+   http://HOSTNAME.local
+
+Or use the IP address from Step 2:
+
+   http://IP_ADDRESS
+
+
+Notes
+-----
+- The install takes 5-10 minutes (downloads packages)
+- Pi needs internet during install
+- After install, use Settings in Vernis to add art
+- If using a Waveshare 4" DPI display, the installer
+  sets it up automatically

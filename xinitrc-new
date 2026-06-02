@@ -1,0 +1,83 @@
+#!/bin/bash
+# Vernis v3 Kiosk Mode - X Session
+
+# Disable screen blanking
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide cursor
+unclutter -idle 0.1 -root &
+
+# Apply saved rotation if config exists
+ROTATION_FILE="/opt/vernis/rotation-config.json"
+if [ -f "$ROTATION_FILE" ]; then
+  ROTATION=$(grep -oP '"rotation":\s*\K[0-9]+' "$ROTATION_FILE" 2>/dev/null)
+  case "$ROTATION" in
+    90)  ROTATE_VAL="right" ;;
+    180) ROTATE_VAL="inverted" ;;
+    270) ROTATE_VAL="left" ;;
+    *)   ROTATE_VAL="normal" ;;
+  esac
+
+  # Apply rotation to displays
+  for OUTPUT in $(xrandr | grep ' connected' | cut -d' ' -f1); do
+    xrandr --output $OUTPUT --rotate $ROTATE_VAL 2>/dev/null
+  done
+
+  # Apply touch calibration
+  case "$ROTATION" in
+    90)  MATRIX="0 1 0 -1 0 1 0 0 1" ;;
+    180) MATRIX="-1 0 1 0 -1 1 0 0 1" ;;
+    270) MATRIX="0 -1 1 1 0 0 0 0 1" ;;
+    *)   MATRIX="1 0 0 0 1 0 0 0 1" ;;
+  esac
+
+  # Apply to known touch devices (handles spaces in device names)
+  xinput set-prop 'SYNAPTICS Synaptics Touch Digitizer V04' 'Coordinate Transformation Matrix' $MATRIX 2>/dev/null
+  xinput set-prop 'FT5406 memory based driver' 'Coordinate Transformation Matrix' $MATRIX 2>/dev/null
+
+  # Also try any device with touch/digitizer in name
+  xinput list --name-only 2>/dev/null | while IFS= read -r DEVICE; do
+    case "$DEVICE" in
+      *[Tt]ouch*|*SYNAPTICS*|*[Dd]igitizer*)
+        xinput set-prop "$DEVICE" 'Coordinate Transformation Matrix' $MATRIX 2>/dev/null
+        ;;
+    esac
+  done
+
+  sleep 1
+fi
+
+# Get URL from config file (allows remote control to change it)
+URL_FILE="/opt/vernis/kiosk-url.conf"
+if [ -f "$URL_FILE" ]; then
+  START_URL=$(cat "$URL_FILE")
+else
+  START_URL="http://localhost/"
+fi
+
+# Get current screen resolution (after rotation applied)
+SCREEN_RES=$(xrandr | grep '^Screen' | grep -oP 'current \K[0-9]+ x [0-9]+' | tr -d ' ' | tr 'x' ',')
+if [ -z "$SCREEN_RES" ]; then
+  SCREEN_RES="2560,1440"
+fi
+
+# Start chromium in kiosk mode with dynamic resolution and remote debugging
+exec chromium --kiosk \
+  --noerrdialogs \
+  --incognito \
+  --disable-infobars \
+  --start-fullscreen \
+  --start-maximized \
+  --window-size=$SCREEN_RES \
+  --window-position=0,0 \
+  --force-device-scale-factor=1 \
+  --disable-translate \
+  --disable-features=TranslateUI \
+  --check-for-update-interval=31536000 \
+  --disable-session-crashed-bubble \
+  --disable-component-update \
+  --remote-debugging-port=9222 \
+  --remote-allow-origins=* \
+  "$START_URL"

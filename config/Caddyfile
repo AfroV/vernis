@@ -1,0 +1,53 @@
+# Vernis v3 - Caddy Web Server Configuration
+# Serves web UI and proxies API requests to Flask
+
+{
+    auto_https off
+}
+
+# Main Vernis site
+http://vernis.local {
+    root * /var/www/vernis
+    file_server
+
+    # IMPORTANT: do NOT set trusted_proxies — Caddy is the only proxy, and
+    # clients are untrusted. With no trusted_proxies, Caddy ignores any
+    # client-supplied X-Forwarded-For and overrides it with the real IP.
+    reverse_proxy /api/* localhost:5000 {
+        header_up X-Forwarded-For {client_ip}
+        header_up X-Real-IP {client_ip}
+    }
+
+    reverse_proxy /nfts/* localhost:5000 {
+        header_up X-Forwarded-For {client_ip}
+        header_up X-Real-IP {client_ip}
+    }
+
+    encode gzip
+    header /assets/* Cache-Control "public, max-age=31536000"
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer-when-downgrade
+    }
+
+    log {
+        output file /var/log/caddy/vernis.log
+        format json
+    }
+}
+
+# Also respond to direct IP access
+http://:80 {
+    root * /var/www/vernis
+    file_server
+    reverse_proxy /api/* localhost:5000 {
+        header_up X-Forwarded-For {client_ip}
+        header_up X-Real-IP {client_ip}
+    }
+    reverse_proxy /nfts/* localhost:5000 {
+        header_up X-Forwarded-For {client_ip}
+        header_up X-Real-IP {client_ip}
+    }
+    encode gzip
+}

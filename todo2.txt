@@ -1,0 +1,14 @@
+
+3)Async art layers — build composite image from layer images based on metadata state. Cover images vs complete built image. Premium-feel presentation.
+  Also: custom remote menu/card to interact with layers and update art based on blockchain state. Research how async.art (now closed) worked.
+  Phase 2: Interactive layer remote/card to switch states + live canvas compositing + on-chain state sync.
+
+
+update insstructions file for user first use. 
+
+
+When pi is restricted. and person tries to access from pc to e.g add art and get blocked. then it expected to be promted with pin and short explanation and a back icon. 
+Pi 39 looks to have a green background on the main screen. non of the other devices has this. please inestigate. 
+
+
+Does the 3 levl of pin securety allso affect the bluethooth connection opion from the pi home screen? 

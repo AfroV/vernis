@@ -1,0 +1,18 @@
+[Unit]
+Description=Vernis BLE WiFi Provisioning
+After=bluetooth.target
+Requires=bluetooth.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/vernis/scripts/ble_provisioning.py
+Restart=on-failure
+RestartSec=5
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+# Give time for BLE stack to initialize
+ExecStartPre=/bin/sleep 2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,46 @@
+# Vernis v3 - Git Ignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# Downloads and uploads
+nfts/
+uploads/
+backup/
+
+# Local dev fixtures
+dev-csv-library/
+
+# Superpowers brainstorming session files
+.superpowers/
+
+# Logs
+*.log
+logs/
+
+# System
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Update packages
+*.tar.gz
+*.zip
+
+# Secrets (if you add any)
+.env
+secrets.env
+secrets.env.bak.*
+config.json
+secrets.json
+pi-devices.json
+handover/

@@ -1,0 +1,14 @@
+# Never commit anything that could leak owner state, even by accident.
+*.json
+*.log
+*.env
+.env
+CLAUDE.md
+pi-devices.json
+security-sessions.json
+security-failures.json
+security.json
+audit.log
+__pycache__/
+*.pyc
+.DS_Store

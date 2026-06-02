@@ -1,0 +1,496 @@
+/* Supersize Option A - 50% Bigger */
+/* Apply with: <link rel="stylesheet" href="vernis-supersize-a.css"> */
+
+/* Hamburger menu button */
+.menu-toggle {
+  width: 72px !important;
+  height: 72px !important;
+  gap: 8px !important;
+}
+
+.menu-toggle span {
+  width: 33px !important;
+  height: 5px !important;
+}
+
+/* X animation: translateY = height (5px) + gap (8px) = 13px */
+.menu-toggle.active span:nth-child(1) {
+  transform: translateY(13px) rotate(45deg) !important;
+}
+.menu-toggle.active span:nth-child(3) {
+  transform: translateY(-13px) rotate(-45deg) !important;
+}
+
+/* Mobile menu items */
+.mobile-menu a {
+  padding: 30px 36px !important;
+  font-size: 27px !important;
+  border-radius: 18px !important;
+}
+
+.mobile-menu a .menu-icon {
+  font-size: 36px !important;
+  width: 48px !important;
+}
+
+/* Logo */
+.header .logo {
+  font-size: 36px !important;
+}
+
+/* All buttons */
+.btn {
+  padding: 18px 36px !important;
+  font-size: 21px !important;
+  min-height: 60px !important;
+}
+
+.btn-sm {
+  padding: 12px 24px !important;
+  font-size: 18px !important;
+}
+
+/* Form inputs */
+input,
+select,
+textarea {
+  padding: 18px 21px !important;
+  font-size: 21px !important;
+  min-height: 60px !important;
+}
+
+/* Toggle switches */
+.toggle-slider {
+  width: 75px !important;
+  height: 42px !important;
+}
+
+.toggle-slider:before {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+input:checked+.toggle-slider:before {
+  transform: translateX(33px) !important;
+}
+
+/* Cards and sections */
+.card,
+.metadata-section,
+.info-box {
+  padding: 30px !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 18px !important;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 9px !important;
+}
+
+/* Gallery controls - already updated, but ensure consistency */
+.control-btn {
+  width: 105px !important;
+  height: 105px !important;
+}
+
+.control-btn svg {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+.control-btn.play-pause {
+  width: 135px !important;
+  height: 135px !important;
+}
+
+.control-btn.play-pause svg {
+  width: 60px !important;
+  height: 60px !important;
+}
+
+/* Touch-friendly tap areas */
+* {
+  touch-action: manipulation;
+}
+
+a,
+button,
+.btn,
+input,
+select,
+.toggle-switch {
+  min-height: 54px;
+  min-width: 54px;
+}
+
+/* Fullscreen and exit buttons */
+.fullscreen-btn {
+  width: 90px !important;
+  height: 90px !important;
+}
+
+.fullscreen-btn svg {
+  width: 42px !important;
+  height: 42px !important;
+}
+
+.gallery-power-btn {
+  width: 72px !important;
+  height: 72px !important;
+  font-size: 30px !important;
+}
+
+.exit-btn {
+  width: 60px !important;
+  height: 60px !important;
+  font-size: 30px !important;
+}
+
+/* Main content padding */
+.main {
+  padding: 130px 30px 80px !important;
+}
+
+/* Settings sidebar */
+.settings-sidebar {
+  width: 280px !important;
+}
+
+.sidebar-item {
+  padding: 16px 24px !important;
+  font-size: 17px !important;
+  min-height: 54px !important;
+}
+
+.sidebar-item svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+.sidebar-title {
+  font-size: 14px !important;
+  padding: 14px 24px !important;
+}
+
+.settings-content {
+  margin-left: 280px !important;
+}
+
+/* Theme options */
+.theme-option {
+  padding: 16px !important;
+  min-height: 60px !important;
+}
+
+.theme-option .theme-name {
+  font-size: 17px !important;
+}
+
+.theme-option .theme-preview {
+  height: 45px !important;
+}
+
+/* Settings cards */
+.settings-card {
+  padding: 24px !important;
+}
+
+.settings-card h3 {
+  font-size: 24px !important;
+  margin-bottom: 14px !important;
+}
+
+.settings-card p {
+  font-size: 17px !important;
+}
+
+/* Toggle groups in settings */
+.toggle-group {
+  padding: 16px 0 !important;
+}
+
+.toggle-label div:first-child {
+  font-size: 17px !important;
+}
+
+.toggle-label .small {
+  font-size: 14px !important;
+}
+
+/* Toggle switch (settings style) */
+.toggle {
+  width: 60px !important;
+  height: 33px !important;
+  border-radius: 17px !important;
+}
+
+.toggle::before {
+  width: 27px !important;
+  height: 27px !important;
+  top: 3px !important;
+  left: 3px !important;
+}
+
+.toggle.active::before {
+  left: 30px !important;
+}
+
+/* Labels */
+label,
+.form-group label {
+  font-size: 18px !important;
+  margin-bottom: 10px !important;
+}
+
+/* Range groups */
+.range-group label {
+  font-size: 17px !important;
+}
+
+.range-value {
+  font-size: 17px !important;
+}
+
+/* Section titles */
+h1 {
+  font-size: 48px !important;
+}
+
+h2 {
+  font-size: 36px !important;
+}
+
+h3 {
+  font-size: 27px !important;
+}
+
+h4 {
+  font-size: 21px !important;
+}
+
+p {
+  font-size: 18px !important;
+  line-height: 1.6 !important;
+}
+
+/* Mode buttons */
+.mode-btn {
+  padding: 14px 18px !important;
+  font-size: 16px !important;
+  min-height: 50px !important;
+}
+
+/* Scale buttons */
+.scale-btn {
+  padding: 16px 12px !important;
+  min-height: 60px !important;
+}
+
+.scale-btn .scale-name {
+  font-size: 16px !important;
+}
+
+.scale-btn .scale-desc {
+  font-size: 12px !important;
+}
+
+/* Gallery button positioning - prevent overlap */
+.fullscreen-btn {
+  top: auto !important;
+  right: auto !important;
+  bottom: 20px !important;
+  left: 20px !important;
+}
+
+.exit-btn {
+  top: 20px !important;
+  right: 20px !important;
+}
+
+/* Hue button - top left */
+.gallery-power-controls {
+  top: 20px !important;
+  left: 20px !important;
+  bottom: auto !important;
+  right: auto !important;
+}
+
+/* Gallery controls bar */
+.gallery-controls {
+  padding: 18px !important;
+  gap: 18px !important;
+}
+
+/* Keyboard button - ensure it's above other elements but below modals */
+.keyboard-btn {
+  z-index: 900 !important;
+}
+
+/* Small text overrides - bump to 16px/17px for readability */
+.small,
+small {
+  font-size: 16px !important;
+}
+
+/* Info text */
+.info-text,
+.help-text,
+.muted {
+  font-size: 16px !important;
+}
+
+/* Toggle labels - enhance readability */
+.toggle-label div:first-child {
+  font-size: 19px !important;
+  font-weight: 600 !important;
+}
+
+.toggle-label .small {
+  font-size: 16px !important;
+  opacity: 0.8 !important;
+}
+
+/* Button row spacing */
+.button-row {
+  gap: 14px !important;
+}
+
+/* Section headers */
+.section-header h1 {
+  font-size: 36px !important;
+}
+
+.section-header p {
+  font-size: 17px !important;
+}
+
+/* Subtitle */
+.subtitle {
+  font-size: 17px !important;
+}
+
+/* Nav tabs */
+.nav-tab,
+.filter-btn {
+  padding: 14px 20px !important;
+  font-size: 17px !important;
+  min-height: 50px !important;
+}
+
+/* Card action buttons */
+.card-action-btn {
+  width: 50px !important;
+  height: 50px !important;
+  font-size: 20px !important;
+}
+
+/* Mobile menu - settings extras */
+.mobile-menu .menu-extra {
+  padding: 20px !important;
+  font-size: 20px !important;
+}
+
+/* Virtual keyboard scaling */
+.vk-overlay {
+  padding: 15px !important;
+}
+.vk-container {
+  padding: 18px !important;
+  border-radius: 20px !important;
+}
+.vk-rows {
+  gap: 8px !important;
+}
+.vk-row {
+  gap: 7px !important;
+}
+.vk-key {
+  min-width: 54px !important;
+  height: 64px !important;
+  font-size: 27px !important;
+  border-radius: 10px !important;
+}
+.vk-key.vk-special {
+  min-width: 72px !important;
+  font-size: 20px !important;
+}
+.vk-close-top {
+  width: 44px !important;
+  height: 44px !important;
+  font-size: 28px !important;
+  top: -12px !important;
+  right: -12px !important;
+}
+.vk-fab {
+  width: 72px !important;
+  height: 72px !important;
+  font-size: 30px !important;
+  bottom: 140px !important;
+}
+
+/* CSS-class based small text overrides — catches what inline selectors miss */
+.radio-content small,
+.light-type,
+.stat-label,
+.checkmark,
+.scale-desc,
+.form-group label,
+.sidebar-title,
+.nft-collection,
+.file-meta,
+.storage-badge,
+.status-text,
+.color-hex,
+.progress-text,
+.chip {
+  font-size: 16px !important;
+}
+
+.sidebar-item,
+.settings-card p,
+.toggle-label div:first-child,
+.radio-content strong,
+.mode-btn,
+.range-group label,
+.range-value,
+.form-input,
+.quick-ref-card h4,
+.code-example {
+  font-size: 17px !important;
+}
+
+/* Scale up small inline font-sizes for readability */
+[style*="font-size: 9px"],
+[style*="font-size: 10px"],
+[style*="font-size: 11px"],
+[style*="font-size: 12px"],
+[style*="font-size: 13px"],
+[style*="font-size: 14px"],
+[style*="font-size:9px"],
+[style*="font-size:10px"],
+[style*="font-size:11px"],
+[style*="font-size:12px"],
+[style*="font-size:13px"],
+[style*="font-size:14px"] {
+  font-size: 17px !important;
+}
+
+/* Responsive - hide sidebar on small screens */
+@media (max-width: 900px) {
+  .settings-sidebar {
+    width: 100% !important;
+    position: fixed !important;
+    left: -100% !important;
+  }
+
+  .settings-sidebar.open {
+    left: 0 !important;
+  }
+
+  .settings-content {
+    margin-left: 0 !important;
+  }
+}

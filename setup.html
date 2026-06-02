@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Vernis Setup</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --card-bg: #141414;
+      --border: #2a2a2a;
+      --text: #ffffff;
+      --text-secondary: #888;
+      --accent: #6366f1;
+      --accent-secondary: #a855f7;
+      --success: #22c55e;
+      --error: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .logo h1 {
+      font-size: 42px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo p {
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 20px;
+    }
+
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    .step h2 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .step p {
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 2px solid var(--border);
+      color: var(--text);
+      margin-top: 12px;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      box-shadow: none;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .form-group input::placeholder {
+      color: #555;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: var(--bg);
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .status-dot.connected {
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.error {
+      background: var(--error);
+    }
+
+    .status-dot.connecting {
+      background: var(--warning);
+      animation: pulse 0.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .device-info {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .device-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      background: var(--success);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .success-icon svg {
+      width: 40px;
+      height: 40px;
+      stroke: white;
+      stroke-width: 3;
+    }
+
+    .ip-address {
+      font-size: 28px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 8px;
+      font-family: monospace;
+    }
+
+    .ip-hint {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .error-message {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .progress-steps {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .progress-step {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .progress-step.active {
+      background: var(--accent);
+    }
+
+    .progress-step.completed {
+      background: var(--success);
+    }
+
+    .not-supported {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .not-supported h2 {
+      margin-bottom: 16px;
+    }
+
+    .not-supported p {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .browser-list {
+      text-align: left;
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 10px;
+    }
+
+    .browser-list li {
+      padding: 8px 0;
+      color: var(--text-secondary);
+    }
+  </style>
+  <script src="vernis-keyboard.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="logo">
+      <h1>Vernis</h1>
+      <p>WiFi Setup</p>
+    </div>
+
+    <!-- Browser Not Supported -->
+    <div id="not-supported" class="card not-supported" style="display: none;">
+      <h2>Browser Not Supported</h2>
+      <p>Web Bluetooth requires a supported browser. Please use one of the following:</p>
+      <ul class="browser-list">
+        <li><strong>Chrome</strong> on Android, Windows, Mac, or Linux</li>
+        <li><strong>Edge</strong> on Windows, Mac, or Linux</li>
+        <li><strong>Opera</strong> on Android or desktop</li>
+        <li><strong>Samsung Internet</strong> on Android</li>
+      </ul>
+      <p style="margin-top: 16px; font-size: 13px;">Note: Safari and Firefox do not support Web Bluetooth.</p>
+    </div>
+
+    <!-- Step 1: Connect -->
+    <div id="step1" class="card step active">
+      <div class="progress-steps">
+        <div class="progress-step active"></div>
+        <div class="progress-step"></div>
+        <div class="progress-step"></div>
+      </div>
+      <h2>Connect to Vernis</h2>
+      <p>Make sure your Vernis device is powered on and showing the blue LED (setup mode).</p>
+      <button class="btn" id="connect-btn" onclick="connectBluetooth()">
+        Connect via Bluetooth
+      </button>
+    </div>
+
+    <!-- Step 2: Enter WiFi -->
+    <div id="step2" class="card step">
+      <div class="progress-steps">
+        <div class="progress-step completed"></div>
+        <div class="progress-step active"></div>
+        <div class="progress-step"></div>
+      </div>
+
+      <div class="status-indicator">
+        <div class="status-dot connected"></div>
+        <div class="device-info">
+          Connected to <span class="device-name" id="device-name">Vernis</span>
+        </div>
+      </div>
+
+      <h2>Enter WiFi Details</h2>
+      <p>Enter your WiFi network credentials to connect Vernis to your network.</p>
+
+      <div id="wifi-error" class="error-message" style="display: none;"></div>
+
+      <div class="form-group">
+        <label for="ssid">WiFi Network Name (SSID)</label>
+        <input type="text" id="ssid" placeholder="Enter your WiFi name" autocomplete="off" autocorrect="off" autocapitalize="off">
+      </div>
+
+      <div class="form-group">
+        <label for="password">WiFi Password</label>
+        <input type="text" id="password" placeholder="Tap to enter password" readonly style="cursor:pointer;">
+      </div>
+
+      <button class="btn" id="save-btn" onclick="saveWiFi()">
+        Connect to WiFi
+      </button>
+
+      <button class="btn btn-secondary" onclick="disconnect()">
+        Disconnect
+      </button>
+    </div>
+
+    <!-- Step 3: Connecting -->
+    <div id="step3" class="card step">
+      <div class="progress-steps">
+        <div class="progress-step completed"></div>
+        <div class="progress-step completed"></div>
+        <div class="progress-step active"></div>
+      </div>
+
+      <h2 style="text-align: center;">Connecting...</h2>
+      <p style="text-align: center;">Vernis is connecting to your WiFi network. This may take a moment.</p>
+
+      <div class="spinner"></div>
+
+      <div class="status-indicator">
+        <div class="status-dot connecting" id="connecting-dot"></div>
+        <div class="device-info" id="connecting-status">Sending credentials...</div>
+      </div>
+    </div>
+
+    <!-- Step 4: Success -->
+    <div id="step4" class="card step">
+      <div class="progress-steps">
+        <div class="progress-step completed"></div>
+        <div class="progress-step completed"></div>
+        <div class="progress-step completed"></div>
+      </div>
+
+      <div class="success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+
+      <h2 style="text-align: center;">Connected!</h2>
+      <p style="text-align: center;">Vernis is now connected to your WiFi network.</p>
+
+      <p class="ip-hint">Access your gallery at:</p>
+      <div class="ip-address" id="ip-address">192.168.1.x</div>
+
+      <a class="btn" id="open-vernis" href="#" target="_blank">
+        Open Vernis
+      </a>
+    </div>
+
+    <!-- Error State -->
+    <div id="step-error" class="card step">
+      <div class="progress-steps">
+        <div class="progress-step completed"></div>
+        <div class="progress-step completed"></div>
+        <div class="progress-step error" style="background: var(--error);"></div>
+      </div>
+
+      <h2 style="text-align: center; color: var(--error);">Connection Failed</h2>
+      <p style="text-align: center;" id="error-text">Unable to connect to WiFi. Please check your credentials and try again.</p>
+
+      <button class="btn" onclick="showStep(2)">
+        Try Again
+      </button>
+
+      <button class="btn btn-secondary" onclick="disconnect()">
+        Start Over
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // BLE UUIDs - must match the Python server
+    const SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+    const SSID_UUID = '12345678-1234-5678-1234-56789abcdef1';
+    const PASS_UUID = '12345678-1234-5678-1234-56789abcdef2';
+    const STATUS_UUID = '12345678-1234-5678-1234-56789abcdef3';
+    const INFO_UUID = '12345678-1234-5678-1234-56789abcdef4';
+
+    let device = null;
+    let server = null;
+    let service = null;
+    let ssidChar = null;
+    let passChar = null;
+    let statusChar = null;
+    let statusPollInterval = null;
+
+    // Check for Web Bluetooth support
+    function checkBluetooth() {
+      if (!navigator.bluetooth) {
+        document.getElementById('step1').style.display = 'none';
+        document.getElementById('not-supported').style.display = 'block';
+        return false;
+      }
+      return true;
+    }
+
+    function showStep(num) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById('step' + num).classList.add('active');
+    }
+
+    async function connectBluetooth() {
+      if (!checkBluetooth()) return;
+
+      const btn = document.getElementById('connect-btn');
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+
+      try {
+        // Request the device
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'Vernis-Setup' }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        btn.textContent = 'Connecting...';
+
+        // Connect to GATT server
+        server = await device.gatt.connect();
+
+        // Get the service
+        service = await server.getPrimaryService(SERVICE_UUID);
+
+        // Get characteristics
+        ssidChar = await service.getCharacteristic(SSID_UUID);
+        passChar = await service.getCharacteristic(PASS_UUID);
+        statusChar = await service.getCharacteristic(STATUS_UUID);
+
+        // Get device info
+        try {
+          const infoChar = await service.getCharacteristic(INFO_UUID);
+          const infoValue = await infoChar.readValue();
+          const info = JSON.parse(new TextDecoder().decode(infoValue));
+          document.getElementById('device-name').textContent = info.name || 'Vernis';
+        } catch (e) {
+          console.log('Could not read device info');
+        }
+
+        // Handle disconnection
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+
+        // Move to step 2
+        showStep(2);
+
+      } catch (error) {
+        console.error('Connection error:', error);
+        btn.disabled = false;
+        btn.textContent = 'Connect via Bluetooth';
+
+        if (error.name !== 'NotFoundError') {
+          alert('Connection failed: ' + error.message);
+        }
+      }
+    }
+
+    async function saveWiFi() {
+      const ssid = document.getElementById('ssid').value.trim();
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('wifi-error');
+
+      // Validate
+      if (!ssid) {
+        errorEl.textContent = 'Please enter a WiFi network name';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      errorEl.style.display = 'none';
+
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      try {
+        // Send SSID
+        await ssidChar.writeValue(new TextEncoder().encode(ssid));
+
+        // Send password (this triggers the connection attempt)
+        await passChar.writeValue(new TextEncoder().encode(password));
+
+        // Move to connecting step
+        showStep(3);
+
+        // Start polling status
+        startStatusPolling();
+
+      } catch (error) {
+        console.error('Write error:', error);
+        btn.disabled = false;
+        btn.textContent = 'Connect to WiFi';
+        errorEl.textContent = 'Failed to send credentials: ' + error.message;
+        errorEl.style.display = 'block';
+      }
+    }
+
+    function startStatusPolling() {
+      const statusEl = document.getElementById('connecting-status');
+      const dotEl = document.getElementById('connecting-dot');
+
+      statusPollInterval = setInterval(async () => {
+        try {
+          const value = await statusChar.readValue();
+          const status = new TextDecoder().decode(value);
+          console.log('Status:', status);
+
+          if (status.startsWith('connected:')) {
+            // Success!
+            clearInterval(statusPollInterval);
+            const ip = status.split(':')[1];
+            document.getElementById('ip-address').textContent = ip;
+            document.getElementById('open-vernis').href = 'http://' + ip;
+            showStep(4);
+
+          } else if (status === 'connecting') {
+            statusEl.textContent = 'Connecting to WiFi...';
+
+          } else if (status.startsWith('error:')) {
+            // Error
+            clearInterval(statusPollInterval);
+            const errorMsg = status.split(':')[1];
+            document.getElementById('error-text').textContent = getErrorMessage(errorMsg);
+            showStep('error');
+          }
+        } catch (e) {
+          console.error('Status read error:', e);
+          // Device may have disconnected
+          if (!device || !device.gatt.connected) {
+            clearInterval(statusPollInterval);
+            document.getElementById('error-text').textContent = 'Lost connection to device. The device may have connected to WiFi successfully. Check for a "Vernis" device on your network.';
+            showStep('error');
+          }
+        }
+      }, 1000);
+    }
+
+    function getErrorMessage(code) {
+      const messages = {
+        'no_ssid': 'No WiFi network name provided.',
+        'connection_failed': 'Could not connect to the WiFi network. Please check your password and try again.',
+        'timeout': 'Connection timed out. Please try again.'
+      };
+      return messages[code] || 'Connection failed: ' + code;
+    }
+
+    function onDisconnected() {
+      console.log('Device disconnected');
+      if (statusPollInterval) {
+        clearInterval(statusPollInterval);
+      }
+    }
+
+    function disconnect() {
+      if (statusPollInterval) {
+        clearInterval(statusPollInterval);
+      }
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+      }
+      device = null;
+      server = null;
+      service = null;
+
+      // Reset form
+      document.getElementById('ssid').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('wifi-error').style.display = 'none';
+      document.getElementById('connect-btn').disabled = false;
+      document.getElementById('connect-btn').textContent = 'Connect via Bluetooth';
+      document.getElementById('save-btn').disabled = false;
+      document.getElementById('save-btn').textContent = 'Connect to WiFi';
+
+      showStep(1);
+    }
+
+    // Check on load
+    checkBluetooth();
+
+    // Password field → fullscreen keyboard page
+    (function() {
+      var pw = document.getElementById('password');
+      if (!pw) return;
+      // Clean up sessionStorage (keyboard page handles connect directly now)
+      sessionStorage.removeItem('vernis-wifi-password');
+      function _goKb(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var s = document.getElementById('ssid').value.trim();
+        if (!s) { var err = document.getElementById('wifi-error'); err.textContent = 'Enter network name first'; err.style.display = 'block'; return; }
+        window.location.href = 'wifi-keyboard.html?ssid=' + encodeURIComponent(s) + '&return=setup.html';
+      }
+      pw.addEventListener('touchstart', _goKb, { passive: false });
+      pw.addEventListener('click', _goKb);
+    })();
+
+    // Override saveWiFi to use real password from keyboard
+    var _origSaveWiFi = saveWiFi;
+    saveWiFi = async function() {
+      var pw = document.getElementById('password');
+      if (pw.dataset.realValue) {
+        pw.type = 'password';
+        pw.value = pw.dataset.realValue;
+      }
+      return _origSaveWiFi();
+    };
+  </script>
+</body>
+
+</html>

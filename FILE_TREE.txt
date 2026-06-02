@@ -1,0 +1,228 @@
+Vernis v3 - Complete File Tree
+═══════════════════════════════════════════════════════════════════════════
+
+vernis v3/
+│
+├── 📄 README.md                         Main documentation & feature guide
+├── 🏗️  ARCHITECTURE.txt                  Visual system diagrams
+├── 🔧 DEPLOYMENT_GUIDE.md               Production deployment guide
+├── 📝 DEV-WORKFLOW.md                   Development workflow & local testing
+├── 📋 FEATURE_SUMMARY.txt               Complete feature & capability summary
+├── 🖥️  KIOSK_MODE.md                     Kiosk mode setup & troubleshooting
+├── 🔄 UPDATE-SYSTEM.md                  OTA update system details
+├── 🌲 FILE_TREE.txt                     This file
+│
+├── 📜 LICENSE                           MIT License
+├── 🚫 .gitignore                        Git ignore rules
+├── 📊 sample-nfts.csv                   Example CSV format
+│
+├── ⚙️  install.sh                        Main installer (v1 & v2)
+│
+├── 🌐 Web UI (4 files)
+│   ├── index.html                       Home page (3 action cards)
+│   ├── add.html                         Upload CSV / add single NFT
+│   ├── gallery.html                     Fullscreen rotating gallery
+│   └── settings.html                    Wi-Fi, storage, system controls
+│
+├── 🐍 backend/
+│   └── app.py                           Flask API server (8 endpoints)
+│
+├── 📜 scripts/
+│   ├── nft_downloader.py               Download NFT media (Python)
+│   ├── enable-setup-ap.sh              Create Wi-Fi fallback AP
+│   ├── disable-setup-ap.sh             Stop fallback AP
+│   ├── updater.sh                      OTA update handler
+│   ├── watchdog.sh                     Screen freeze monitor (kiosk)
+│   └── create-update-package.sh        Build OTA update bundles
+│
+├── ⚙️  config/
+│   ├── Caddyfile                       Web server configuration
+│   ├── avahi-vernis.service            mDNS advertisement
+│   ├── autostart                       Kiosk mode boot config
+│   └── kiosk-setup.sh                  Kiosk installation script
+│
+└── 🔄 systemd/
+    ├── vernis-api.service              Flask backend service
+    ├── vernis-watchdog.service         Screen monitor (v2)
+    ├── vernis-ap-check.timer           Fallback AP scheduler
+    └── vernis-ap-check.service         Fallback AP checker
+
+═══════════════════════════════════════════════════════════════════════════
+File Statistics
+═══════════════════════════════════════════════════════════════════════════
+
+Total Files: 29
+
+By Category:
+  • Documentation:     7 files (README, guides, architecture)
+  • Web UI:            4 files (HTML pages)
+  • Backend:           1 file  (Python Flask API)
+  • Scripts:           6 files (Shell scripts + Python downloader)
+  • Configuration:     4 files (Caddy, Avahi, kiosk)
+  • Systemd:           4 files (Services + timer)
+  • Installer:         1 file  (Main install.sh)
+  • Metadata:          2 files (LICENSE, .gitignore, sample CSV)
+
+By Purpose:
+  • Core System:      15 files (API, web UI, scripts, configs)
+  • Documentation:     7 files (guides, architecture, structure)
+  • Deployment:        5 files (installer, systemd, configs)
+  • Examples/Meta:     2 files (sample CSV, LICENSE, gitignore)
+
+═══════════════════════════════════════════════════════════════════════════
+What Goes Where (Deployment Paths)
+═══════════════════════════════════════════════════════════════════════════
+
+Development (this folder):
+  vernis v3/
+  ├── All source files shown above
+
+Production (after install.sh):
+
+  /var/www/vernis/
+  ├── index.html
+  ├── add.html
+  ├── gallery.html
+  └── settings.html
+
+  /opt/vernis/
+  ├── app.py
+  ├── nfts/                              (created at runtime)
+  ├── uploads/                           (created at runtime)
+  ├── backup/                            (created at runtime)
+  └── scripts/
+      ├── nft_downloader.py
+      ├── enable-setup-ap.sh
+      ├── disable-setup-ap.sh
+      ├── updater.sh
+      ├── watchdog.sh
+      └── create-update-package.sh
+
+  /etc/caddy/
+  └── Caddyfile
+
+  /etc/avahi/services/
+  └── vernis.service
+
+  /etc/systemd/system/
+  ├── vernis-api.service
+  ├── vernis-watchdog.service
+  ├── vernis-ap-check.timer
+  └── vernis-ap-check.service
+
+  /home/pi/.config/lxsession/LXDE-pi/
+  └── autostart                          (v2 kiosk only)
+
+═══════════════════════════════════════════════════════════════════════════
+File Sizes (Approximate)
+═══════════════════════════════════════════════════════════════════════════
+
+Web UI:
+  index.html          ~8 KB
+  add.html            ~3 KB
+  gallery.html        ~1 KB
+  settings.html       ~3 KB
+  ─────────────────────────
+  Total:             ~15 KB
+
+Backend:
+  app.py              ~7 KB
+
+Scripts:
+  nft_downloader.py   ~4 KB
+  enable-setup-ap.sh  ~2 KB
+  disable-setup-ap.sh ~0.5 KB
+  updater.sh          ~2 KB
+  watchdog.sh         ~0.5 KB
+  create-update-package.sh ~1 KB
+  ─────────────────────────
+  Total:             ~10 KB
+
+Configuration:
+  Caddyfile           ~1 KB
+  avahi-vernis.service ~0.5 KB
+  autostart           ~0.5 KB
+  kiosk-setup.sh      ~1 KB
+  ─────────────────────────
+  Total:              ~3 KB
+
+Systemd:
+  4 service files     ~2 KB
+
+Documentation:
+  README.md           ~20 KB
+  QUICK_START.md      ~12 KB
+  DEPLOYMENT.md       ~25 KB
+  PROJECT_STRUCTURE.md ~28 KB
+  ARCHITECTURE.txt    ~10 KB
+  BUILD_COMPLETE.md   ~15 KB
+  FILE_TREE.txt       ~5 KB
+  ─────────────────────────
+  Total:             ~115 KB
+
+Other:
+  install.sh          ~5 KB
+  LICENSE             ~1 KB
+  .gitignore          ~0.5 KB
+  sample-nfts.csv     ~0.2 KB
+
+═══════════════════════════════════════════════════════════════════════════
+Grand Total: ~158 KB (source code + documentation)
+═══════════════════════════════════════════════════════════════════════════
+
+Note: This is just the codebase. At runtime:
+  • NFT media files: 100 KB - 50 MB each
+  • System logs: ~10 MB/month
+  • OTA backups: Full copy of /opt/vernis per update
+
+═══════════════════════════════════════════════════════════════════════════
+Dependencies (Not Included - Installed via install.sh)
+═══════════════════════════════════════════════════════════════════════════
+
+System Packages:
+  • python3, python3-pip, python3-venv
+  • caddy (web server)
+  • hostapd, dnsmasq (Wi-Fi AP)
+  • avahi-daemon (mDNS)
+  • network-manager (Wi-Fi)
+  • chromium-browser, unclutter (kiosk mode, v2 only)
+  • lightdm (display manager, v2 only)
+
+Python Packages:
+  • flask (web framework)
+  • requests (HTTP client)
+  • pillow (image processing, optional)
+
+═══════════════════════════════════════════════════════════════════════════
+Quick Navigation
+═══════════════════════════════════════════════════════════════════════════
+
+Want to...                          Read this file
+─────────────────────────────────────────────────────────────────────────
+Get started quickly                 README.md
+Understand features                 FEATURE_SUMMARY.txt
+Deploy to production                DEPLOYMENT_GUIDE.md
+Understand architecture             ARCHITECTURE.txt
+Kiosk mode help                     KIOSK_MODE.md
+Development workflow                DEV-WORKFLOW.md
+Navigate files                      FILE_TREE.txt (this file)
+
+Modify...                           Edit this file
+─────────────────────────────────────────────────────────────────────────
+Home page                           index.html
+Upload interface                    add.html
+Gallery display                     gallery.html
+Settings page                       settings.html
+API endpoints                       backend/app.py
+NFT download logic                  scripts/nft_downloader.py
+Wi-Fi fallback                      scripts/enable-setup-ap.sh
+OTA updates                         scripts/updater.sh
+Web server config                   config/Caddyfile
+Kiosk boot                          config/autostart
+
+═══════════════════════════════════════════════════════════════════════════
+
+Ready to deploy? → DEPLOYMENT_GUIDE.md
+Need help? → README.md (Troubleshooting section)
+
+═══════════════════════════════════════════════════════════════════════════

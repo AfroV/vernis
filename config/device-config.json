@@ -1,0 +1,49 @@
+{
+  "device_mode": "full",
+  "device_name": "Vernis Gallery",
+  "version": "3.0",
+  "preload": {
+    "enabled": false,
+    "csv_collections": [],
+    "ipfs_files": []
+  },
+  "library": {
+    "enabled": true,
+    "collections_dir": "/opt/vernis/csv-library"
+  },
+  "display": {
+    "image_duration": 15,
+    "video_duration": 30,
+    "shuffle": true,
+    "frosted_background": false,
+    "force_horizontal": false
+  },
+  "network": {
+    "hostname": "vernis",
+    "ap_mode": false,
+    "wifi_country": "US"
+  },
+  "ipfs": {
+    "storage_max": "2000GB",
+    "gateway_port": 8080,
+    "api_port": 5001,
+    "gc_period": "6h",
+    "reprovider_interval": "12h",
+    "bloom_filter_size": 1048576
+  },
+  "download": {
+    "default_workers": 3,
+    "max_workers": 8,
+    "timeout": 60,
+    "retry_attempts": 5
+  },
+  "security": {
+    "firewall_enabled": true,
+    "allowed_ports": [
+      22,
+      5000,
+      5353
+    ],
+    "ssh_enabled": true
+  }
+}

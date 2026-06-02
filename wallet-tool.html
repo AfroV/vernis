@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Wallet Import - Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <script src="vernis-notifications.js"></script>
+  <style>
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .main {
+      padding: 130px 50px 80px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 40px;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .card h3 {
+      font-family: var(--font-display);
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .card p {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
+    input[type=text],
+    input[type=password] {
+      width: 100%;
+      padding: 14px 18px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      color: var(--text-primary);
+      font-size: 15px;
+      font-family: var(--font-body);
+      margin-bottom: 12px;
+      box-sizing: border-box;
+      transition: all 0.3s;
+    }
+
+    input[type=text]:focus,
+    input[type=password]:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-alpha);
+    }
+
+    input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn {
+      min-height: 44px;
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-light);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-primary);
+      background: var(--bg-secondary);
+    }
+
+    .btn-small {
+      padding: 8px 16px;
+      font-size: 13px;
+      min-height: 36px;
+    }
+
+    /* Chain selector */
+    .chain-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .chain-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg-tertiary);
+      border: 1.5px solid var(--border-light);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      font-size: 14px;
+      color: var(--text-secondary);
+      min-height: 44px;
+    }
+
+    .chain-chip:hover {
+      border-color: var(--accent-primary);
+    }
+
+    .chain-chip.active {
+      border-color: var(--accent-primary);
+      background: var(--accent-primary-alpha);
+      color: var(--text-primary);
+    }
+
+    .chain-chip input[type=checkbox] {
+      display: none;
+    }
+
+    .chain-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* API key section */
+    .api-key-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .exhausted-banner {
+      background: #b71c1c;
+      color: #fff;
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-size: 14px;
+      line-height: 1.4;
+      display: none;
+    }
+    .exhausted-banner.active { display: block; }
+    .exhausted-banner a { color: #ffeb3b; text-decoration: underline; }
+
+    .api-key-row input {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    .api-key-status {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    .api-key-status.configured {
+      color: #4ade80;
+    }
+
+    /* Collection filter */
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-row select {
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: var(--font-body);
+      min-height: 44px;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .filter-row select:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+    }
+
+    /* Stats */
+    .stats {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .nft-card {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border-light);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.3s;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .nft-card:hover {
+      border-color: var(--accent-primary);
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px var(--shadow-md);
+    }
+
+    .nft-card.selected {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 16px var(--accent-primary-alpha);
+    }
+
+    .nft-img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      background: var(--bg-tertiary);
+    }
+
+    .nft-info {
+      padding: 10px;
+    }
+
+    .nft-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nft-collection {
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nft-chain-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 10px;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      backdrop-filter: blur(8px);
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    .checkbox-overlay {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 26px;
+      height: 26px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--border-light);
+      transition: all 0.2s;
+      backdrop-filter: blur(8px);
+    }
+
+    .nft-card.selected .checkbox-overlay {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+    }
+
+    .checkbox-overlay::after {
+      content: '\2713';
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .nft-card.selected .checkbox-overlay::after {
+      opacity: 1;
+    }
+
+    /* Actions bar */
+    .actions {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .actions input[type=text] {
+      flex: 1;
+      min-width: 180px;
+      margin-bottom: 0;
+      padding: 12px 14px;
+    }
+
+    /* Loading */
+    .loading-area {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-secondary);
+      font-size: 16px;
+    }
+
+    .loading-area .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border-light);
+      border-top-color: var(--accent-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state h3 {
+      font-family: var(--font-display);
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+
+    /* Resolved address */
+    .resolved-addr {
+      font-size: 12px;
+      color: var(--accent-primary);
+      margin-bottom: 12px;
+      font-family: monospace;
+      word-break: break-all;
+    }
+
+    @media (max-width: 768px) {
+      .main { padding: 110px 20px 60px; }
+      h1 { font-size: 36px; }
+      .subtitle { font-size: 14px; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+      .stats { flex-direction: column; gap: 10px; }
+      .actions { padding: 16px; }
+      .chain-row { gap: 8px; }
+      .chain-chip { padding: 8px 12px; font-size: 13px; }
+    }
+  </style>
+  <script>
+    (function () {
+      var theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme + '-' + mode);
+      function _syncTheme(){fetch('/api/theme').then(function(r){return r.json()}).then(function(t){if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(function(){});}_syncTheme();setInterval(_syncTheme,5000);
+    })();
+  </script>
+</head>
+
+<body>
+
+  <div class="header">
+    <a href="index.html" class="logo">Vernis</a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="add.html">Add Art</a>
+      <a href="library.html">Library</a>
+      <a href="manage.html">Manage Art</a>
+      <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
+    <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
+    <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
+    <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
+    <a href="settings.html" class="settings-parent"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</a>
+    <div class="settings-submenu">
+    <div class="menu-divider">Appearance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-theme'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Theme</div>
+    <div class="menu-divider">Display</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-display'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Display Settings</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-screensaver'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Screen Timeout</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-orientation'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Orientation</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-hue'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg> Ambient Light</div>
+    <div class="menu-divider">Content</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-github'" style="display:none;"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg> GitHub Library</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ethereum'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 3 12 12 22 21 12"/></svg> Ethereum RPC</div>
+    <div class="menu-divider">Storage</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ipfs'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> IPFS Pinning</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-external'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M6 14h2"/></svg> External Drive</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-backup'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Backup</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-storage'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Storage Health</div>
+    <div class="menu-divider">System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-wifi'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> Wi-Fi</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-performance'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Performance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-system'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.6 15H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 6.6V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-about'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About</div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const toggle = document.querySelector('.menu-toggle');
+      menu.classList.toggle('active');
+      toggle.classList.toggle('active');
+      var isOpen = menu.classList.contains('active');
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      var mc = document.querySelector('.main');
+      if (mc) mc.style.visibility = isOpen ? 'hidden' : '';
+      if (!isOpen) void document.body.offsetHeight;
+    }
+    // Show Atelier if unlocked
+    (function(){
+      if(localStorage.getItem('vernis-moon-unlocked')==='true'||localStorage.getItem('vernis-pixels-unlocked')==='true'||localStorage.getItem('vernis-doom-unlocked')==='true'||localStorage.getItem('vernis-burner-unlocked')==='true'){
+        document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }
+      fetch('/api/easter-egg').then(function(r){return r.json();}).then(function(s){
+        if(s.moon||s.pixels||s.doom||s.burner) document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }).catch(function(){});
+    })();
+  </script>
+
+  <div class="main">
+    <h1>Wallet Import</h1>
+    <div class="subtitle">Fetch NFTs from any wallet and add them to your collection</div>
+
+    <!-- Wallet + Chain Selection -->
+    <div class="card">
+      <h3>Wallet Address</h3>
+      <input type="text" id="wallet-address" placeholder="0x... or ENS name (e.g. vitalik.eth)">
+      <div id="resolved-addr" class="resolved-addr" style="display:none;"></div>
+
+      <div style="margin-bottom:16px;">
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:10px; font-weight:500;">Chains to search:</div>
+        <div class="chain-row" id="chain-selector">
+          <label class="chain-chip active" data-chain="ethereum">
+            <input type="checkbox" checked>
+            <span class="chain-dot" style="background:#627eea;"></span>
+            Ethereum
+          </label>
+          <label class="chain-chip" data-chain="base">
+            <input type="checkbox">
+            <span class="chain-dot" style="background:#0052ff;"></span>
+            Base
+          </label>
+          <label class="chain-chip" data-chain="optimism">
+            <input type="checkbox">
+            <span class="chain-dot" style="background:#ff0420;"></span>
+            Optimism
+          </label>
+          <label class="chain-chip" data-chain="polygon">
+            <input type="checkbox">
+            <span class="chain-dot" style="background:#8247e5;"></span>
+            Polygon
+          </label>
+          <label class="chain-chip" data-chain="arbitrum">
+            <input type="checkbox">
+            <span class="chain-dot" style="background:#28a0f0;"></span>
+            Arbitrum
+          </label>
+          <label class="chain-chip" data-chain="zora">
+            <input type="checkbox">
+            <span class="chain-dot" style="background:#5b5bd6;"></span>
+            Zora
+          </label>
+        </div>
+      </div>
+
+      <button class="btn" onclick="fetchWallet()" id="fetch-btn" style="width:100%;">Fetch NFTs</button>
+    </div>
+
+    <!-- API Key Setup (collapsible) -->
+    <div id="exhausted-banner" class="exhausted-banner">
+      <strong>OpenSea API limit reached.</strong> Auto-updates are paused until you provide a new key.
+      Get a free key at <a href="https://opensea.io/settings/developer" target="_blank">opensea.io/settings/developer</a>
+      and paste it in the box below.
+    </div>
+
+    <div class="card" id="api-key-card">
+      <div onclick="var b=document.getElementById('api-key-body');var c=document.getElementById('api-key-chevron');if(b.style.display==='none'){b.style.display='block';c.style.transform='rotate(180deg)';}else{b.style.display='none';c.style.transform='';}" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+        <h3 style="margin:0;">OpenSea API Key</h3>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="api-key-status" id="api-key-status" style="margin:0; font-size:12px;">Checking...</div>
+          <svg id="api-key-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform 0.2s; opacity:0.5;"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div id="api-key-body" style="display:none; margin-top:16px;">
+        <div class="api-key-row">
+          <input type="password" id="api-key-input" placeholder="Paste your OpenSea API key">
+          <button class="btn btn-small" onclick="saveApiKey()">Save</button>
+          <button class="btn btn-secondary btn-small" onclick="clearApiKey()">Clear</button>
+        </div>
+        <p style="margin-top:10px;">Get a free key at <strong>opensea.io/account/settings/developer</strong>. Required for fetching NFTs.</p>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div id="stats" class="stats" style="display:none;">
+      <div class="stat-card">
+        <div class="stat-value" id="total-nfts">0</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="selected-nfts">0</div>
+        <div class="stat-label">Selected</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="collections-count">0</div>
+        <div class="stat-label">Collections</div>
+      </div>
+    </div>
+
+    <!-- Filter + Actions -->
+    <div id="actions" class="actions" style="display:none;">
+      <button class="btn btn-small" onclick="selectAll()">Select All</button>
+      <button class="btn btn-secondary btn-small" onclick="selectNone()">Deselect</button>
+      <select id="filter-collection" onchange="applyFilter()" style="flex:1; min-width:160px; padding:10px 14px; background:var(--bg-tertiary); border:1px solid var(--border-light); border-radius:10px; color:var(--text-primary); font-size:13px; font-family:var(--font-body);">
+        <option value="">All Collections</option>
+      </select>
+      <input type="text" id="csv-name" placeholder="collection-name">
+      <button class="btn btn-small" onclick="uploadToDevice()">Add to Library</button>
+      <button class="btn btn-secondary btn-small" onclick="downloadCSV()">Download CSV</button>
+    </div>
+
+    <!-- Success state - shown after adding to library -->
+    <div id="success-panel" class="card" style="display:none; text-align:center; border-color:var(--accent-primary);">
+      <div style="font-size:48px; margin-bottom:12px; opacity:0.9;">&#10003;</div>
+      <h3 style="margin-bottom:8px;" id="success-title">Added to Library!</h3>
+      <p style="color:var(--text-secondary); margin-bottom:24px; font-size:14px; line-height:1.6;" id="success-msg"></p>
+      <div style="background:var(--bg-tertiary); border-radius:12px; padding:20px; margin-bottom:24px; text-align:left;">
+        <div style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:14px;">Next steps:</div>
+        <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:14px;">
+          <div style="min-width:28px; height:28px; border-radius:50%; background:var(--accent-primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">1</div>
+          <div><div style="font-size:14px; font-weight:600; color:var(--text-primary);">Go to Library</div><div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Find your collection and tap <strong>Install</strong> to download the artwork files to this device</div></div>
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:14px;">
+          <div style="min-width:28px; height:28px; border-radius:50%; background:var(--accent-primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">2</div>
+          <div><div style="font-size:14px; font-weight:600; color:var(--text-primary);">Manage Art</div><div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Choose which pieces appear in the gallery slideshow</div></div>
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:12px;">
+          <div style="min-width:28px; height:28px; border-radius:50%; background:var(--accent-primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">3</div>
+          <div><div style="font-size:14px; font-weight:600; color:var(--text-primary);">Enjoy</div><div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Your art is ready to display in the gallery</div></div>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <a href="library.html" class="btn" style="text-decoration:none; font-size:14px; padding:12px 24px;">Go to Library</a>
+        <button class="btn btn-secondary" onclick="document.getElementById('success-panel').style.display='none'; document.getElementById('actions').style.display='flex'; document.getElementById('grid').style.display='grid';" style="font-size:14px; padding:12px 24px;">Add More</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="loading-area" style="display:none;">
+      <div class="spinner"></div>
+      <div id="loading-text">Fetching NFTs...</div>
+    </div>
+
+    <!-- Grid -->
+    <div id="grid" class="grid" style="display:none;"></div>
+
+    <!-- Empty state -->
+    <div id="empty" class="empty-state">
+      <div style="font-size:64px; opacity:0.15; margin-bottom:16px;">&#128188;</div>
+      <h3>Enter a wallet address to get started</h3>
+      <p>We'll fetch all NFTs and let you pick which ones to add</p>
+    </div>
+  </div>
+
+  <script>
+    var walletNFTs = [];
+    var filteredIndices = [];
+    var selectedNFTs = new Set();
+    var currentFilter = '';
+    // Wallet origin metadata — passed to /api/csv-library/upload so the
+    // resulting collection gets a `wallet` field in its sidecar. That
+    // field is what makes the Auto-sync toggle visible in Library and
+    // what populates Settings → Wallets.
+    var walletAddress = '';
+    var walletChains = [];
+
+    // XSS escape
+    function esc(s) {
+      if (!s) return '';
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // ---- Chain selector ----
+    document.getElementById('chain-selector').addEventListener('click', function (e) {
+      var chip = e.target.closest('.chain-chip');
+      if (!chip) return;
+      var cb = chip.querySelector('input[type=checkbox]');
+      cb.checked = !cb.checked;
+      chip.classList.toggle('active', cb.checked);
+    });
+
+    function getSelectedChains() {
+      var chips = document.querySelectorAll('#chain-selector .chain-chip');
+      var chains = [];
+      chips.forEach(function (c) {
+        if (c.querySelector('input').checked) chains.push(c.dataset.chain);
+      });
+      return chains.length ? chains : ['ethereum'];
+    }
+
+    // ---- API Key ----
+    function loadApiKeyStatus() {
+      fetch('/api/opensea-key')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var el = document.getElementById('api-key-status');
+          if (d.configured) {
+            el.textContent = 'Key configured: ' + d.key_preview;
+            el.className = 'api-key-status configured';
+          } else {
+            el.textContent = 'No API key configured';
+            el.className = 'api-key-status';
+          }
+          var banner = document.getElementById('exhausted-banner');
+          if (banner) banner.classList.toggle('active', !!d.exhausted);
+          if (d.exhausted) {
+            var body = document.getElementById('api-key-body');
+            var chev = document.getElementById('api-key-chevron');
+            if (body && body.style.display === 'none') {
+              body.style.display = 'block';
+              if (chev) chev.style.transform = 'rotate(180deg)';
+            }
+          }
+        })
+        .catch(function () {
+          document.getElementById('api-key-status').textContent = 'Could not check key status';
+        });
+    }
+
+    function saveApiKey() {
+      var key = document.getElementById('api-key-input').value.trim();
+      if (!key) return showError('Please enter an API key');
+      fetch('/api/opensea-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: key })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.success) {
+            showSuccess('API key saved');
+            document.getElementById('api-key-input').value = '';
+            loadApiKeyStatus();
+          } else {
+            showError(d.error || 'Failed to save key');
+          }
+        })
+        .catch(function (e) { showError('Error: ' + e.message); });
+    }
+
+    function clearApiKey() {
+      fetch('/api/opensea-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: '' })
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          showInfo('API key removed');
+          loadApiKeyStatus();
+        })
+        .catch(function (e) { showError('Error: ' + e.message); });
+    }
+
+    // ---- Fetch NFTs ----
+    async function fetchWallet() {
+      var address = document.getElementById('wallet-address').value.trim();
+      if (!address) return showError('Please enter a wallet address');
+
+      // Basic validation
+      var isENS = address.endsWith('.eth');
+      if (!isENS && (!/^0x[0-9a-fA-F]{40}$/.test(address))) {
+        return showError('Enter a valid address (0x...) or ENS name (.eth)');
+      }
+
+      var chains = getSelectedChains();
+      var resolvedEl = document.getElementById('resolved-addr');
+      resolvedEl.style.display = 'none';
+
+      // Reset state
+      walletNFTs = [];
+      selectedNFTs.clear();
+      currentFilter = '';
+      document.getElementById('empty').style.display = 'none';
+      document.getElementById('grid').style.display = 'none';
+      document.getElementById('stats').style.display = 'none';
+      document.getElementById('actions').style.display = 'none';
+      document.getElementById('success-panel').style.display = 'none';
+      document.getElementById('loading').style.display = 'block';
+      var chainNames = chains.join(', ');
+      document.getElementById('loading-text').textContent =
+        isENS ? 'Resolving ' + esc(address) + '...' : 'Fetching from ' + chainNames + '...';
+      document.getElementById('loading-text').innerHTML +=
+        '<br><span style="font-size:13px;color:var(--text-muted);">This may take 30\u201360 seconds for multiple chains</span>';
+      document.getElementById('fetch-btn').disabled = true;
+
+      try {
+        var response = await fetch('/api/fetch-wallet-nfts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet: address, chains: chains })
+        });
+
+        var data = await response.json();
+        document.getElementById('fetch-btn').disabled = false;
+
+        if (!data.success) throw new Error(data.error || 'Failed to fetch');
+
+        walletNFTs = data.nfts || [];
+        // Remember the resolved wallet + chains so uploadToDevice() can
+        // tag the saved CSV with its origin (enables Auto-sync toggle).
+        walletAddress = data.wallet || address;
+        walletChains = chains.slice();
+
+        // Show resolved address for ENS
+        if (isENS && data.wallet) {
+          resolvedEl.textContent = 'Resolved: ' + data.wallet;
+          resolvedEl.style.display = 'block';
+        }
+
+        document.getElementById('loading').style.display = 'none';
+
+        if (walletNFTs.length === 0) {
+          document.getElementById('empty').style.display = 'block';
+          document.getElementById('empty').innerHTML =
+            '<div style="font-size:64px;opacity:0.15;margin-bottom:16px;">&#128237;</div>' +
+            '<h3>No NFTs found</h3><p>This wallet has no NFTs on the selected chain(s)</p>';
+          return;
+        }
+
+        // Show chain summary
+        var summary = [];
+        if (data.chains) {
+          Object.keys(data.chains).forEach(function (c) {
+            var v = data.chains[c];
+            if (typeof v === 'number' && v > 0) summary.push(c + ': ' + v);
+          });
+        }
+        var msg = 'Found ' + walletNFTs.length + ' art NFTs';
+        if (summary.length > 1) msg += ' (' + summary.join(', ') + ')';
+        if (data.skipped > 0) msg += '. Skipped ' + data.skipped + ' non-art items (ENS, etc.)';
+        showInfo(msg);
+
+        buildCollectionFilter();
+        filteredIndices = walletNFTs.map(function (_, i) { return i; });
+        document.getElementById('grid').style.display = 'grid';
+        document.getElementById('stats').style.display = 'flex';
+        document.getElementById('actions').style.display = 'flex';
+        renderNFTs();
+        updateStats();
+      } catch (error) {
+        document.getElementById('fetch-btn').disabled = false;
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('empty').style.display = 'block';
+        document.getElementById('empty').innerHTML =
+          '<div style="font-size:64px;opacity:0.15;margin-bottom:16px;">&#9888;&#65039;</div>' +
+          '<h3>Error fetching NFTs</h3><p style="color:var(--accent-primary);">' + esc(error.message) + '</p>';
+      }
+    }
+
+    // ---- Collection filter ----
+    function buildCollectionFilter() {
+      var collections = {};
+      walletNFTs.forEach(function (nft) {
+        var c = nft.collection || 'Unknown';
+        collections[c] = (collections[c] || 0) + 1;
+      });
+      var sel = document.getElementById('filter-collection');
+      sel.innerHTML = '<option value="">All Collections (' + walletNFTs.length + ')</option>';
+      Object.keys(collections).sort().forEach(function (name) {
+        var opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name + ' (' + collections[name] + ')';
+        sel.appendChild(opt);
+      });
+    }
+
+    function applyFilter() {
+      currentFilter = document.getElementById('filter-collection').value;
+      filteredIndices = [];
+      walletNFTs.forEach(function (nft, i) {
+        if (!currentFilter || (nft.collection || 'Unknown') === currentFilter) {
+          filteredIndices.push(i);
+        }
+      });
+      renderNFTs();
+      updateStats();
+    }
+
+    // ---- Render ----
+    function renderNFTs() {
+      var grid = document.getElementById('grid');
+      var html = '';
+      filteredIndices.forEach(function (idx) {
+        var nft = walletNFTs[idx];
+        var sel = selectedNFTs.has(idx) ? ' selected' : '';
+        var imgSrc = esc(nft.image_url || '');
+        var name = esc(nft.name || ('#' + nft.token_id));
+        var col = esc(nft.collection || 'Unknown');
+        var chain = nft.chain && nft.chain !== 'ethereum' ? '<span class="nft-chain-badge">' + esc(nft.chain) + '</span>' : '';
+        html += '<div class="nft-card' + sel + '" data-idx="' + idx + '" onclick="toggleSelect(' + idx + ')">' +
+          '<div class="checkbox-overlay"></div>' + chain +
+          '<img class="nft-img" src="' + (imgSrc || '/placeholder.jpg') + '" alt="" loading="lazy" onerror="this.src=\'/placeholder.jpg\'">' +
+          '<div class="nft-info"><div class="nft-name">' + name + '</div><div class="nft-collection">' + col + '</div></div></div>';
+      });
+      grid.innerHTML = html;
+    }
+
+    // ---- Selection ----
+    function toggleSelect(idx) {
+      if (selectedNFTs.has(idx)) selectedNFTs.delete(idx);
+      else selectedNFTs.add(idx);
+      // Update just the one card
+      var card = document.querySelector('[data-idx="' + idx + '"]');
+      if (card) card.classList.toggle('selected', selectedNFTs.has(idx));
+      updateStats();
+    }
+
+    function selectAll() {
+      filteredIndices.forEach(function (i) { selectedNFTs.add(i); });
+      renderNFTs();
+      updateStats();
+    }
+
+    function selectNone() {
+      if (currentFilter) {
+        filteredIndices.forEach(function (i) { selectedNFTs.delete(i); });
+      } else {
+        selectedNFTs.clear();
+      }
+      renderNFTs();
+      updateStats();
+    }
+
+    function updateStats() {
+      document.getElementById('total-nfts').textContent = walletNFTs.length;
+      document.getElementById('selected-nfts').textContent = selectedNFTs.size;
+      var cols = new Set(walletNFTs.map(function (n) { return n.collection || ''; }).filter(Boolean));
+      document.getElementById('collections-count').textContent = cols.size;
+    }
+
+    // ---- Build CSV content ----
+    function buildCSV() {
+      var csv = 'contract_address,token_id,name,collection,image_url,chain,metadata_url,cid\n';
+      selectedNFTs.forEach(function (idx) {
+        var nft = walletNFTs[idx];
+        var contract = nft.contract || '';
+        var tokenId = nft.token_id || '';
+        var name = (nft.name || '').replace(/"/g, '""');
+        var col = (nft.collection || '').replace(/"/g, '""');
+        var imgUrl = (nft.image_url || '').replace(/"/g, '""');
+        var chain = nft.chain || 'ethereum';
+        var metaUrl = (nft.metadata_url || '').replace(/"/g, '""');
+        var cid = nft.cid || '';
+        if (contract && tokenId) {
+          csv += contract + ',' + tokenId + ',"' + name + '","' + col + '","' + imgUrl + '",' + chain + ',"' + metaUrl + '",' + cid + '\n';
+        }
+      });
+      return csv;
+    }
+
+    // ---- Download CSV ----
+    function downloadCSV() {
+      if (selectedNFTs.size === 0) return showError('Select at least one NFT');
+      var csvName = document.getElementById('csv-name').value.trim() || 'wallet-collection';
+      var csv = buildCSV();
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = csvName + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showSuccess('Downloaded ' + csvName + '.csv with ' + selectedNFTs.size + ' NFTs');
+    }
+
+    // ---- Upload to device ----
+    async function uploadToDevice() {
+      if (selectedNFTs.size === 0) return showError('Select at least one NFT');
+      var csvName = document.getElementById('csv-name').value.trim() || 'wallet-collection';
+      var csv = buildCSV();
+      var dismiss = showLoading('Saving ' + selectedNFTs.size + ' NFTs to library as "' + esc(csvName) + '"...');
+
+      try {
+        var fd = new FormData();
+        var blob = new Blob([csv], { type: 'text/csv' });
+        fd.append('file', blob, csvName + '.csv');
+        // Friendly display name for the sidecar (whatever the user typed
+        // in the csv-name input). Without this the sidecar would only
+        // get an auto-generated name from the filename.
+        fd.append('name', csvName);
+        // Wallet origin so the collection shows the Auto-sync toggle in
+        // Library and appears in Settings → Wallets. Bug fix: without
+        // these fields the upload was indistinguishable from a generic
+        // CSV upload.
+        if (walletAddress) fd.append('wallet', walletAddress);
+        if (walletChains.length) fd.append('chains', walletChains.join(','));
+
+        var response = await fetch('/api/csv-library/upload', {
+          method: 'POST',
+          body: fd
+        });
+        var result = await response.json();
+        dismiss();
+
+        if (result.success) {
+          // Show success panel with next steps
+          document.getElementById('success-title').textContent = csvName + ' added to Library!';
+          document.getElementById('success-msg').textContent = selectedNFTs.size + ' NFTs saved. The artwork files still need to be downloaded — head to the Library to install them.';
+          document.getElementById('actions').style.display = 'none';
+          document.getElementById('grid').style.display = 'none';
+          document.getElementById('stats').style.display = 'none';
+          document.getElementById('success-panel').style.display = '';
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
+      } catch (error) {
+        dismiss();
+        showError('Upload error: ' + error.message);
+      }
+    }
+
+    // Init
+    loadApiKeyStatus();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,241 @@
+Vernis v3 — Security Audit Report
+Date: 2026-02-18
+
+Scope: Full codebase — backend, frontend, scripts, Docker renderer, config/secrets
+
+Files audited: ~60 (1 Flask backend, 15 HTML files, 38 scripts, Docker setup, config files)
+
+Summary
+Severity	Count
+CRITICAL	6
+HIGH	12
+MEDIUM	18
+LOW	14
+Total	50
+CRITICAL (Fix immediately)
+C1. Plaintext credentials committed to git
+Files: CLAUDE.md, README.md, INSTALL.md, ARCHITECTURE.txt, KIOSK_MODE.md, noWiFi.md
+
+All Pi SSH passwords (<device-password>, etc.) and AP password (<ap-password>) are tracked in git history. Even if removed now, they persist in every commit.
+
+Fix: Rotate ALL passwords immediately. git rm --cached CLAUDE.md, add to .gitignore. Strip passwords from all docs.
+
+C2. Flask API runs as root
+Files: install-vernis.sh:139, deploy-to-pi.sh:107
+
+User=root in the systemd service means every API vulnerability = full root compromise.
+
+Fix: Change to User=pi (or a dedicated vernis user). Grant specific sudo permissions via sudoers drop-in.
+
+C3. SSRF — arbitrary URL fetch via /api/eth-rpc/test
+File: backend/app.py ~line 9531
+
+Accepts any URL and makes an HTTP POST to it. Can scan internal networks, access cloud metadata (169.254.169.254).
+
+Fix: Allowlist known RPC providers (Infura, Alchemy, etc.) or block private/link-local IP ranges.
+
+C4. Command injection via BLE in wifi_provision.py
+File: scripts/wifi_provision.py:181
+
+shell=True with SSID/password from BLE. Attacker in BLE range sends '; rm -rf / # as password → root shell execution.
+
+Fix: Use subprocess.run(["sudo", "nmcli", "dev", "wifi", "connect", ssid, "password", password]) — no shell=True.
+
+C5. Command injection via popen() in hue-stream.c
+File: scripts/hue-stream.c:133-158
+
+bridge_ip, username, area_id from argv passed unsanitized to snprintf → popen(). Shell metacharacters in any field = arbitrary command execution.
+
+Fix: Use libcurl C API instead of shelling out, or validate inputs to [a-zA-Z0-9._:-] only.
+
+C6. Hardcoded universal WiFi AP password
+File: scripts/enable-setup-ap.sh:28 — PASS="<ap-password>"
+
+Every Vernis device uses the same recovery AP password, documented in public source code.
+
+Fix: Generate per-device password from CPU serial hash, or let user set a custom AP password.
+
+HIGH (Fix soon)
+H1. 16+ destructive API endpoints have no authentication
+File: backend/app.py
+
+Endpoints missing require_auth(): /api/system/update, /api/system/reboot, /api/system/shutdown, /api/nft-delete, /api/csv-library/delete, /api/backup/create, /api/backup/import, /api/fan/config, /api/system/cpu-profile, /api/os-lock/*, /api/auto-update, /api/diagnostics, /api/screen/off, /api/ipfs/restart.
+
+Any LAN device can delete NFTs, reboot, or trigger system updates.
+
+Fix: Add require_auth() to all state-changing endpoints.
+
+H2. SSRF via Hue bridge IP
+File: backend/app.py ~line 7568
+
+bridge_ip from user input used directly to construct HTTP URLs. Can probe internal hosts.
+
+Fix: Validate bridge_ip is a private/link-local IPv4 address.
+
+H3. Legacy stream server — zero auth, zero URL validation
+File: scripts/vernis-stream-server.py
+
+No API key, no URL allowlist, Access-Control-Allow-Origin: *. Any webpage or LAN device can command it to render arbitrary URLs.
+
+Fix: Delete this file (Docker server.py supersedes it) or add matching auth + allowlist.
+
+H4. XSS — manage.html NFT grid (filenames/metadata unescaped)
+File: manage.html:1257-1285
+
+NFT filenames and metadata injected raw into innerHTML and onclick handlers. escHTML() exists in the file but isn't used here.
+
+Fix: Apply escHTML() to all nft.filename, displayName, meta.collection values.
+
+H5. XSS — library.html collection cards
+File: library.html:1437-1494
+
+Collection name/description/author/filename from CSV data rendered without escaping.
+
+Fix: Apply escHTML() to all collection metadata in card rendering.
+
+H6. XSS — index.html GitHub dynamic cards
+File: index.html:1130-1144
+
+GitHub card title, description, link unescaped. link can be javascript: scheme.
+
+Fix: Escape text values; validate link to http:/https: only.
+
+H7. SSRF via URL allowlist bypass (IPFS redirect)
+File: scripts/vernis-renderer/server.py
+
+Attacker uploads HTML to IPFS that redirects Chromium to internal hosts post-load. URL check only validates the initial URL, not post-navigation.
+
+Fix: Add --host-resolver-rules to block private IP ranges in Chromium. Add --disable-webrtc.
+
+H8. sshpass -p exposes passwords in process list
+Files: deploy-to-pi.py, scripts/deploy-to-pi.sh, CLAUDE.md
+
+Passwords visible via ps aux on multi-user systems.
+
+Fix: Switch to SSH key auth, or use sshpass -e (environment variable).
+
+H9. StrictHostKeyChecking=no on all SSH connections
+Files: deploy-to-pi.py (14 occurrences)
+
+Disables MITM protection on all deployment SSH sessions.
+
+Fix: Use StrictHostKeyChecking=accept-new and pre-populate known_hosts.
+
+H10. BLE WiFi config injection in ble_provisioning.py
+File: scripts/ble_provisioning.py:253-265
+
+SSID/password with " or newlines can inject rogue network={} blocks into wpa_supplicant.conf.
+
+Fix: Escape " and \ in SSID/password, or use wpa_passphrase to generate config safely.
+
+H11. WiFi password written world-readable in /tmp/
+File: scripts/wifi_provision.py:158-171
+
+Creds in /tmp/vernis_wifi_pass with default 0644 permissions. Any local process can read them.
+
+Fix: Use os.open() with 0o600 and delete files immediately after use.
+
+H12. Unsafe tarfile.extractall() — Zip Slip
+File: scripts/stream-receiver.py:73
+
+No path validation on extracted tar members. Compromised archive can write anywhere.
+
+Fix: Use tf.extractall(path, filter='data') (Python 3.12+) or validate each member path.
+
+MEDIUM (Fix in next sprint)
+M1–M6. XSS in multiple frontend files (6 instances)
+index.html — Changelog/version in What's New popup (lines 1330-1335)
+wallet-tool.html — NFT names from external API (lines 411-430)
+add.html — Filenames/CIDs in upload review (lines 631-721)
+settings.html — Backup filenames in onclick handlers (lines 7491-7506)
+settings.html — USB drive labels in innerHTML (lines 7272-7311)
+settings.html — User-input CID reflected after prefix check (line 6962)
+Fix for all: Add/use escHTML() consistently. For onclick contexts, also .replace(/'/g, "&#39;").
+
+M7. Chrome DevTools Protocol exposed on port 9222
+File: scripts/kiosk-launcher.sh:77
+
+--remote-debugging-port=9222 --remote-allow-origins=* — full browser control from LAN if firewall misconfigured.
+
+Fix: Add --remote-debugging-address=127.0.0.1, remove wildcard origins.
+
+M8. No rate limiting on any endpoint
+File: backend/app.py — global
+
+Expensive operations (/api/backup/create, /api/diagnostics, /api/storage/scan, /api/benchmark) can be triggered unlimited times.
+
+Fix: Add flask-limiter. Strict limits on expensive endpoints (1 req/min).
+
+M9. Unauthenticated diagnostics endpoint leaks system info
+File: backend/app.py ~line 1474
+
+Kernel version, CPU, memory, services, network, logs — all exposed without auth.
+
+Fix: Add require_auth().
+
+M10. Traceback exposed in /api/qrcode error response
+File: backend/app.py ~line 1047
+
+traceback.format_exc() sent to client, leaking internal paths.
+
+Fix: Log server-side, return generic error.
+
+M11. Unauthenticated renderer pairing/unregister
+File: backend/app.py ~lines 1364-1371
+
+Anyone on LAN can unregister the renderer or open a pairing window to register a malicious one.
+
+Fix: Add pairing PIN displayed on Pi screen.
+
+M12. API key timing attack
+File: scripts/vernis-renderer/server.py:82
+
+== comparison on API key. Use hmac.compare_digest().
+
+M13. No input validation on render dimensions
+File: scripts/vernis-renderer/server.py:271-278
+
+width=99999, height=99999 → OOM crash. Fix: Clamp to sane ranges (max 3840x2160).
+
+M14. app-local.py runs with debug=True on 0.0.0.0
+File: backend/app-local.py:650
+
+Werkzeug debugger = arbitrary code execution from LAN.
+
+Fix: Bind to 127.0.0.1.
+
+M15. .gitignore missing patterns
+Missing: CLAUDE.md, auth-token.json, stream-renderer.json, *.key, *.pem, hue-*.json.
+
+M16. SSL verification disabled for Hue Bridge
+File: scripts/hue-entertainment-daemon.py:69-72
+
+MITM can intercept Hue credentials on LAN. Known limitation of Hue's self-signed certs. Consider cert pinning.
+
+M17. OTA updater has no signature verification
+File: scripts/updater.sh:33-43
+
+Downloads and deploys code without checksum/GPG verification.
+
+Fix: Add GPG signature verification.
+
+M18. No Docker resource limits documented
+File: Dockerfile + docker run examples
+
+Fix: Document --memory=2g --cpus=2 --pids-limit=200 in run commands.
+
+LOW (14 items — backlog)
+API error messages (data.error, err.message) unescaped in innerHTML across settings.html (12+ locations)
+Hue bridge/light names unescaped in settings.html
+Changelog entries unescaped in settings.html
+CSV filenames unescaped in manage.html collection toggles
+GitHub collection names unescaped in settings.html
+IPFS CIDs unescaped in settings.html
+API key logged to stdout in Docker entrypoint
+RTSP credentials in API response
+PID file race condition in /tmp/
+Predictable temp file paths in multiple scripts
+Xvfb -ac disables X11 access control in container
+Chromium --no-sandbox in Docker
+dev-update.sh downloads code over plain HTTP
+First /home/ user assumed as Vernis user in HDMI hotplug script

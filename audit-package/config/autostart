@@ -1,0 +1,14 @@
+# Vernis v3 - Kiosk Mode Autostart
+# Place this at: /home/pi/.config/lxsession/LXDE-pi/autostart
+# Only needed for Vernis with built-in screen
+
+# Disable screen blanking
+@xset s off
+@xset -dpms
+@xset s noblank
+
+# Hide cursor after 0.1s of inactivity
+@unclutter -idle 0.1 -root
+
+# Start kiosk mode browser pointing to gallery page
+@chromium-browser --kiosk --noerrdialogs --incognito --disable-infobars --start-fullscreen --disable-translate --disable-features=TranslateUI --check-for-update-interval=31536000 file:///var/www/vernis/splash.html

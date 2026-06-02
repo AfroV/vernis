@@ -1,0 +1,35 @@
+[Unit]
+Description=Vernis v3 Backend API Server
+After=network.target vernis-ipfs.service
+Wants=vernis-ipfs.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/vernis
+Environment="FLASK_APP=backend/app.py"
+Environment="FLASK_ENV=production"
+Environment="PYTHONUNBUFFERED=1"
+
+# Start Flask server
+ExecStart=/usr/bin/python3 -m flask run --host=0.0.0.0 --port=5000
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/vernis/nfts /opt/vernis/uploads /opt/vernis/config
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vernis-api
+
+[Install]
+WantedBy=multi-user.target

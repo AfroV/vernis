@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>WiFi Password</title>
+  <link rel="stylesheet" href="vernis-themes.css">
+  <script>
+    // Apply saved theme immediately to avoid flash
+    var _t = localStorage.getItem('vernis-theme-style') || 'walnut';
+    var _m = localStorage.getItem('vernis-theme-mode') || 'dark';
+    if (_m === 'auto') _m = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', _t + '-' + _m);
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-primary, #0a0a0a);
+      color: var(--text-primary, #fff);
+      font-family: var(--font-body, 'Inter', -apple-system, sans-serif);
+    }
+
+    .pw-screen {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    .pw-top {
+      flex: 0 0 auto;
+      padding: 16px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--bg-primary, #0a0a0a);
+    }
+
+    .pw-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .pw-back {
+      width: 52px;
+      height: 52px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary, #aaa);
+      font-size: 28px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      padding: 0;
+    }
+    .pw-back:active { color: var(--text-primary, #fff); }
+
+    .pw-network-name {
+      font-size: 28px;
+      color: var(--text-secondary, #aaa);
+    }
+    .pw-network-name strong {
+      color: var(--text-primary, #fff);
+      font-size: 32px;
+    }
+
+    .pw-field-wrap {
+      position: relative;
+      width: 100%;
+    }
+    #pw-input {
+      width: 100%;
+      background: var(--bg-secondary, #171717) !important;
+      border: 1px solid var(--border-light, #262626);
+      border-radius: 10px;
+      color: var(--text-primary, #fff);
+      font-size: 52px !important;
+      font-family: var(--font-body, 'Inter', -apple-system, sans-serif);
+      padding: 24px 140px 24px 24px !important;
+      min-height: auto !important;
+      letter-spacing: 1px;
+      outline: none;
+      text-overflow: clip;
+      direction: ltr;
+      box-sizing: border-box;
+    }
+    #pw-input:focus {
+      border-color: var(--accent-primary, #e5e5e5);
+    }
+    #pw-input::placeholder {
+      color: var(--text-muted, #555);
+      font-size: 36px !important;
+      letter-spacing: 0;
+    }
+
+    .pw-show-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--bg-tertiary, #262626);
+      border: 1px solid var(--border-light, #333);
+      color: var(--text-secondary, #aaa);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-size: 22px;
+      font-weight: 600;
+      font-family: var(--font-body, 'Inter', -apple-system, sans-serif);
+      cursor: pointer;
+      letter-spacing: 0.01em;
+    }
+    .pw-show-btn:active { background: var(--accent-primary, #e5e5e5); color: #000; }
+
+    .pw-connect {
+      width: 100%;
+      background: var(--accent-primary, #e5e5e5);
+      color: #ffffff;
+      border: none;
+      font-size: 32px;
+      font-weight: 600;
+      font-family: var(--font-body, 'Inter', -apple-system, sans-serif);
+      padding: 22px;
+      border-radius: 10px;
+      cursor: pointer;
+      letter-spacing: 0.01em;
+      box-shadow: 0 2px 8px var(--shadow-sm, rgba(0,0,0,0.2));
+      transition: opacity 0.15s;
+    }
+    .pw-connect:active { opacity: 0.85; }
+    .pw-connect:disabled { opacity: 0.5; }
+
+    .pw-btn-wrap {
+      position: relative;
+    }
+    .pw-status {
+      display: none;
+      padding: 22px;
+      border-radius: 10px;
+      font-size: 30px;
+      text-align: center;
+      font-weight: 600;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pw-kb {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 6px;
+      gap: 4px;
+      background: var(--bg-secondary, #171717);
+      border-top: 1px solid var(--border-light, #262626);
+      min-height: 0;
+    }
+    .pw-kb-row {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+      min-height: 0;
+    }
+    .pw-key {
+      flex: 1 1 0%;
+      min-width: 0;
+      border: none;
+      background: var(--bg-tertiary, #262626);
+      color: var(--text-primary, #fff);
+      border-radius: 8px;
+      font-size: 19px;
+      font-family: var(--font-body, 'Inter', -apple-system, sans-serif);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.08s;
+    }
+    .pw-key:active {
+      background: var(--accent-primary, #e5e5e5);
+      color: #000;
+    }
+    .pw-key.space {
+      flex: 3.5;
+      background: var(--bg-primary, #0a0a0a);
+      border: 1px solid var(--border-light, #333);
+    }
+    .pw-key.special {
+      flex: 1.4;
+      font-size: 14px;
+      font-weight: 600;
+      background: var(--bg-primary, #0a0a0a);
+    }
+    .pw-key.shift-active {
+      background: var(--accent-primary, #e5e5e5);
+      color: #000;
+    }
+    .pw-key.backspace {
+      flex: 1.4;
+      font-size: 20px;
+      background: var(--bg-primary, #0a0a0a);
+    }
+  </style>
+</head>
+<body>
+  <div class="pw-screen">
+    <div class="pw-top">
+      <div class="pw-header">
+        <button class="pw-back" id="pw-back">&#8592;</button>
+        <div class="pw-network-name">Connect to <strong id="pw-ssid"></strong></div>
+      </div>
+      <div class="pw-field-wrap">
+        <input class="pw-input" id="pw-input" type="text" placeholder="Enter password" autocomplete="off" autocorrect="off" spellcheck="false" readonly>
+        <button class="pw-show-btn" id="pw-toggle">Hide</button>
+      </div>
+      <div class="pw-btn-wrap">
+        <button class="pw-connect" id="pw-connect">Connect</button>
+        <div class="pw-status" id="pw-status"></div>
+      </div>
+    </div>
+    <div class="pw-kb" id="pw-kb"></div>
+  </div>
+
+  <script>
+    // Note: all key labels are hardcoded string literals, never user-supplied.
+    // DOM built with createElement + textContent for safety.
+    var layouts = {
+      lower: [
+        ['1','2','3','4','5','6','7','8','9','0'],
+        ['q','w','e','r','t','y','u','i','o','p'],
+        ['a','s','d','f','g','h','j','k','l'],
+        ['\u21E7','z','x','c','v','b','n','m','\u232B'],
+        ['?123','\u00C6\u00D8\u00C5','@',' ','.','\u21B5']
+      ],
+      upper: [
+        ['1','2','3','4','5','6','7','8','9','0'],
+        ['Q','W','E','R','T','Y','U','I','O','P'],
+        ['A','S','D','F','G','H','J','K','L'],
+        ['\u21E7','Z','X','C','V','B','N','M','\u232B'],
+        ['?123','\u00C6\u00D8\u00C5','@',' ','.','\u21B5']
+      ],
+      symbols: [
+        ['!','@','#','$','%','^','&','*','(',')'],
+        ['-','_','=','+','[',']','{','}','|','\\'],
+        ['~','`',':',';','"',"'",'<','>','?','/'],
+        ['ABC',',','.',' ','\u232B','\u21B5']
+      ],
+      intl: [
+        ['\u00E6','\u00F8','\u00E5','\u00E4','\u00F6','\u00FC','\u00DF','\u00F1','\u00E7','\u00E9'],
+        ['\u00C6','\u00D8','\u00C5','\u00C4','\u00D6','\u00DC','\u00E8','\u00EA','\u00EB','\u00EE'],
+        ['\u00F4','\u00FB','\u00F9','\u00EF','\u00E1','\u00ED','\u00F3','\u00FA','\u00FD','\u00F0'],
+        ['ABC',',','.',' ','\u232B','\u21B5']
+      ]
+    };
+
+    // Read params: ssid, return (page to go back to with password in sessionStorage)
+    var params = new URLSearchParams(window.location.search);
+    var ssid = params.get('ssid') || '';
+    var returnPage = params.get('return') || '';
+    document.getElementById('pw-ssid').textContent = ssid;
+
+    // Auth token (only needed for direct API mode)
+    var _vernisToken = '';
+    if (!returnPage) {
+      fetch('/api/auth-token').then(function(r) { return r.json(); }).then(function(d) { if (d.token) _vernisToken = d.token; }).catch(function(){});
+    }
+
+    var input = document.getElementById('pw-input');
+    var kb = document.getElementById('pw-kb');
+    var connectBtn = document.getElementById('pw-connect');
+    var statusEl = document.getElementById('pw-status');
+    var currentLayout = 'lower';
+    var isShift = false;
+    var isHidden = false;
+    var value = '';
+    var cursorPos = 0;
+
+    function render() {
+      var layout = layouts[currentLayout];
+      while (kb.firstChild) kb.removeChild(kb.firstChild);
+
+      layout.forEach(function(row) {
+        var rowDiv = document.createElement('div');
+        rowDiv.className = 'pw-kb-row';
+
+        row.forEach(function(key) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'pw-key';
+          btn.dataset.key = key;
+
+          if (key === ' ') {
+            btn.classList.add('space');
+            btn.textContent = '\u2423';
+          } else if (key === '\u21E7') {
+            btn.classList.add('special');
+            if (isShift) btn.classList.add('shift-active');
+            btn.textContent = key;
+          } else if (key === '\u232B') {
+            btn.classList.add('backspace');
+            btn.textContent = key;
+          } else if (key === '?123' || key === 'ABC' || key === '\u21B5' || key === '\u00C6\u00D8\u00C5') {
+            btn.classList.add('special');
+            btn.textContent = key;
+          } else {
+            btn.textContent = key;
+          }
+
+          var lastTouch = 0;
+          btn.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            lastTouch = Date.now();
+            handleKey(key);
+          }, { passive: false });
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (Date.now() - lastTouch < 400) return;
+            handleKey(key);
+          });
+
+          rowDiv.appendChild(btn);
+        });
+
+        kb.appendChild(rowDiv);
+      });
+    }
+
+    function updateDisplay() {
+      if (isHidden) {
+        if (value.length <= 2) {
+          input.value = value;
+        } else {
+          input.value = '\u2022'.repeat(value.length - 2) + value.slice(-2);
+        }
+      } else {
+        input.value = value;
+      }
+      input.scrollLeft = input.scrollWidth;
+    }
+
+    function handleKey(key) {
+      switch(key) {
+        case '\u21E7':
+          isShift = !isShift;
+          currentLayout = isShift ? 'upper' : 'lower';
+          render();
+          return;
+        case '?123':
+          currentLayout = 'symbols';
+          render();
+          return;
+        case 'ABC':
+          currentLayout = isShift ? 'upper' : 'lower';
+          render();
+          return;
+        case '\u00C6\u00D8\u00C5':
+          currentLayout = 'intl';
+          render();
+          return;
+        case '\u232B':
+          if (cursorPos > 0) {
+            value = value.slice(0, cursorPos - 1) + value.slice(cursorPos);
+            cursorPos--;
+          }
+          break;
+        case '\u21B5':
+          connectBtn.click();
+          return;
+        default:
+          value = value.slice(0, cursorPos) + key + value.slice(cursorPos);
+          cursorPos += key.length;
+          if (isShift && currentLayout === 'upper') {
+            isShift = false;
+            currentLayout = 'lower';
+            render();
+          }
+      }
+      updateDisplay();
+    }
+
+    // Toggle show/hide
+    document.getElementById('pw-toggle').addEventListener('click', function() {
+      isHidden = !isHidden;
+      this.textContent = isHidden ? 'Show' : 'Hide';
+      updateDisplay();
+    });
+
+    // Back button
+    document.getElementById('pw-back').addEventListener('click', function() {
+      window.location.href = returnPage || 'settings.html#wifi';
+    });
+
+    // Connect button — calls the real WiFi API
+    function showStatus(msg, type) {
+      statusEl.style.display = 'flex';
+      statusEl.textContent = msg;
+      if (type === 'error') {
+        statusEl.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        statusEl.style.color = 'white';
+      } else if (type === 'success') {
+        statusEl.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+        statusEl.style.color = 'white';
+      } else {
+        statusEl.style.background = 'var(--bg-tertiary)';
+        statusEl.style.color = 'var(--text-secondary)';
+      }
+      // Auto-hide after 4s for errors
+      if (type === 'error') {
+        setTimeout(function() { statusEl.style.display = 'none'; }, 4000);
+      }
+    }
+
+    // Poll /api/status to verify which network we actually connected to
+    function verifyConnection(targetSsid, goBack, attempt) {
+      if (attempt > 5) {
+        // Gave up — probably fell back to old network
+        showStatus('Could not connect to ' + targetSsid + '. Check the password.', 'error');
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'Connect';
+        return;
+      }
+      fetch('/api/status').then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ssid === targetSsid) {
+          showStatus('Connected to ' + targetSsid + '!', 'success');
+          connectBtn.textContent = 'Connected';
+          setTimeout(function() { window.location.href = goBack; }, 2000);
+        } else if (d.ssid && d.ssid !== 'Not connected') {
+          // Connected to a different network — the switch failed, fell back
+          showStatus('Could not connect to ' + targetSsid + '. Check the password.', 'error');
+          connectBtn.disabled = false;
+          connectBtn.textContent = 'Connect';
+        } else {
+          // Still reconnecting
+          setTimeout(function() { verifyConnection(targetSsid, goBack, attempt + 1); }, 3000);
+        }
+      }).catch(function() {
+        // API unreachable — still switching, retry
+        setTimeout(function() { verifyConnection(targetSsid, goBack, attempt + 1); }, 3000);
+      });
+    }
+
+    connectBtn.addEventListener('click', function() {
+      if (!ssid) { showStatus('No network selected', 'error'); return; }
+      if (!value) { showStatus('Enter a password first', 'error'); return; }
+
+      connectBtn.disabled = true;
+      connectBtn.textContent = 'Connecting...';
+      showStatus('Connecting to ' + ssid + '...', 'info');
+
+      var headers = { 'Content-Type': 'application/json' };
+      if (_vernisToken) headers['X-Vernis-Token'] = _vernisToken;
+
+      var goBack = returnPage || 'settings.html#wifi';
+
+      fetch('/api/wifi', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ ssid: ssid, psk: value })
+      }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+      .then(function(res) {
+        if (res.ok && res.data.success) {
+          showStatus('Connected to ' + ssid + '!', 'success');
+          connectBtn.textContent = 'Connected';
+          setTimeout(function() { window.location.href = goBack; }, 2000);
+        } else {
+          throw new Error(res.data.error || res.data.message || 'Wrong password or network unavailable');
+        }
+      }).catch(function(err) {
+        var msg = err.message || '';
+        if (msg === 'Failed to fetch') {
+          // Connection interrupted — WiFi is switching. Verify what happened.
+          showStatus('Verifying connection...', 'info');
+          connectBtn.textContent = 'Verifying...';
+          setTimeout(function() { verifyConnection(ssid, goBack, 1); }, 4000);
+          return;
+        }
+        showStatus(msg || 'Connection failed. Check password and try again.', 'error');
+        connectBtn.disabled = false;
+        connectBtn.textContent = 'Connect';
+      });
+    });
+
+    render();
+    updateDisplay();
+  </script>
+</body>
+</html>

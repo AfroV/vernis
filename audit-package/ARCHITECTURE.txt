@@ -1,0 +1,374 @@
+═══════════════════════════════════════════════════════════════════════════
+                        VERNIS v3 ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         USER INTERFACES                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  📱 Phone/Tablet                    🖥️  Built-in Screen (v2 only)      │
+│  ┌─────────────────┐                ┌─────────────────────────────┐   │
+│  │ Open browser    │                │ Auto-boots to fullscreen    │   │
+│  │ → vernis.local  │                │ → gallery.html (kiosk)      │   │
+│  │                 │                │                             │   │
+│  │ ✓ Home          │                │ ✓ Rotating gallery          │   │
+│  │ ✓ Add Art       │                │ ✓ Crossfade transitions     │   │
+│  │ ✓ Display       │                │ ✓ 15s images, 30s videos    │   │
+│  │ ✓ Settings      │                │ ✓ Watchdog auto-restart     │   │
+│  └─────────────────┘                └─────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          NETWORK LAYER                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌────────────────────┐         ┌────────────────────────────┐         │
+│  │   Normal Mode      │         │   Fallback Mode            │         │
+│  ├────────────────────┤         ├────────────────────────────┤         │
+│  │ mDNS (Avahi)       │         │ Wi-Fi AP                   │         │
+│  │ → vernis.local     │         │ → Vernis-XXXXXXXX          │         │
+│  │                    │         │ → Password: <ap-password>     │         │
+│  │ Connected to       │         │                            │         │
+│  │ home Wi-Fi         │         │ Static IP: 192.168.50.1    │         │
+│  │                    │         │ DHCP: .10-.50              │         │
+│  └────────────────────┘         └────────────────────────────┘         │
+│           ▲                                   ▲                         │
+│           │                                   │                         │
+│     Has internet?                        No internet?                  │
+│           │                                   │                         │
+│           └───────────── Checked every 5 min ┘                         │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         WEB SERVER (Caddy)                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Port 80 (HTTP)                                                         │
+│  ┌──────────────────────────────────────────────────────────┐          │
+│  │  Request Router                                           │          │
+│  ├──────────────────────────────────────────────────────────┤          │
+│  │  GET  /              → index.html                         │          │
+│  │  GET  /add.html      → add.html                           │          │
+│  │  GET  /gallery.html  → gallery.html                       │          │
+│  │  GET  /settings.html → settings.html                      │          │
+│  │  GET  /api/*         → Proxy to Flask (localhost:5000)    │          │
+│  │  GET  /nfts/*        → Proxy to Flask (localhost:5000)    │          │
+│  └──────────────────────────────────────────────────────────┘          │
+│                                                                         │
+│  Static Files: /var/www/vernis/                                        │
+│  Logs: /var/log/caddy/vernis.log                                       │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        FLASK API (Backend)                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Port 5000 (localhost only)                                             │
+│  ┌──────────────────────────────────────────────────────────┐          │
+│  │  API Endpoints                                            │          │
+│  ├──────────────────────────────────────────────────────────┤          │
+│  │  GET  /api/pinned-art    → List NFT files                │          │
+│  │  GET  /nfts/<file>       → Serve NFT media               │          │
+│  │  POST /api/upload-csv    → Handle CSV upload             │          │
+│  │  POST /api/add-single    → Add single NFT                │          │
+│  │  GET  /api/status        → System stats                  │          │
+│  │  POST /api/wifi          → Change Wi-Fi                  │          │
+│  │  GET  /api/update        → OTA update                    │          │
+│  │  GET  /api/reboot        → Reboot system                 │          │
+│  └──────────────────────────────────────────────────────────┘          │
+│                                                                         │
+│  Python: /opt/vernis/app.py                                             │
+│  Systemd: vernis-api.service                                            │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        BACKGROUND SERVICES                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌───────────────────┐  ┌─────────────────┐  ┌────────────────────┐   │
+│  │ NFT Downloader    │  │ Wi-Fi Fallback  │  │ Screen Watchdog    │   │
+│  ├───────────────────┤  ├─────────────────┤  ├────────────────────┤   │
+│  │ Python script     │  │ Bash script     │  │ Bash script        │   │
+│  │                   │  │                 │  │                    │   │
+│  │ • Fetch metadata  │  │ • Check ping    │  │ • Monitor Chromium │   │
+│  │ • Download media  │  │ • Start hostapd │  │ • Check X server   │   │
+│  │ • Save to disk    │  │ • Start dnsmasq │  │ • Restart if stuck │   │
+│  │ • Rate limiting   │  │ • Every 5 min   │  │ • Every 5 min      │   │
+│  │                   │  │                 │  │                    │   │
+│  │ Trigger: API call │  │ Trigger: Timer  │  │ Trigger: Always    │   │
+│  │                   │  │                 │  │ (v2 only)          │   │
+│  └───────────────────┘  └─────────────────┘  └────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          FILE STORAGE                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  /opt/vernis/                                                           │
+│  ├── app.py              Flask API server                               │
+│  ├── nfts/               Downloaded NFT media (images/videos)           │
+│  ├── uploads/            CSV uploads                                    │
+│  ├── backup/             OTA update backups                             │
+│  └── scripts/                                                           │
+│      ├── nft_downloader.py      NFT download logic                     │
+│      ├── enable-setup-ap.sh     Create fallback AP                     │
+│      ├── disable-setup-ap.sh    Stop fallback AP                       │
+│      ├── updater.sh             OTA update handler                     │
+│      ├── watchdog.sh            Screen monitor                         │
+│      └── create-update-package.sh  Build updates                       │
+│                                                                         │
+│  /var/www/vernis/                                                       │
+│  ├── index.html          Home page                                      │
+│  ├── add.html            Upload interface                               │
+│  ├── gallery.html        Gallery viewer                                 │
+│  └── settings.html       System settings                                │
+│                                                                         │
+│  /etc/systemd/system/                                                   │
+│  ├── vernis-api.service          Flask backend                         │
+│  ├── vernis-watchdog.service     Screen monitor (v2)                   │
+│  ├── vernis-ap-check.timer       Fallback scheduler                    │
+│  └── vernis-ap-check.service     Fallback checker                      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+                            DATA FLOW EXAMPLES
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  EXAMPLE 1: User Uploads CSV                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  User (add.html)
+      │
+      │ 1. Drag & drop my-nfts.csv
+      ▼
+  JavaScript
+      │
+      │ 2. FormData upload
+      ▼
+  POST /api/upload-csv
+      │
+      │ 3. Caddy proxies request
+      ▼
+  Flask API (app.py)
+      │
+      │ 4. Save CSV to /opt/vernis/uploads/
+      │ 5. Spawn background process
+      ▼
+  nft_downloader.py
+      │
+      │ 6. Read CSV line by line
+      │ 7. For each NFT:
+      │    → Fetch metadata (OpenSea API)
+      │    → Download image/video
+      │    → Save to /opt/vernis/nfts/
+      │    → Rate limit (1s delay)
+      ▼
+  Disk: /opt/vernis/nfts/
+      │
+      │ 0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D_1.jpg
+      │ 0x60E4d786628Fea6478F785A6d7e704777c86a7c6_1000.png
+      ▼
+  User opens gallery.html
+      │
+      │ 8. GET /api/pinned-art
+      ▼
+  Flask returns JSON:
+      ["/nfts/...1.jpg", "/nfts/...1000.png"]
+      │
+      │ 9. Browser displays gallery
+      ▼
+  Rotating slideshow with crossfades!
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  EXAMPLE 2: Internet Goes Down                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  vernis-ap-check.timer
+      │
+      │ Every 5 minutes
+      ▼
+  enable-setup-ap.sh
+      │
+      │ ping 8.8.8.8
+      ▼
+  No response (timeout)
+      │
+      │ Internet is down!
+      ▼
+  Start Fallback Mode
+      │
+      │ 1. Get CPU serial
+      │    → XXXXXXXX
+      │ 2. Configure hostapd
+      │    → SSID: Vernis-XXXXXXXX
+      │    → Password: <ap-password>
+      │ 3. Configure dnsmasq
+      │    → DHCP: 192.168.50.10-50
+      │ 4. Set static IP
+      │    → wlan0: 192.168.50.1
+      │ 5. Start services
+      ▼
+  AP Broadcasting!
+      │
+      │ User's phone sees: Vernis-XXXXXXXX
+      │ User connects with password
+      │ Phone gets IP: 192.168.50.15 (via DHCP)
+      ▼
+  User opens: http://vernis.local
+      │
+      │ DNS: vernis.local → 192.168.50.1
+      ▼
+  Caddy serves web UI normally
+      │
+      │ All features work (except internet-dependent ones)
+      ▼
+  User can change Wi-Fi via Settings page!
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  EXAMPLE 3: OTA Update                                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  User (settings.html)
+      │
+      │ Click "Check for Updates"
+      ▼
+  GET /api/update
+      │
+      │ Caddy proxy
+      ▼
+  Flask API
+      │
+      │ Spawn background: updater.sh
+      │ Return success immediately
+      ▼
+  updater.sh
+      │
+      │ 1. Create backup
+      │    → /opt/vernis/backup-20250103-143022/
+      │ 2. Download update
+      │    → curl https://yourdomain.com/vernis/latest.tar.gz
+      │ 3. Extract to temp
+      │    → /tmp/vernis-update/
+      │ 4. Copy files
+      │    → www/* → /var/www/vernis/
+      │    → app.py → /opt/vernis/
+      │    → scripts/* → /opt/vernis/scripts/
+      │    → systemd/* → /etc/systemd/system/
+      │ 5. Reload services
+      │    → systemctl daemon-reload
+      │    → systemctl restart vernis-api
+      │    → systemctl restart caddy
+      │ 6. Wait 10 seconds
+      │ 7. Reboot
+      ▼
+  System reboots with new version!
+
+
+═══════════════════════════════════════════════════════════════════════════
+                         HARDWARE CONNECTIONS
+═══════════════════════════════════════════════════════════════════════════
+
+  Vernis v1 (Headless)                Vernis v2 (With Screen)
+
+  ┌──────────────────┐                ┌──────────────────┐
+  │  Raspberry Pi 4B │                │  Raspberry Pi 4B │
+  └──────────────────┘                └──────────────────┘
+           │                                   │
+           │                                   │
+    ┌──────┴──────┐                     ┌──────┴──────────┐
+    │             │                     │                 │
+    ▼             ▼                     ▼                 ▼
+  USB SSD    Ethernet/Wi-Fi         USB SSD          7" Screen
+  (storage)  (network)              (storage)        (DSI/HDMI)
+                                                           │
+                                                           │
+                                                    Touchscreen/
+                                                    HDMI Display
+
+
+═══════════════════════════════════════════════════════════════════════════
+                        BOOT SEQUENCE
+═══════════════════════════════════════════════════════════════════════════
+
+  Power On
+      │
+      ├─ 1. Linux kernel loads (15s)
+      │
+      ├─ 2. Systemd starts services:
+      │    ├─ Network Manager (Wi-Fi)
+      │    ├─ Avahi (mDNS)
+      │    ├─ Caddy (web server)
+      │    └─ vernis-api (Flask)
+      │
+      ├─ 3. vernis-ap-check.timer
+      │    └─ Waits 90s → checks internet
+      │
+      └─ 4. (v2 only) Lightdm → LXDE
+           └─ autostart → Chromium kiosk
+                └─ http://vernis.local/gallery.html
+                     │
+                     └─ Fullscreen gallery!
+
+  Total boot time: 30-60 seconds
+
+
+═══════════════════════════════════════════════════════════════════════════
+                        SECURITY BOUNDARIES
+═══════════════════════════════════════════════════════════════════════════
+
+  ┌────────────────────────────────────────────────────────────┐
+  │  PUBLIC (No authentication required)                       │
+  ├────────────────────────────────────────────────────────────┤
+  │  • Port 80 (HTTP) - Caddy web server                       │
+  │  • All web pages (index, add, display, settings)           │
+  │  • All API endpoints                                       │
+  │  • Fallback Wi-Fi AP                                       │
+  │                                                            │
+  │  ⚠️  Trust Model: Local/Private Network Only               │
+  │     NOT designed for public internet exposure              │
+  └────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────┐
+  │  INTERNAL (localhost only)                                 │
+  ├────────────────────────────────────────────────────────────┤
+  │  • Port 5000 - Flask API (not exposed externally)          │
+  │  • Systemd services (no external access)                   │
+  │  • File storage (/opt/vernis, /var/www)                    │
+  └────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────┐
+  │  PRIVILEGED (requires sudo)                                │
+  ├────────────────────────────────────────────────────────────┤
+  │  • Reboot command                                          │
+  │  • Wi-Fi configuration (nmcli)                             │
+  │  • OTA updates (file system writes)                        │
+  │  • AP management (hostapd/dnsmasq)                         │
+  │                                                            │
+  │  🔧 Requires passwordless sudo for 'pi' user               │
+  └────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+For more details, see:
+  • README.md - Feature overview
+  • DEPLOYMENT_GUIDE.md - Production setup
+  • FEATURE_SUMMARY.txt - Complete feature summary
+  • DEV-WORKFLOW.md - Development workflow
+
+═══════════════════════════════════════════════════════════════════════════

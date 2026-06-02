@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Supersize Test • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <link rel="stylesheet" href="" id="supersize-css">
+  <style>
+    .test-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .test-section h3 {
+      margin-bottom: 16px;
+      color: var(--accent-primary);
+    }
+    .size-selector {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+    .size-btn {
+      padding: 20px 32px;
+      font-size: 18px;
+      border: 2px solid var(--border-light);
+      border-radius: 12px;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .size-btn:hover {
+      border-color: var(--accent-primary);
+    }
+    .size-btn.active {
+      background: var(--accent-primary);
+      color: white;
+      border-color: var(--accent-primary);
+    }
+    .current-size {
+      font-size: 24px;
+      color: var(--accent-primary);
+      margin-bottom: 24px;
+    }
+    .test-buttons {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .test-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+  </style>
+  <script>
+    (function () {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      const mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+      function _syncTheme(){fetch('/api/theme').then(r=>r.json()).then(t=>{if(t.style){var m=t.mode==='auto'?((new Date().getHours()>=20||new Date().getHours()<7)?'dark':'light'):(t.mode||'dark');var k=t.style+'-'+m;if(document.documentElement.getAttribute('data-theme')!==k){document.documentElement.setAttribute('data-theme',k);localStorage.setItem('vernis-theme-style',t.style);localStorage.setItem('vernis-theme-mode',t.mode||'dark');}}}).catch(()=>{});}_syncTheme();setInterval(_syncTheme,5000);
+    })();
+  </script>
+</head>
+<body>
+  <div class="header">
+    <a href="index.html" class="logo">Vernis</a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html"><span class="menu-icon">🏠</span> Home</a>
+    <a href="add.html"><span class="menu-icon">➕</span> Add Art</a>
+    <a href="library.html"><span class="menu-icon">📚</span> Library</a>
+    <a href="manage.html"><span class="menu-icon">🎨</span> Manage</a>
+    <a href="gallery.html"><span class="menu-icon">🖼️</span> Gallery</a>
+    <a href="settings.html"><span class="menu-icon">⚙️</span> Settings</a>
+  </div>
+
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const toggle = document.querySelector('.menu-toggle');
+      menu.classList.toggle('active');
+      toggle.classList.toggle('active');
+    }
+  </script>
+
+  <div class="main" style="padding-top: 120px; max-width: 800px; margin: 0 auto;">
+    <h1 style="text-align: center; margin-bottom: 16px;">Supersize Test</h1>
+    <p class="subtitle" style="text-align: center; margin-bottom: 32px;">Test different UI scale options for touchscreens</p>
+
+    <div class="current-size">Current: <span id="current-label">Normal (Default)</span></div>
+
+    <div class="size-selector">
+      <button class="size-btn active" onclick="setSize('normal')">Normal</button>
+      <button class="size-btn" onclick="setSize('a')">Option A (+50%)</button>
+      <button class="size-btn" onclick="setSize('b')">Option B (+100%)</button>
+      <button class="size-btn" onclick="setSize('c')">Option C (+150%)</button>
+    </div>
+
+    <div class="test-section">
+      <h3>Test Buttons</h3>
+      <div class="test-buttons">
+        <button class="btn">Primary Button</button>
+        <button class="btn btn-secondary">Secondary</button>
+        <button class="btn btn-sm">Small Button</button>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h3>Test Form Inputs</h3>
+      <div class="form-group">
+        <label>Text Input</label>
+        <input type="text" placeholder="Type something...">
+      </div>
+      <div class="form-group">
+        <label>Select Dropdown</label>
+        <select>
+          <option>Option 1</option>
+          <option>Option 2</option>
+          <option>Option 3</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h3>Test Toggle Switches</h3>
+      <div class="test-row">
+        <span>Enable Feature</span>
+        <label class="toggle-switch">
+          <input type="checkbox" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="test-row">
+        <span>Another Option</span>
+        <label class="toggle-switch">
+          <input type="checkbox">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h3>Test Text Sizes</h3>
+      <h1>Heading 1</h1>
+      <h2>Heading 2</h2>
+      <h3>Heading 3</h3>
+      <h4>Heading 4</h4>
+      <p>This is a paragraph of text. Test if this size is readable on your touchscreen display.</p>
+    </div>
+
+    <div class="test-section">
+      <h3>Test Menu</h3>
+      <p>Tap the hamburger menu (☰) in the top-right corner to test menu item sizes.</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 32px;">
+      <a href="gallery.html" class="btn">Test in Gallery</a>
+    </div>
+  </div>
+
+  <script>
+    const labels = {
+      'normal': 'Normal (Default)',
+      'a': 'Option A (+50% Bigger)',
+      'b': 'Option B (+100% Bigger)',
+      'c': 'Option C (+150% Bigger)'
+    };
+
+    function setSize(size) {
+      const cssLink = document.getElementById('supersize-css');
+      const btns = document.querySelectorAll('.size-btn');
+
+      btns.forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      if (size === 'normal') {
+        cssLink.href = '';
+      } else {
+        cssLink.href = `vernis-supersize-${size}.css`;
+      }
+
+      document.getElementById('current-label').textContent = labels[size];
+      localStorage.setItem('vernis-supersize', size);
+    }
+
+    // Load saved preference
+    const saved = localStorage.getItem('vernis-supersize');
+    if (saved && saved !== 'normal') {
+      setSize(saved);
+      document.querySelectorAll('.size-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase().includes(saved)) {
+          btn.classList.add('active');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
