@@ -44,3 +44,7 @@ config.json
 secrets.json
 pi-devices.json
 handover/
+
+# Personal notes / TODOs (not for public mirror)
+todo.txt
+todo2.txt
