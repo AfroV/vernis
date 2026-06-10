@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+  - button "Toggle Hue Sync" [ref=e2] [cursor=pointer]:
+    - img [ref=e3]
+  - button "Screen On/Off" [ref=e9] [cursor=pointer]:
+    - img [ref=e10]
+  - button "Exit Remote" [ref=e12] [cursor=pointer]:
+    - img [ref=e13]
+  - generic [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e18]: Vernis Remote
+      - generic [ref=e19]: Connecting...
+    - generic [ref=e20]:
+      - button "Previous" [ref=e21] [cursor=pointer]:
+        - img
+      - button "Play/Pause" [ref=e22] [cursor=pointer]:
+        - img
+      - button "Next" [ref=e23] [cursor=pointer]:
+        - img
+    - generic [ref=e24]:
+      - generic [ref=e27]: Connected
+      - generic [ref=e28]: "-- artworks"
+    - button "Start Gallery" [ref=e29] [cursor=pointer]

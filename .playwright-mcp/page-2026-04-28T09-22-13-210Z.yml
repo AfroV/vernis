@@ -1,0 +1,94 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - link "Home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+    - link "Add Art" [ref=e5] [cursor=pointer]:
+      - /url: add.html
+    - link "Library" [ref=e6] [cursor=pointer]:
+      - /url: library.html
+    - link "Manage Art" [ref=e7] [cursor=pointer]:
+      - /url: manage.html
+    - link "Atelier" [ref=e8] [cursor=pointer]:
+      - /url: lab.html
+    - link "Settings" [ref=e9] [cursor=pointer]:
+      - /url: settings.html
+  - generic [ref=e10]:
+    - complementary [ref=e11]:
+      - generic [ref=e12]: Appearance
+      - generic [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+        - text: Theme
+      - generic [ref=e17]: Display
+      - generic [ref=e18] [cursor=pointer]:
+        - img [ref=e19]
+        - text: Display Settings
+      - generic [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+        - text: Screen Timeout
+      - generic [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - text: Orientation
+      - generic [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+        - text: Ambient Light
+      - generic [ref=e33]: Content
+      - generic [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+        - text: Ethereum RPC
+      - generic [ref=e37]: Storage
+      - generic [ref=e38] [cursor=pointer]:
+        - img [ref=e39]
+        - text: IPFS Pinning
+      - generic [ref=e41] [cursor=pointer]:
+        - img [ref=e42]
+        - text: External Drive
+      - generic [ref=e45] [cursor=pointer]:
+        - img [ref=e46]
+        - text: Backup
+      - generic [ref=e50] [cursor=pointer]:
+        - img [ref=e51]
+        - text: Storage Health
+      - generic [ref=e53]: System
+      - generic [ref=e54] [cursor=pointer]:
+        - img [ref=e55]
+        - text: Wi-Fi
+      - generic [ref=e60] [cursor=pointer]:
+        - img [ref=e61]
+        - text: Performance
+      - generic [ref=e63] [cursor=pointer]:
+        - img [ref=e64]
+        - text: System
+      - generic [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - text: HTTPS
+      - generic [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - text: Preserve
+      - generic [ref=e76] [cursor=pointer]:
+        - img [ref=e77]
+        - text: About
+      - generic [ref=e80] [cursor=pointer]:
+        - img [ref=e81]
+        - text: Help & Guide
+    - main [ref=e84]:
+      - generic [ref=e139]:
+        - generic [ref=e140]:
+          - heading "Wallets" [level=1] [ref=e141]
+          - paragraph [ref=e142]: Imported wallets that automatically sync new artworks. Toggle auto-sync per wallet, or check for new NFTs on demand. Add new wallets from the Library page.
+        - generic [ref=e144]:
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - generic [ref=e147]: "0xe17207fa28f5037d6744c2728ff3240a20940b7a"
+              - generic [ref=e148]: 0xe172…0b7a
+              - generic [ref=e149]: "285 NFTs · Auto-sync on · Last: 11 hr ago"
+            - generic "Auto-sync new artworks daily" [ref=e150] [cursor=pointer]
+            - button "Check Now" [ref=e151] [cursor=pointer]
+          - generic [ref=e152]:
+            - generic [ref=e153]:
+              - generic [ref=e154]: htmlnft.eth
+              - generic [ref=e155]: 0x0c0a…bdef
+              - generic [ref=e156]: "210 NFTs · Auto-sync on · Last: 12 hr ago"
+            - generic "Auto-sync new artworks daily" [ref=e157] [cursor=pointer]
+            - button "Check Now" [ref=e158] [cursor=pointer]
+      - text: RECOMMENDED ACTIVE ACTIVE
+  - button "⌨" [ref=e138] [cursor=pointer]

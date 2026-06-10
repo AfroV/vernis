@@ -1,0 +1,192 @@
+- generic [ref=e49]:
+  - button "Menu" [ref=e2] [cursor=pointer]
+  - generic [ref=e50]:
+    - complementary [ref=e51]:
+      - generic [ref=e52]: Appearance
+      - generic [ref=e53] [cursor=pointer]:
+        - img [ref=e54]
+        - text: Theme
+      - generic [ref=e57]: Display
+      - generic [ref=e58] [cursor=pointer]:
+        - img [ref=e59]
+        - text: Display Settings
+      - generic [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+        - text: Screen Timeout
+      - generic [ref=e66] [cursor=pointer]:
+        - img [ref=e67]
+        - text: Orientation
+      - generic [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+        - text: Ambient Light
+      - generic [ref=e73]: Content
+      - generic [ref=e74] [cursor=pointer]:
+        - img [ref=e75]
+        - text: Ethereum RPC
+      - generic [ref=e77] [cursor=pointer]:
+        - img [ref=e78]
+        - text: Wallets
+      - generic [ref=e81]: Storage
+      - generic [ref=e82] [cursor=pointer]:
+        - img [ref=e83]
+        - text: IPFS Pinning
+      - generic [ref=e85] [cursor=pointer]:
+        - img [ref=e86]
+        - text: External Drive
+      - generic [ref=e89] [cursor=pointer]:
+        - img [ref=e90]
+        - text: Backup
+      - generic [ref=e94] [cursor=pointer]:
+        - img [ref=e95]
+        - text: Storage Health
+      - generic [ref=e97]: System
+      - generic [ref=e98] [cursor=pointer]:
+        - img [ref=e99]
+        - text: Wi-Fi
+      - generic [ref=e104] [cursor=pointer]:
+        - img [ref=e105]
+        - text: Performance
+      - generic [ref=e107] [cursor=pointer]:
+        - img [ref=e108]
+        - text: System
+      - generic [ref=e111] [cursor=pointer]:
+        - img [ref=e112]
+        - text: HTTPS
+      - generic [ref=e115] [cursor=pointer]:
+        - img [ref=e116]
+        - text: Security
+      - generic [ref=e119] [cursor=pointer]:
+        - img [ref=e120]
+        - text: About
+      - generic [ref=e123] [cursor=pointer]:
+        - img [ref=e124]
+        - text: Help & Guide
+    - main [ref=e127]:
+      - text: RECOMMENDED ACTIVE ACTIVE
+      - generic [ref=e239]:
+        - generic [ref=e240]:
+          - heading "Security" [level=1] [ref=e241]
+          - paragraph [ref=e242]: Control who can change settings, delete files, and manage your library.
+        - heading "Access level" [level=2] [ref=e243]
+        - generic [ref=e244]:
+          - 'button "Open active Daily personal use at home. Best for: a device only you and trusted household members use. Full control from any browser on your network. ✓ Everyone has full control ✗ No protection if a guest finds the address" [pressed] [ref=e245] [cursor=pointer]':
+            - generic [ref=e246]:
+              - generic [ref=e248]: Open
+              - generic [ref=e249]: active
+            - paragraph [ref=e250]: Daily personal use at home.
+            - paragraph [ref=e251]: "Best for: a device only you and trusted household members use. Full control from any browser on your network."
+            - list [ref=e252]:
+              - listitem [ref=e253]:
+                - generic [ref=e254]: ✓
+                - generic [ref=e255]: Everyone has full control
+              - listitem [ref=e256]:
+                - generic [ref=e257]: ✗
+                - generic [ref=e258]: No protection if a guest finds the address
+          - 'button "Protected Friends and family visiting. Best for: people you know. They can interact with the gallery without being able to destroy anything. ✓ Browse, change theme, switch displayed art ✓ Control Hue lights 🔒 Deleting files requires PIN 🔒 Changing settings requires PIN" [ref=e259] [cursor=pointer]':
+            - generic [ref=e262]: Protected
+            - paragraph [ref=e263]: Friends and family visiting.
+            - paragraph [ref=e264]: "Best for: people you know. They can interact with the gallery without being able to destroy anything."
+            - list [ref=e265]:
+              - listitem [ref=e266]:
+                - generic [ref=e267]: ✓
+                - generic [ref=e268]: Browse, change theme, switch displayed art
+              - listitem [ref=e269]:
+                - generic [ref=e270]: ✓
+                - generic [ref=e271]: Control Hue lights
+              - listitem [ref=e272]:
+                - generic [ref=e273]: 🔒
+                - generic [ref=e274]: Deleting files requires PIN
+              - listitem [ref=e275]:
+                - generic [ref=e276]: 🔒
+                - generic [ref=e277]: Changing settings requires PIN
+          - 'button "Restricted Public events or strangers. Best for: gallery openings, parties with unknown guests, or any time you want your art to stay exactly as you curated it. ✓ View the gallery on the home page 🔒 Changing the displayed art requires PIN 🔒 Settings, library, deletion all require PIN" [ref=e278] [cursor=pointer]':
+            - generic [ref=e281]: Restricted
+            - paragraph [ref=e282]: Public events or strangers.
+            - paragraph [ref=e283]: "Best for: gallery openings, parties with unknown guests, or any time you want your art to stay exactly as you curated it."
+            - list [ref=e284]:
+              - listitem [ref=e285]:
+                - generic [ref=e286]: ✓
+                - generic [ref=e287]: View the gallery on the home page
+              - listitem [ref=e288]:
+                - generic [ref=e289]: 🔒
+                - generic [ref=e290]: Changing the displayed art requires PIN
+              - listitem [ref=e291]:
+                - generic [ref=e292]: 🔒
+                - generic [ref=e293]: Settings, library, deletion all require PIN
+        - heading "PIN" [level=2] [ref=e294]
+        - button "Set PIN" [active] [ref=e296] [cursor=pointer]
+        - heading "Active sessions" [level=2] [ref=e297]
+        - paragraph [ref=e299]: No PIN sessions yet.
+        - heading "Audit log" [level=2] [ref=e300]
+        - button "View recent activity" [ref=e301] [cursor=pointer]
+        - heading "Device password" [level=2] [ref=e302]
+        - paragraph [ref=e303]: Linux system password for SSH and console access. Changing this also keeps PIN recovery in sync.
+        - generic [ref=e304]:
+          - textbox "Current password" [ref=e305]
+          - button "Show" [ref=e306] [cursor=pointer]
+        - generic [ref=e307]:
+          - textbox "New password (min 8 characters)" [ref=e308]
+          - button "Show" [ref=e309] [cursor=pointer]
+        - generic [ref=e311]:
+          - textbox "Confirm password" [ref=e312]
+          - button "Show" [ref=e313] [cursor=pointer]
+        - button "Change Password" [ref=e314] [cursor=pointer]
+  - dialog "Set up your PIN" [ref=e315]:
+    - generic [ref=e316]:
+      - button "Back" [ref=e317] [cursor=pointer]: ←
+      - generic [ref=e318]: Step 1 of 2 — Device password
+    - generic [ref=e319]:
+      - generic [ref=e320]: Enter your Vernis device password to authorize PIN setup.
+      - generic [ref=e321]:
+        - textbox "Device password" [ref=e322]
+        - button "Next" [disabled] [ref=e323]
+      - generic [ref=e325]:
+        - generic [ref=e326]:
+          - button "1" [ref=e327] [cursor=pointer]
+          - button "2" [ref=e328] [cursor=pointer]
+          - button "3" [ref=e329] [cursor=pointer]
+          - button "4" [ref=e330] [cursor=pointer]
+          - button "5" [ref=e331] [cursor=pointer]
+          - button "6" [ref=e332] [cursor=pointer]
+          - button "7" [ref=e333] [cursor=pointer]
+          - button "8" [ref=e334] [cursor=pointer]
+          - button "9" [ref=e335] [cursor=pointer]
+          - button "0" [ref=e336] [cursor=pointer]
+        - generic [ref=e337]:
+          - button "q" [ref=e338] [cursor=pointer]
+          - button "w" [ref=e339] [cursor=pointer]
+          - button "e" [ref=e340] [cursor=pointer]
+          - button "r" [ref=e341] [cursor=pointer]
+          - button "t" [ref=e342] [cursor=pointer]
+          - button "y" [ref=e343] [cursor=pointer]
+          - button "u" [ref=e344] [cursor=pointer]
+          - button "i" [ref=e345] [cursor=pointer]
+          - button "o" [ref=e346] [cursor=pointer]
+          - button "p" [ref=e347] [cursor=pointer]
+        - generic [ref=e348]:
+          - button "a" [ref=e349] [cursor=pointer]
+          - button "s" [ref=e350] [cursor=pointer]
+          - button "d" [ref=e351] [cursor=pointer]
+          - button "f" [ref=e352] [cursor=pointer]
+          - button "g" [ref=e353] [cursor=pointer]
+          - button "h" [ref=e354] [cursor=pointer]
+          - button "j" [ref=e355] [cursor=pointer]
+          - button "k" [ref=e356] [cursor=pointer]
+          - button "l" [ref=e357] [cursor=pointer]
+        - generic [ref=e358]:
+          - button "⇧" [ref=e359] [cursor=pointer]
+          - button "z" [ref=e360] [cursor=pointer]
+          - button "x" [ref=e361] [cursor=pointer]
+          - button "c" [ref=e362] [cursor=pointer]
+          - button "v" [ref=e363] [cursor=pointer]
+          - button "b" [ref=e364] [cursor=pointer]
+          - button "n" [ref=e365] [cursor=pointer]
+          - button "m" [ref=e366] [cursor=pointer]
+          - button "⌫" [ref=e367] [cursor=pointer]
+        - generic [ref=e368]:
+          - button "?123" [ref=e369] [cursor=pointer]
+          - button "ÆØÅ" [ref=e370] [cursor=pointer]
+          - button "@" [ref=e371] [cursor=pointer]
+          - button "␣" [ref=e372] [cursor=pointer]
+          - button "." [ref=e373] [cursor=pointer]
+          - button "↵" [ref=e374] [cursor=pointer]

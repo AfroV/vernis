@@ -12,3 +12,5 @@ Pi 39 looks to have a green background on the main screen. non of the other devi
 
 
 Does the 3 levl of pin securety allso affect the bluethooth connection opion from the pi home screen? 
+
+verify if securety is set to c and user has pin that they can connect to new wifi and also that if they reset the password and after that are able to connect to wifi. 

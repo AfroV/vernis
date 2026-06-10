@@ -1,0 +1,51 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - link "Home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+    - link "Add Art" [ref=e5] [cursor=pointer]:
+      - /url: add.html
+    - link "Library" [ref=e6] [cursor=pointer]:
+      - /url: library.html
+    - link "Manage Art" [ref=e7] [cursor=pointer]:
+      - /url: manage.html
+    - link "Atelier" [ref=e8] [cursor=pointer]:
+      - /url: lab.html
+    - link "Settings" [ref=e9] [cursor=pointer]:
+      - /url: settings.html
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - heading "VERNIS" [level=1] [ref=e14]
+      - paragraph [ref=e16]: YOUR FOREVER GALLERY
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - heading "View Art" [level=3] [ref=e20]
+        - paragraph [ref=e21]: Let your Vernis become a living digital frame. Beautifully cycles through everything you own.
+        - link "View Art" [ref=e22] [cursor=pointer]:
+          - /url: gallery.html
+      - generic [ref=e23]:
+        - heading "Connect" [level=3] [ref=e24]
+        - paragraph [ref=e25]: Access Vernis from your phone or computer. Scan the QR code or use the link below.
+        - img "QR Code" [ref=e27]
+        - link "http://10.0.0.28" [ref=e29] [cursor=pointer]:
+          - /url: http://10.0.0.28
+      - generic [ref=e30]:
+        - heading "Remote Control" [level=3] [ref=e31]
+        - paragraph [ref=e32]: Control your gallery from any device. Navigate through artworks, pause, or play from your phone.
+        - link "Open Remote" [ref=e33] [cursor=pointer]:
+          - /url: remote.html
+      - generic [ref=e34]:
+        - heading "CSV Library" [level=3] [ref=e35]
+        - paragraph [ref=e36]: Browse curated NFT collections. Download CSV lists or install and pin them directly to your device.
+        - link "Browse Library" [ref=e37] [cursor=pointer]:
+          - /url: library.html
+      - generic [ref=e38]:
+        - heading "Manage Collection" [level=3] [ref=e39]
+        - paragraph [ref=e40]: Curate which NFTs appear in your gallery. Hide unwanted pieces or delete files completely.
+        - link "Manage Art" [ref=e41] [cursor=pointer]:
+          - /url: manage.html
+      - generic [ref=e42]:
+        - heading "Atelier" [level=3] [ref=e43]
+        - paragraph [ref=e44]: Experimental features, generative art and on-chain viewers.
+        - link "Enter Atelier" [ref=e45] [cursor=pointer]:
+          - /url: lab.html
+  - contentinfo [ref=e46]: © 2025-2026 AfroViking

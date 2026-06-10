@@ -1,0 +1,149 @@
+- generic [ref=e49]:
+  - button "Menu" [active] [ref=e2] [cursor=pointer]
+  - generic [ref=e138]:
+    - link "Home" [ref=e139] [cursor=pointer]:
+      - /url: index.html
+      - img [ref=e141]
+      - text: Home
+    - link "Add Art" [ref=e143] [cursor=pointer]:
+      - /url: add.html
+      - img [ref=e145]
+      - text: Add Art
+    - link "Library" [ref=e147] [cursor=pointer]:
+      - /url: library.html
+      - img [ref=e149]
+      - text: Library
+    - link "Manage Art" [ref=e151] [cursor=pointer]:
+      - /url: manage.html
+      - img [ref=e153]
+      - text: Manage Art
+    - link "View Art" [ref=e159] [cursor=pointer]:
+      - /url: gallery.html
+      - img [ref=e161]
+      - text: View Art
+    - link "Atelier" [ref=e163] [cursor=pointer]:
+      - /url: lab.html
+      - img [ref=e165]
+      - text: Atelier
+    - link "Settings":
+      - /url: settings.html
+      - generic:
+        - img
+      - text: Settings
+    - generic [ref=e167]:
+      - generic [ref=e168]: Appearance
+      - generic [ref=e169] [cursor=pointer]:
+        - img [ref=e170]
+        - text: Theme
+      - generic [ref=e173]: Display
+      - generic [ref=e174] [cursor=pointer]:
+        - img [ref=e175]
+        - text: Display Settings
+      - generic [ref=e178] [cursor=pointer]:
+        - img [ref=e179]
+        - text: Screen Timeout
+      - generic [ref=e182] [cursor=pointer]:
+        - img [ref=e183]
+        - text: Orientation
+      - generic [ref=e186] [cursor=pointer]:
+        - img [ref=e187]
+        - text: Ambient Light
+      - generic [ref=e189]: Content
+      - generic [ref=e190] [cursor=pointer]:
+        - img [ref=e191]
+        - text: Ethereum RPC
+      - generic [ref=e193] [cursor=pointer]:
+        - img [ref=e194]
+        - text: Wallets
+      - generic [ref=e197]: Storage
+      - generic [ref=e198] [cursor=pointer]:
+        - img [ref=e199]
+        - text: IPFS Pinning
+      - generic [ref=e201] [cursor=pointer]:
+        - img [ref=e202]
+        - text: External Drive
+      - generic [ref=e205] [cursor=pointer]:
+        - img [ref=e206]
+        - text: Backup
+      - generic [ref=e210] [cursor=pointer]:
+        - img [ref=e211]
+        - text: Storage Health
+      - generic [ref=e213]: System
+      - generic [ref=e214] [cursor=pointer]:
+        - img [ref=e215]
+        - text: Wi-Fi
+      - generic [ref=e220] [cursor=pointer]:
+        - img [ref=e221]
+        - text: Performance
+      - generic [ref=e223] [cursor=pointer]:
+        - img [ref=e224]
+        - text: System
+      - generic [ref=e227] [cursor=pointer]:
+        - img [ref=e228]
+        - text: HTTPS
+      - generic [ref=e231] [cursor=pointer]:
+        - img [ref=e232]
+        - text: Security
+      - generic [ref=e235] [cursor=pointer]:
+        - img [ref=e236]
+        - text: About
+  - complementary [ref=e51]:
+    - generic [ref=e52]: Appearance
+    - generic [ref=e53] [cursor=pointer]:
+      - img [ref=e54]
+      - text: Theme
+    - generic [ref=e57]: Display
+    - generic [ref=e58] [cursor=pointer]:
+      - img [ref=e59]
+      - text: Display Settings
+    - generic [ref=e62] [cursor=pointer]:
+      - img [ref=e63]
+      - text: Screen Timeout
+    - generic [ref=e66] [cursor=pointer]:
+      - img [ref=e67]
+      - text: Orientation
+    - generic [ref=e70] [cursor=pointer]:
+      - img [ref=e71]
+      - text: Ambient Light
+    - generic [ref=e73]: Content
+    - generic [ref=e74] [cursor=pointer]:
+      - img [ref=e75]
+      - text: Ethereum RPC
+    - generic [ref=e77] [cursor=pointer]:
+      - img [ref=e78]
+      - text: Wallets
+    - generic [ref=e81]: Storage
+    - generic [ref=e82] [cursor=pointer]:
+      - img [ref=e83]
+      - text: IPFS Pinning
+    - generic [ref=e85] [cursor=pointer]:
+      - img [ref=e86]
+      - text: External Drive
+    - generic [ref=e89] [cursor=pointer]:
+      - img [ref=e90]
+      - text: Backup
+    - generic [ref=e94] [cursor=pointer]:
+      - img [ref=e95]
+      - text: Storage Health
+    - generic [ref=e97]: System
+    - generic [ref=e98] [cursor=pointer]:
+      - img [ref=e99]
+      - text: Wi-Fi
+    - generic [ref=e104] [cursor=pointer]:
+      - img [ref=e105]
+      - text: Performance
+    - generic [ref=e107] [cursor=pointer]:
+      - img [ref=e108]
+      - text: System
+    - generic [ref=e111] [cursor=pointer]:
+      - img [ref=e112]
+      - text: HTTPS
+    - generic [ref=e115] [cursor=pointer]:
+      - img [ref=e116]
+      - text: Security
+    - generic [ref=e119] [cursor=pointer]:
+      - img [ref=e120]
+      - text: About
+    - generic [ref=e123] [cursor=pointer]:
+      - img [ref=e124]
+      - text: Help & Guide

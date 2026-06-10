@@ -1,0 +1,19 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e6]: VERNIS
+    - generic [ref=e8]: YOUR FOREVER GALLERY
+    - generic [ref=e10]: Loading your NFT collection...
+  - generic:
+    - generic "Toggle Fullscreen" [ref=e11] [cursor=pointer]:
+      - img
+    - img [ref=e13] [cursor=pointer]
+    - button "i" [ref=e15] [cursor=pointer]
+    - generic [ref=e16]:
+      - button "Previous" [ref=e17] [cursor=pointer]:
+        - img
+      - button "Play/Pause" [ref=e18] [cursor=pointer]:
+        - img
+      - button "Next" [ref=e19] [cursor=pointer]:
+        - img
+  - generic [ref=e22]: No metadata available
+  - img

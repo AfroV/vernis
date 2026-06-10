@@ -57,6 +57,49 @@ if not os.environ.get("PYTEST_CURRENT_TEST"):
     TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # ========================================
+# Network: primary IP detection
+# ========================================
+# Ranges that should never be shown as the device's reachable address:
+# NetworkManager hotspot/shared (10.42.x, 192.168.50.x), link-local, docker,
+# and loopback. A stale 10.42.x lease was being shown on the connect card.
+_NON_LAN_IP_PREFIXES = ("10.42.", "192.168.50.", "169.254.", "172.17.", "127.")
+
+def get_primary_ip():
+    """Return the device's current primary LAN IP (source IP of the default route).
+
+    Uses a UDP socket trick that consults the routing table without sending any
+    packets, so it reflects the live primary interface even when offline (as long
+    as a default route exists). Falls back to `hostname -I` with hotspot/virtual
+    addresses filtered out. Returns None only if no usable address is found.
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+        if ip and not ip.startswith(_NON_LAN_IP_PREFIXES):
+            return ip
+    except Exception:
+        pass
+
+    # Fallback: enumerate all assigned addresses and pick the first real LAN one.
+    try:
+        result = subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=5)
+        all_ips = result.stdout.split() if result.stdout else []
+        for ip in all_ips:
+            if ":" not in ip and not ip.startswith(_NON_LAN_IP_PREFIXES):
+                return ip
+        # Last resort: any non-loopback address, even a hotspot one.
+        for ip in all_ips:
+            if ":" not in ip and not ip.startswith("127."):
+                return ip
+    except Exception:
+        pass
+    return None
+
+# ========================================
 # Security: CID validation
 # ========================================
 _CID_RE = re.compile(r'^(Qm[a-zA-Z0-9]{44}|baf[a-z2-7]{50,})(/[\w\-\.]+)*$')
@@ -1933,23 +1976,12 @@ def generate_qrcode():
         }
         colors = theme_colors.get(theme, theme_colors['gallery'])
 
-        # Get actual IP address
-        def get_local_ip():
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                ip = s.getsockname()[0]
-                s.close()
-                return ip
-            except:
-                return None
-
         # Allow custom URL (e.g. Bluetooth PAN address)
         custom_url = request.args.get('url')
         if custom_url:
             host = custom_url
         else:
-            ip = get_local_ip()
+            ip = get_primary_ip()
             host = f"http://{ip}" if ip else request.host_url.rstrip('/')
 
         # Generate QR code with high error correction for logo overlay
@@ -2242,8 +2274,19 @@ def https_setup():
             caddy_content,
             count=1
         )
-        # Append HTTP→HTTPS redirect block
-        new_content += "\n\n:80 {\n\tredir https://{host}{uri} permanent\n}\n"
+        # The Bluetooth-PAN gateway must stay PLAIN HTTP — the phone has no cert
+        # for 10.44.0.1, so redirecting it to HTTPS breaks offline BT navigation.
+        # Caddy matches this specific IP block before the :80 catch-all, so we
+        # carve it out first, then redirect everything else HTTP→HTTPS.
+        new_content += (
+            "\n\nhttp://10.44.0.1 {\n"
+            "\troot * /var/www/vernis\n"
+            "\tfile_server\n"
+            "\treverse_proxy /api/* localhost:5000\n"
+            "\treverse_proxy /nfts/* localhost:5000\n"
+            "}\n"
+            "\n:80 {\n\tredir https://{host}{uri} permanent\n}\n"
+        )
 
         # Write to temp file
         tmp_path = "/tmp/Caddyfile.new"
@@ -2552,24 +2595,8 @@ def status():
         except:
             pass
 
-        # Get device IP address (prefer main network, skip hotspot 192.168.50.x)
-        try:
-            ip_result = subprocess.run(
-                ["hostname", "-I"],
-                capture_output=True, text=True, timeout=5
-            )
-            all_ips = ip_result.stdout.strip().split() if ip_result.stdout.strip() else []
-            # Filter out hotspot IPs (192.168.50.x) and prefer main network
-            ip_address = "Unknown"
-            for ip in all_ips:
-                if not ip.startswith("192.168.50."):
-                    ip_address = ip
-                    break
-            # Fallback to first IP if all are hotspot
-            if ip_address == "Unknown" and all_ips:
-                ip_address = all_ips[0]
-        except:
-            ip_address = "Unknown"
+        # Get device IP address (live primary LAN IP, hotspot/stale addresses filtered)
+        ip_address = get_primary_ip() or "Unknown"
 
         return jsonify({
             "ssid": ssid,
@@ -12922,6 +12949,43 @@ _fix_mislabeled_avif()
 # Bluetooth PAN
 # ========================================
 
+# ========================================
+# Lab media cache — so lab pieces show a still image with no internet.
+# Frontend points <img> at /api/lab-media?url=<remote>. We download+cache once
+# while online, serve the cached copy offline, and 404 (-> onerror placeholder)
+# if it was never cached.
+# ========================================
+LAB_CACHE_DIR = Path("/opt/vernis/lab-cache")
+_LAB_MEDIA_HOSTS = ("media.artblocks.io", "generator.artblocks.io")
+
+@app.route("/api/lab-media")
+def lab_media():
+    from urllib.parse import urlparse
+    url = request.args.get("url", "").strip()
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or p.hostname not in _LAB_MEDIA_HOSTS:
+        return jsonify({"error": "url not allowed"}), 400
+    key = re.sub(r'[^A-Za-z0-9._-]', '_', (p.hostname or "") + p.path)[:120] or "lab.png"
+    cache_file = LAB_CACHE_DIR / key
+    if cache_file.exists() and cache_file.stat().st_size > 0:
+        return send_file(str(cache_file))
+    # Not cached -> try to fetch (online). Offline -> 404 so the UI falls back.
+    try:
+        LAB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        r = requests.get(url, timeout=8, stream=True)
+        if r.status_code != 200:
+            return jsonify({"error": "upstream %d" % r.status_code}), 502
+        tmp = cache_file.with_name(cache_file.name + ".tmp")
+        with open(tmp, "wb") as f:
+            for chunk in r.iter_content(8192):
+                if chunk:
+                    f.write(chunk)
+        tmp.replace(cache_file)
+        return send_file(str(cache_file))
+    except Exception:
+        return jsonify({"error": "offline or unreachable"}), 404
+
+
 _bt_pairing = {"pin": None, "device": None, "timestamp": 0}
 
 @app.route("/api/bluetooth/status")
@@ -13109,21 +13173,44 @@ def bluetooth_discoverable():
     enabled = data.get("enabled", True)
     cmd = "on" if enabled else "off"
     try:
-        subprocess.run(
-            ["bluetoothctl", "discoverable", cmd],
-            capture_output=True, text=True, timeout=5
-        )
         if enabled:
-            subprocess.run(
-                ["bluetoothctl", "pairable", "on"],
-                capture_output=True, text=True, timeout=5
-            )
-            # Cancel previous auto-off timer, start new one
+            # Power on + pairable BEFORE discoverable, or the phone never sees
+            # the Pi: a plain "discoverable on" silently no-ops when the adapter
+            # is powered off or no controller is selected.
+            subprocess.run(["bluetoothctl", "power", "on"],
+                           capture_output=True, text=True, timeout=5)
+            # The Pi's built-in BT (hciuart) can lose its firmware/UART at boot,
+            # so "power on" fails (org.bluez.Error.Failed) and it can never go
+            # discoverable. If the adapter didn't power on, reset the BT stack
+            # once and retry. (Needs sudoers: systemctl restart hciuart/bluetooth.)
+            chk = subprocess.run(["bluetoothctl", "show"],
+                                 capture_output=True, text=True, timeout=5)
+            if "Powered: yes" not in chk.stdout:
+                subprocess.run(["sudo", "systemctl", "restart", "hciuart"],
+                               capture_output=True, timeout=15)
+                subprocess.run(["sudo", "systemctl", "restart", "bluetooth"],
+                               capture_output=True, timeout=15)
+                time.sleep(3)
+                subprocess.run(["bluetoothctl", "power", "on"],
+                               capture_output=True, text=True, timeout=5)
+            subprocess.run(["bluetoothctl", "pairable", "on"],
+                           capture_output=True, text=True, timeout=5)
+        subprocess.run(["bluetoothctl", "discoverable", cmd],
+                       capture_output=True, text=True, timeout=5)
+        # Verify it actually took, and report the real state back to the UI.
+        show = subprocess.run(["bluetoothctl", "show"],
+                              capture_output=True, text=True, timeout=5)
+        powered = "Powered: yes" in show.stdout
+        really_disc = "Discoverable: yes" in show.stdout
+        if enabled:
+            # Cancel previous auto-off timer, start a new one
             _bt_discoverable_cancel.set()
             _bt_discoverable_cancel.clear()
             t = threading.Thread(target=_discoverable_auto_off, daemon=True)
             t.start()
-        return jsonify({"success": True, "discoverable": enabled})
+        return jsonify({"success": True,
+                        "discoverable": really_disc if enabled else False,
+                        "powered": powered})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

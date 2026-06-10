@@ -1,0 +1,15 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic "Toggle Fullscreen" [ref=e2] [cursor=pointer]:
+      - img
+    - img [ref=e4] [cursor=pointer]
+    - button "i" [ref=e6] [cursor=pointer]
+    - generic [ref=e7]:
+      - button "Previous" [ref=e8] [cursor=pointer]:
+        - img
+      - button "Play/Pause" [ref=e9] [cursor=pointer]:
+        - img
+      - button "Next" [ref=e10] [cursor=pointer]:
+        - img
+  - generic [ref=e13]: No metadata available
+  - img

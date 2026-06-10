@@ -1,0 +1,20 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic "Toggle Fullscreen" [ref=e2]:
+      - img
+    - img [ref=e4]
+    - generic [ref=e5]:
+      - button "Hue Sync OFF - Click to enable" [ref=e14]:
+        - img [ref=e15]
+      - button "i" [ref=e6]
+    - generic: 1 of 130 viewed • <1 min
+    - generic [ref=e7]:
+      - button "Previous" [ref=e8]:
+        - img
+      - button "Play/Pause" [ref=e9]:
+        - img
+      - button "Next" [ref=e10]:
+        - img
+  - generic [ref=e13]: No metadata available
+  - img
+  - img [ref=e22]

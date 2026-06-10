@@ -18,7 +18,7 @@ echo "Creating Vernis update package: $OUTPUT"
 echo "Source: $PROJECT_DIR"
 
 # Create temporary directory structure
-mkdir -p "$TEMP_DIR"/{www,scripts,systemd}
+mkdir -p "$TEMP_DIR"/{www,scripts}
 
 # Copy web files
 echo "Copying web files..."
@@ -42,11 +42,12 @@ cp "$PROJECT_DIR"/scripts/*.sh "$TEMP_DIR/scripts/" 2>/dev/null || true
 cp "$PROJECT_DIR"/scripts/*.py "$TEMP_DIR/scripts/" 2>/dev/null || true
 cp "$PROJECT_DIR"/scripts/*.c "$TEMP_DIR/scripts/" 2>/dev/null || true
 
-# Copy systemd files if they exist
-if [ -d "$PROJECT_DIR/systemd" ]; then
-    cp "$PROJECT_DIR"/systemd/*.service "$TEMP_DIR/systemd/" 2>/dev/null || true
-    cp "$PROJECT_DIR"/systemd/*.timer "$TEMP_DIR/systemd/" 2>/dev/null || true
-fi
+# NOTE: systemd unit files are intentionally NOT packaged. They are
+# device-specific (install-vernis.sh generates vernis-api.service with
+# User=$USER_NAME). Shipping the repo's systemd/vernis-api.service (User=pi)
+# would clobber the device's correct User= and crash the API (status=217/USER)
+# on any device whose user isn't "pi". Service files are managed by the
+# installer only, never by updates.
 
 # Create tarball
 echo "Creating tarball..."

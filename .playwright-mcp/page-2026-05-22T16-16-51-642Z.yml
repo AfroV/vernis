@@ -1,0 +1,18 @@
+- button "Menu" [ref=e2] [cursor=pointer]
+- generic [ref=e6] [cursor=pointer]:
+  - generic [ref=e7]: ✓
+  - generic [ref=e8]: Vernis
+- generic [ref=e14] [cursor=pointer]: Museum Gallery
+- generic [ref=e20] [cursor=pointer]: Nordic Elegance
+- generic [ref=e26] [cursor=pointer]: X
+- generic [ref=e32] [cursor=pointer]: Royal
+- generic [ref=e38] [cursor=pointer]: Pop Art
+- button "☀️ Light" [ref=e43] [cursor=pointer]:
+  - generic [ref=e44]: ☀️
+  - text: Light
+- button "🌙 Dark" [ref=e45] [cursor=pointer]:
+  - generic [ref=e46]: 🌙
+  - text: Dark
+- button "🌗 Auto" [ref=e47] [cursor=pointer]:
+  - generic [ref=e48]: 🌗
+  - text: Auto

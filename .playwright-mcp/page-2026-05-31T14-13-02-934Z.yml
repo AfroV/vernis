@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - link "Home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+    - link "Add Art" [ref=e5] [cursor=pointer]:
+      - /url: add.html
+    - link "Library" [ref=e6] [cursor=pointer]:
+      - /url: library.html
+    - link "Manage Art" [ref=e7] [cursor=pointer]:
+      - /url: manage.html
+    - link "Settings" [ref=e8] [cursor=pointer]:
+      - /url: settings.html
+  - generic [ref=e9]:
+    - heading "CSV Library" [level=1] [ref=e10]
+    - generic [ref=e11]: Browse, search and install curated NFT collections
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - img
+        - textbox "Search collections by name or description..." [ref=e14]
+      - 'generic "Storage: 33.9 GB used / 116.6 GB total (77.9 GB free)" [ref=e66]':
+        - img [ref=e16]
+        - generic [ref=e19]: 71%
+      - combobox [ref=e21] [cursor=pointer]:
+        - option "Name (A-Z)"
+        - option "Name (Z-A)"
+        - option "Installed First"
+        - option "Progress" [selected]
+    - generic [ref=e22]:
+      - generic [ref=e67] [cursor=pointer]:
+        - img [ref=e69]
+        - generic [ref=e71]: Add Collection
+        - generic [ref=e72]: Upload a CSV file to add NFTs
+      - generic [ref=e73]:
+        - button "More options" [ref=e75] [cursor=pointer]:
+          - img [ref=e76]
+        - heading "Shortcut Works" [level=3] [ref=e80]
+        - generic [ref=e81]: 185 NFTs
+        - generic [ref=e82]: NFT collection
+        - button "Stop" [ref=e84] [cursor=pointer]
+        - generic [ref=e87]: Retrying 4 timed out (180s timeout)
+      - generic [ref=e88]:
+        - button "More options" [ref=e90] [cursor=pointer]:
+          - img [ref=e91]
+        - heading "sc-vault.eth" [level=3] [ref=e95]
+        - generic [ref=e96]: 1566 NFTs
+        - generic [ref=e97]: NFTs from wallet
+        - button "Resume" [ref=e99] [cursor=pointer]
+        - generic [ref=e100]:
+          - generic "Auto-update daily" [ref=e101] [cursor=pointer]
+          - generic [ref=e102]: "Last: 4m ago"
+          - button "Check for new NFTs now" [ref=e103] [cursor=pointer]:
+            - img [ref=e104]
+        - generic [ref=e110]: 1288 of 1566 downloaded · 278 remaining

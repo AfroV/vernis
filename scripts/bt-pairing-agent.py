@@ -17,10 +17,11 @@ AGENT_PATH = "/vernis/bt_agent"
 BACKEND_URL = "http://localhost:5000/api/bluetooth/pairing"
 CAPABILITY = "DisplayYesNo"
 
-# Delay before Pi confirms its side of pairing. Without this, some PCs
-# (Windows especially) auto-dismiss their BT pairing dialog as soon as
-# the remote end has confirmed, leaving the user no time to click Pair.
-CONFIRM_DELAY_MS = 18000
+# Confirm the Pi's side of pairing immediately. Phones (iOS especially)
+# abort pairing if the Pi delays its confirmation, so we must respond fast.
+# A long delay was previously added to suit Windows PCs, but it broke iPhone
+# pairing; this deployment is phone-only, so confirm right away.
+CONFIRM_DELAY_MS = 0
 
 
 def notify_backend(pin, device, event="pin"):

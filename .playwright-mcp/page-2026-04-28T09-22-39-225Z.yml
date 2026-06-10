@@ -1,0 +1,104 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - link "Home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+    - link "Add Art" [ref=e5] [cursor=pointer]:
+      - /url: add.html
+    - link "Library" [ref=e6] [cursor=pointer]:
+      - /url: library.html
+    - link "Manage Art" [ref=e7] [cursor=pointer]:
+      - /url: manage.html
+    - link "Atelier" [ref=e8] [cursor=pointer]:
+      - /url: lab.html
+    - link "Settings" [ref=e9] [cursor=pointer]:
+      - /url: settings.html
+  - generic [ref=e10]:
+    - complementary [ref=e11]:
+      - generic [ref=e12]: Appearance
+      - generic [ref=e13] [cursor=pointer]:
+        - img [ref=e14]
+        - text: Theme
+      - generic [ref=e17]: Display
+      - generic [ref=e18] [cursor=pointer]:
+        - img [ref=e19]
+        - text: Display Settings
+      - generic [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+        - text: Screen Timeout
+      - generic [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - text: Orientation
+      - generic [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+        - text: Ambient Light
+      - generic [ref=e33]: Content
+      - generic [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+        - text: Ethereum RPC
+      - generic [ref=e37] [cursor=pointer]:
+        - img [ref=e38]
+        - text: Wallets
+      - generic [ref=e41]: Storage
+      - generic [ref=e42] [cursor=pointer]:
+        - img [ref=e43]
+        - text: IPFS Pinning
+      - generic [ref=e45] [cursor=pointer]:
+        - img [ref=e46]
+        - text: External Drive
+      - generic [ref=e49] [cursor=pointer]:
+        - img [ref=e50]
+        - text: Backup
+      - generic [ref=e54] [cursor=pointer]:
+        - img [ref=e55]
+        - text: Storage Health
+      - generic [ref=e57]: System
+      - generic [ref=e58] [cursor=pointer]:
+        - img [ref=e59]
+        - text: Wi-Fi
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - text: Performance
+      - generic [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - text: System
+      - generic [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - text: HTTPS
+      - generic [ref=e75] [cursor=pointer]:
+        - img [ref=e76]
+        - text: Preserve
+      - generic [ref=e80] [cursor=pointer]:
+        - img [ref=e81]
+        - text: About
+      - generic [ref=e84] [cursor=pointer]:
+        - img [ref=e85]
+        - text: Help & Guide
+    - main [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e90]:
+          - heading "Choose Your Style" [level=1] [ref=e91]
+          - paragraph [ref=e92]: Select from our curated collection of premium themes
+        - generic [ref=e93]:
+          - heading "Color Theme" [level=3] [ref=e94]
+          - generic [ref=e95]:
+            - generic [ref=e96] [cursor=pointer]:
+              - generic [ref=e97]: ✓
+              - generic [ref=e98]: Vernis
+            - generic [ref=e104] [cursor=pointer]: Museum Gallery
+            - generic [ref=e110] [cursor=pointer]: Nordic Elegance
+            - generic [ref=e116] [cursor=pointer]: X
+            - generic [ref=e122] [cursor=pointer]: Royal
+            - generic [ref=e128] [cursor=pointer]: Pop Art
+        - generic [ref=e133]:
+          - heading "Light / Dark Mode" [level=3] [ref=e134]
+          - generic [ref=e135]:
+            - button "☀️ Light" [ref=e136] [cursor=pointer]:
+              - generic [ref=e137]: ☀️
+              - text: Light
+            - button "🌙 Dark" [ref=e138] [cursor=pointer]:
+              - generic [ref=e139]: 🌙
+              - text: Dark
+            - button "🌗 Auto" [ref=e140] [cursor=pointer]:
+              - generic [ref=e141]: 🌗
+              - text: Auto
+  - button "⌨" [ref=e142] [cursor=pointer]

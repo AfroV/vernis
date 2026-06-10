@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>connect.html — Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f0d0d;
+    color: #e5e5e5;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+
+  .connect-container {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  /* Logo */
+  .logo-section {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .logo-mark {
+    width: 56px; height: 56px;
+    background: radial-gradient(circle at 35% 35%, #d4af37, #8b6914);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px;
+    box-shadow: 0 4px 20px rgba(212,175,55,0.25);
+  }
+  .logo-mark span {
+    font-size: 26px; font-weight: 700; color: #0f0d0d;
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+  .logo-title {
+    font-size: 22px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase;
+    color: #e5e5e5;
+  }
+  .logo-sub {
+    font-size: 12px; color: #888; margin-top: 4px; letter-spacing: 1px;
+  }
+
+  /* Tabbed Panel */
+  .panel {
+    background: rgba(30,28,28,0.85);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .tab {
+    flex: 1;
+    padding: 16px 12px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #777;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: none; border-top: none; border-left: none; border-right: none;
+  }
+  .tab:hover { color: #bbb; }
+  .tab.active {
+    color: #d4af37;
+    border-bottom-color: #d4af37;
+  }
+  .tab svg { width: 18px; height: 18px; }
+
+  .tab-content {
+    display: none;
+    padding: 28px 24px;
+    min-height: 320px;
+  }
+  .tab-content.active { display: block; }
+
+  /* WiFi Tab */
+  .qr-area {
+    width: 180px; height: 180px;
+    background: #fff;
+    border-radius: 12px;
+    margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .qr-placeholder {
+    width: 150px; height: 150px;
+    background: repeating-conic-gradient(#333 0% 25%, #fff 0% 50%) 50% / 12px 12px;
+    border-radius: 4px;
+  }
+  .qr-logo {
+    position: absolute;
+    width: 36px; height: 36px;
+    background: #0f0d0d;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qr-logo span { color: #d4af37; font-weight: 700; font-size: 16px; font-family: 'Playfair Display', serif; }
+
+  .ip-display {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .ip-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+  .ip-value {
+    font-size: 20px; font-weight: 600; color: #d4af37;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    letter-spacing: 1px;
+  }
+
+  .connection-status {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px;
+    background: rgba(50,215,75,0.08);
+    border: 1px solid rgba(50,215,75,0.15);
+    border-radius: 10px;
+    font-size: 13px; color: #32d74b;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #32d74b;
+    animation: pulse 2s ease infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Bluetooth Tab */
+  .bt-icon-large {
+    width: 72px; height: 72px;
+    background: rgba(55,120,250,0.1);
+    border: 1px solid rgba(55,120,250,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+  }
+  .bt-icon-large svg { width: 32px; height: 32px; color: #3778fa; }
+
+  .device-name {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .device-name .label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+  .device-name .name { font-size: 20px; font-weight: 600; color: #e5e5e5; }
+
+  .bt-steps {
+    list-style: none;
+    margin-bottom: 24px;
+  }
+  .bt-steps li {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13px; color: #aaa;
+    line-height: 1.5;
+  }
+  .bt-steps li:last-child { border-bottom: none; }
+  .step-num {
+    width: 24px; height: 24px;
+    background: rgba(55,120,250,0.12);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: #3778fa;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .bt-status {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px;
+    background: rgba(55,120,250,0.08);
+    border: 1px solid rgba(55,120,250,0.15);
+    border-radius: 10px;
+    font-size: 13px; color: #3778fa;
+  }
+
+  /* PIN Overlay (shown during pairing) */
+  .pin-overlay {
+    text-align: center;
+    padding: 20px 0;
+  }
+  .pin-label { font-size: 13px; color: #888; margin-bottom: 12px; }
+  .pin-code {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: 12px;
+    color: #d4af37;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    text-shadow: 0 0 30px rgba(212,175,55,0.3);
+    margin-bottom: 12px;
+  }
+  .pin-device { font-size: 12px; color: #666; }
+  .pin-spinner {
+    width: 24px; height: 24px;
+    border: 2px solid rgba(212,175,55,0.2);
+    border-top-color: #d4af37;
+    border-radius: 50%;
+    margin: 16px auto 0;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Footer */
+  .panel-footer {
+    padding: 16px 24px;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    text-align: center;
+    font-size: 11px; color: #555;
+  }
+  .panel-footer a { color: #888; text-decoration: none; }
+
+  /* View Toggle */
+  .view-toggle {
+    display: flex; gap: 12px; justify-content: center; margin-bottom: 24px;
+  }
+  .view-btn {
+    padding: 8px 20px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #888;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .view-btn:hover { border-color: rgba(255,255,255,0.2); color: #ccc; }
+  .view-btn.active { background: rgba(212,175,55,0.1); border-color: rgba(212,175,55,0.3); color: #d4af37; }
+
+  .mockup-set { display: none; }
+  .mockup-set.active { display: block; }
+
+  .mockup-label {
+    text-align: center; font-size: 12px; color: #666;
+    text-transform: uppercase; letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+  <div style="width:100%; max-width: 900px;">
+    <h2 style="text-align:center; color:#e5e5e5; margin-bottom:8px; font-size:20px;">connect.html — Tabbed Panel Mockup</h2>
+    <p style="text-align:center; color:#777; margin-bottom:24px; font-size:13px;">Three views: WiFi tab, Bluetooth tab, and Pairing PIN state</p>
+
+    <div class="view-toggle">
+      <button class="view-btn active" onclick="showView('wifi', this)">WiFi Tab</button>
+      <button class="view-btn" onclick="showView('bt', this)">Bluetooth Tab</button>
+      <button class="view-btn" onclick="showView('pin', this)">Pairing PIN</button>
+    </div>
+
+    <!-- WiFi View -->
+    <div class="mockup-set active" id="view-wifi">
+      <div class="mockup-label">Pi Screen / Phone View</div>
+      <div style="display:flex; justify-content:center;">
+        <div class="connect-container">
+          <div class="logo-section">
+            <div class="logo-mark"><span>V</span></div>
+            <div class="logo-title">Vernis</div>
+            <div class="logo-sub">Connect to your frame</div>
+          </div>
+          <div class="panel">
+            <div class="tabs">
+              <button class="tab active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                WiFi
+              </button>
+              <button class="tab">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11M12 2l3.5 3.5L12 9l3.5 3.5L12 16l3.5 3.5L12 23"/><path d="M12 2L8.5 5.5 12 9 8.5 12.5 12 16l-3.5 3.5L12 23"/></svg>
+                Bluetooth
+              </button>
+            </div>
+            <div class="tab-content active">
+              <div class="qr-area">
+                <div class="qr-placeholder"></div>
+                <div class="qr-logo"><span>V</span></div>
+              </div>
+              <div class="ip-display">
+                <div class="ip-label">Device Address</div>
+                <div class="ip-value">10.0.0.28</div>
+              </div>
+              <div class="connection-status">
+                <div class="status-dot"></div>
+                Connected to MyWiFi
+              </div>
+            </div>
+          </div>
+          <div style="text-align:center; margin-top:16px; font-size:11px; color:#444;">
+            Scan QR code or visit the address above from your phone or PC
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bluetooth View -->
+    <div class="mockup-set" id="view-bt">
+      <div class="mockup-label">Pi Screen / Phone View</div>
+      <div style="display:flex; justify-content:center;">
+        <div class="connect-container">
+          <div class="logo-section">
+            <div class="logo-mark"><span>V</span></div>
+            <div class="logo-title">Vernis</div>
+            <div class="logo-sub">Connect to your frame</div>
+          </div>
+          <div class="panel">
+            <div class="tabs">
+              <button class="tab">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                WiFi
+              </button>
+              <button class="tab active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11M12 2l3.5 3.5L12 9l3.5 3.5L12 16l3.5 3.5L12 23"/><path d="M12 2L8.5 5.5 12 9 8.5 12.5 12 16l-3.5 3.5L12 23"/></svg>
+                Bluetooth
+              </button>
+            </div>
+            <div class="tab-content active">
+              <div class="bt-icon-large">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11M12 2l3.5 3.5L12 9l3.5 3.5L12 16l3.5 3.5L12 23"/><path d="M12 2L8.5 5.5 12 9 8.5 12.5 12 16l-3.5 3.5L12 23"/></svg>
+              </div>
+              <div class="device-name">
+                <div class="label">Device Name</div>
+                <div class="name">Vernis-afrol</div>
+              </div>
+              <ol class="bt-steps">
+                <li><div class="step-num">1</div><div>Open <strong>Bluetooth settings</strong> on your phone or laptop</div></li>
+                <li><div class="step-num">2</div><div>Pair with <strong style="color:#e5e5e5;">Vernis-afrol</strong></div></li>
+                <li><div class="step-num">3</div><div>Confirm the PIN shown on this screen</div></li>
+                <li><div class="step-num">4</div><div>Connect to the <strong>PAN network</strong>, then visit <strong style="color:#3778fa;">https://10.44.0.1</strong></div></li>
+              </ol>
+              <div class="bt-status">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v.01M12 8v4"/></svg>
+                Waiting for pairing request...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIN View -->
+    <div class="mockup-set" id="view-pin">
+      <div class="mockup-label">Pi Screen — During Active Pairing</div>
+      <div style="display:flex; justify-content:center;">
+        <div class="connect-container">
+          <div class="logo-section">
+            <div class="logo-mark"><span>V</span></div>
+            <div class="logo-title">Vernis</div>
+            <div class="logo-sub">Connect to your frame</div>
+          </div>
+          <div class="panel">
+            <div class="tabs">
+              <button class="tab">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                WiFi
+              </button>
+              <button class="tab active">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11M12 2l3.5 3.5L12 9l3.5 3.5L12 16l3.5 3.5L12 23"/><path d="M12 2L8.5 5.5 12 9 8.5 12.5 12 16l-3.5 3.5L12 23"/></svg>
+                Bluetooth
+              </button>
+            </div>
+            <div class="tab-content active">
+              <div class="pin-overlay">
+                <div class="pin-label">Confirm this PIN on your device</div>
+                <div class="pin-code">847 293</div>
+                <div class="pin-device">Pairing with iPhone 15 Pro</div>
+                <div class="pin-spinner"></div>
+              </div>
+              <div style="text-align:center; font-size:12px; color:#555; margin-top:16px;">
+                PIN expires in 30 seconds
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showView(id, btn) {
+      document.querySelectorAll('.mockup-set').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.view-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('view-' + id).classList.add('active');
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

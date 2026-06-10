@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - link "Home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+    - link "Add Art" [ref=e5] [cursor=pointer]:
+      - /url: add.html
+    - link "Library" [ref=e6] [cursor=pointer]:
+      - /url: library.html
+    - link "Manage Art" [ref=e7] [cursor=pointer]:
+      - /url: manage.html
+    - link "Atelier" [ref=e8] [cursor=pointer]:
+      - /url: lab.html
+    - link "Settings" [ref=e9] [cursor=pointer]:
+      - /url: settings.html
+  - generic [ref=e10]:
+    - heading "Manage Art" [level=1] [ref=e11]
+    - generic [ref=e12]: Select which NFTs to display in your gallery slideshow
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: "0"
+        - generic [ref=e16]: Total NFTs
+      - generic [ref=e17]:
+        - generic [ref=e18]: "0"
+        - generic [ref=e19]: In Slideshow
+      - generic [ref=e20]:
+        - generic [ref=e21]: "0"
+        - generic [ref=e22]: Hidden
+      - generic [ref=e23]:
+        - generic [ref=e24]: "0"
+        - generic [ref=e25]: Selected
+    - generic [ref=e26]:
+      - button "Artworks" [ref=e27] [cursor=pointer]
+      - button "All IPFS Files" [ref=e28] [cursor=pointer]
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - button "↻ Refresh" [ref=e32] [cursor=pointer]
+          - button "Select All" [ref=e33] [cursor=pointer]
+          - button "Deselect All" [ref=e34] [cursor=pointer]
+          - button "Invert Selection" [ref=e35] [cursor=pointer]
+        - generic [ref=e36]:
+          - button "Show Only Selected" [ref=e37] [cursor=pointer]
+          - button "Add to Gallery" [ref=e38] [cursor=pointer]
+          - button "Hide Selected" [ref=e39] [cursor=pointer]
+          - button "Preview in Gallery" [ref=e40] [cursor=pointer]
+        - generic [ref=e41]: Tap artworks to select them, then use the buttons above to control which ones appear in your gallery slideshow.
+        - generic [ref=e42]:
+          - button "Filters" [ref=e43] [cursor=pointer]
+          - button "Collections" [ref=e44] [cursor=pointer]
+          - button "Slideshow Presets" [ref=e45] [cursor=pointer]
+      - generic [ref=e46]:
+        - text: Loading your artworks...
+        - text: Generating thumbnails for first load may take a moment

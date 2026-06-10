@@ -1,0 +1,26 @@
+<h2>Manual Layout Structure</h2>
+<p class="subtitle">How should users navigate through the manual?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Single Long Page with Sidebar TOC</h3>
+      <p>All content on one scrollable page. A sticky sidebar (or collapsible TOC on mobile) lets users jump to sections. Smooth scroll between sections. Similar to premium product documentation (like Apple's product guides). The entire manual is always visible — no hidden content.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tabbed Chapters</h3>
+      <p>Content split into chapter tabs at the top (Setup, Gallery, Settings, Advanced, etc.). Each tab shows only that chapter's content. Keeps the screen focused but requires tab switching. Works well on the 720px Pi screen since each chapter fits without deep scrolling.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Card-Based Hub (Recommended)</h3>
+      <p>Landing page with Vernis branding + URL input field at top, then a grid of chapter cards (same style as index.html). Tapping a card expands it into a full-page section with a back button. Matches the Vernis main page design you asked for. The hub is the "home" — each section is a focused deep-dive. Works great on both 720px kiosk and phone screens.</p>
+    </div>
+  </div>
+</div>

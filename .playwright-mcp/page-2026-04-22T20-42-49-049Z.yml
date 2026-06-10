@@ -1,0 +1,146 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - link "Home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+    - link "Add Art" [ref=e5] [cursor=pointer]:
+      - /url: add.html
+    - link "Library" [ref=e6] [cursor=pointer]:
+      - /url: library.html
+    - link "Manage Art" [ref=e7] [cursor=pointer]:
+      - /url: manage.html
+    - link "Atelier" [ref=e8] [cursor=pointer]:
+      - /url: lab.html
+    - link "Settings" [ref=e9] [cursor=pointer]:
+      - /url: settings.html
+  - generic [ref=e10]:
+    - heading "CSV Library" [level=1] [ref=e11]
+    - generic [ref=e12]: Browse, search and install curated NFT collections
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - img
+        - textbox "Search collections by name or description..." [ref=e15]
+      - generic "Disk Usage" [ref=e16]:
+        - img [ref=e17]
+        - generic [ref=e20]: "--"
+      - combobox [ref=e22] [cursor=pointer]:
+        - option "Name (A-Z)"
+        - option "Name (Z-A)"
+        - option "Installed First"
+        - option "Progress" [selected]
+      - button "Sync" [ref=e23] [cursor=pointer]:
+        - img [ref=e24]
+        - generic [ref=e29]: Sync
+    - generic [ref=e30]:
+      - generic [ref=e31] [cursor=pointer]:
+        - img [ref=e33]
+        - generic [ref=e35]: Add Collection
+        - generic [ref=e36]: Upload a CSV file to add NFTs
+      - generic [ref=e37]:
+        - button "More options" [ref=e39] [cursor=pointer]:
+          - img [ref=e40]
+        - heading "0xe17207fa28f5037d6744c2728ff3240a20940b7a" [level=3] [ref=e44]
+        - generic [ref=e45]: 228 NFTs
+        - generic [ref=e46]: 285 NFTs from Ethereum, Base, Optimism, Shape, Polygon, Zora
+        - button "Pin IPFS Files" [ref=e48] [cursor=pointer]
+        - generic [ref=e49]:
+          - generic "Auto-update daily" [ref=e50] [cursor=pointer]
+          - generic [ref=e51]: "Last: never"
+          - button "Check for new NFTs now" [ref=e52] [cursor=pointer]:
+            - img [ref=e53]
+        - generic [ref=e59]: ✓ 228 downloaded · 36/74 IPFS pinned
+      - generic [ref=e60]:
+        - button "More options" [ref=e62] [cursor=pointer]:
+          - img [ref=e63]
+        - heading "Hackatao Collection" [level=3] [ref=e67]
+        - generic [ref=e68]: 79 NFTs
+        - generic [ref=e69]: NFT collection
+        - button "Resume" [ref=e71] [cursor=pointer]
+        - generic [ref=e74]: 74 of 79 downloaded · 5 remaining
+      - generic [ref=e75]:
+        - button "More options" [ref=e77] [cursor=pointer]:
+          - img [ref=e78]
+        - heading "Doom Party" [level=3] [ref=e82]
+        - generic [ref=e83]: 75 NFTs
+        - generic [ref=e84]: NFT collection
+        - button "Resume" [ref=e86] [cursor=pointer]
+        - generic [ref=e89]: 62 of 75 downloaded · 13 remaining
+      - generic [ref=e90]:
+        - button "More options" [ref=e92] [cursor=pointer]:
+          - img [ref=e93]
+        - heading "Banksta" [level=3] [ref=e97]
+        - generic [ref=e98]: 31 NFTs
+        - generic [ref=e99]: NFT collection
+        - button "Resume" [ref=e101] [cursor=pointer]
+        - generic [ref=e104]:
+          - text: 22 of 31 downloaded ·
+          - generic [ref=e105] [cursor=pointer]: 7 failed (IPFS gateway timeout) ▾
+      - generic [ref=e106]:
+        - button "More options" [ref=e108] [cursor=pointer]:
+          - img [ref=e109]
+        - heading "X" [level=3] [ref=e113]
+        - generic [ref=e114]: 497 NFTs
+        - generic [ref=e115]: NFT collection
+        - button "Resume" [ref=e117] [cursor=pointer]
+        - generic [ref=e120]: 306 of 497 downloaded · 191 remaining
+      - generic [ref=e121]:
+        - button "More options" [ref=e123] [cursor=pointer]:
+          - img [ref=e124]
+        - heading "htmlnft.eth" [level=3] [ref=e128]
+        - generic [ref=e129]: 190 NFTs
+        - generic [ref=e130]: 179 NFTs from Ethereum
+        - button "Resume" [ref=e132] [cursor=pointer]
+        - generic [ref=e133]:
+          - generic "Auto-update daily" [ref=e134] [cursor=pointer]
+          - generic [ref=e135]: "Last: 11m ago"
+          - button "Check for new NFTs now" [ref=e136] [cursor=pointer]:
+            - img [ref=e137]
+        - generic [ref=e143]: 104 of 190 downloaded · 86 remaining
+      - generic [ref=e144]:
+        - button "More options" [ref=e146] [cursor=pointer]:
+          - img [ref=e147]
+        - heading "Async Art Blueprints Nfts" [level=3] [ref=e151]
+        - generic [ref=e152]: 20547 NFTs
+        - generic [ref=e153]: NFT collection
+        - button "Install" [ref=e155] [cursor=pointer]
+      - generic [ref=e158]:
+        - button "More options" [ref=e160] [cursor=pointer]:
+          - img [ref=e161]
+        - heading "Async Art V1 Nfts" [level=3] [ref=e165]
+        - generic [ref=e166]: 337 NFTs
+        - generic [ref=e167]: NFT collection
+        - button "Install" [ref=e169] [cursor=pointer]
+      - generic [ref=e172]:
+        - button "More options" [ref=e174] [cursor=pointer]:
+          - img [ref=e175]
+        - heading "Async Art V2 Nfts" [level=3] [ref=e179]
+        - generic [ref=e180]: 5105 NFTs
+        - generic [ref=e181]: NFT collection
+        - button "Install" [ref=e183] [cursor=pointer]
+      - generic [ref=e186]:
+        - button "More options" [ref=e188] [cursor=pointer]:
+          - img [ref=e189]
+        - heading "Grifters" [level=3] [ref=e193]
+        - generic [ref=e194]: 1998 NFTs
+        - generic [ref=e195]: NFT collection
+        - button "Install" [ref=e197] [cursor=pointer]
+      - generic [ref=e200]:
+        - button "More options" [ref=e202] [cursor=pointer]:
+          - img [ref=e203]
+        - heading "Max Pain And Frens" [level=3] [ref=e207]
+        - generic [ref=e208]: 7443 NFTs
+        - generic [ref=e209]: NFT collection
+        - button "Install" [ref=e211] [cursor=pointer]
+      - generic [ref=e214]:
+        - button "More options" [ref=e216] [cursor=pointer]:
+          - img [ref=e217]
+        - heading "Rabble" [level=3] [ref=e221]
+        - generic [ref=e222]: 439 NFTs
+        - generic [ref=e223]: NFT collection
+        - button "Install" [ref=e225] [cursor=pointer]
+      - generic [ref=e228]:
+        - button "More options" [ref=e230] [cursor=pointer]:
+          - img [ref=e231]
+        - heading "Whale Vault" [level=3] [ref=e235]
+        - generic [ref=e236]: 3565 NFTs
+        - generic [ref=e237]: NFT collection
+        - button "Install" [ref=e239] [cursor=pointer]

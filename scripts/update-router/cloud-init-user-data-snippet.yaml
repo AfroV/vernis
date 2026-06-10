@@ -1,0 +1,48 @@
+# === Vernis update-router provisioning ===
+# APPEND this to the existing cloud-init user-data on the boot partition
+# (keep the Imager-generated keys: hostname, users, enable_ssh, etc.).
+#
+# Security choices (this is a throwaway, wireless-only, offline hotspot):
+#   * Set a STRONG AP password below (>=12 chars). The runcmd guard refuses
+#     to bring up the hotspot if the placeholder/weak default is left in place
+#     — the production units share this LAN, so a crackable PSK is the real risk.
+#   * The package server binds to the AP address (10.42.0.1) only, not 0.0.0.0.
+#   * No wired uplink is configured (see cloud-init-network-config.yaml), so
+#     there is nothing for an AP client to NAT-pivot into; ipv4.never-default
+#     is also set as belt-and-suspenders.
+#
+# Result on first boot:
+#   1. WiFi hotspot "VernisAP" (10.42.0.1, DHCP for clients)
+#   2. HTTP server on 10.42.0.1:8080 serving the Vernis update package
+write_files:
+- path: /etc/systemd/system/vernis-update-server.service
+  permissions: '0644'
+  content: |
+    [Unit]
+    Description=Vernis update package HTTP server
+    After=network.target
+    [Service]
+    WorkingDirectory=/opt/update-router/www
+    ExecStart=/usr/bin/python3 -m http.server 8080 --bind 10.42.0.1
+    Restart=always
+    RestartSec=3
+    [Install]
+    WantedBy=multi-user.target
+runcmd:
+- mkdir -p /opt/update-router/www
+- bash -c "cp /boot/firmware/vernis-update.tar.gz /opt/update-router/www/ 2>/dev/null || cp /boot/vernis-update.tar.gz /opt/update-router/www/ 2>/dev/null || true"
+- |
+  # vvv set a strong, non-default hotspot password here vvv
+  PSK="<AP_PASSWORD>"
+  if printf '%s' "$PSK" | grep -q '<AP_PASSWORD>' || [ "$PSK" = vernis1234 ] || [ "${#PSK}" -lt 12 ]; then
+    echo "VernisAP: refusing to start hotspot with a default/weak password. Set a strong PSK (>=12 chars) in user-data." >&2
+    exit 0
+  fi
+  nmcli connection delete VF 2>/dev/null || true
+  nmcli connection add type wifi ifname wlan0 con-name VernisAP autoconnect yes ssid VernisAP
+  nmcli connection modify VernisAP 802-11-wireless.mode ap 802-11-wireless.band bg \
+    ipv4.method shared ipv4.never-default true \
+    wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PSK"
+  nmcli connection up VernisAP
+- systemctl daemon-reload
+- systemctl enable --now vernis-update-server.service

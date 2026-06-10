@@ -1,0 +1,40 @@
+<h2>connect.html — Design Approach</h2>
+<p class="subtitle">How should the page be structured and what's the visual tone?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Split Card Layout</h3>
+      <p>Two large cards side by side: <strong>WiFi</strong> (left) and <strong>Bluetooth</strong> (right). Each card has its own icon, status indicator, instructions, and action button. The pairing PIN overlay appears as a centered modal on top.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Clean, balanced — both methods equally prominent</li><li>Works well on wide screens (HDMI TV) and narrow (phone)</li><li>Easy to extend with more methods later</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Two big cards might feel sparse on a phone</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tabbed Panel</h3>
+      <p>A single centered panel with two tabs at the top: <strong>WiFi</strong> | <strong>Bluetooth</strong>. Each tab reveals its connection flow. Active tab has an accent underline. PIN display replaces the BT tab content when pairing.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Compact — works great on 720x720 Pi screen</li><li>Familiar pattern (settings-style)</li><li>PIN display feels natural in the tab content area</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Only shows one method at a time</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Stacked Sections (Recommended)</h3>
+      <p>Full-width page with <strong>Vernis logo</strong> at top, then a <strong>WiFi section</strong> (QR code + IP), then a <strong>Bluetooth section</strong> (device name + pair button + PIN area). Scrollable on small screens. Premium feel with glass cards and subtle animations.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Pros</h4><ul><li>Both methods visible at once without feeling cramped</li><li>Natural reading flow — WiFi first (primary), BT second (fallback)</li><li>PIN display integrates into the BT section directly</li><li>Logo at top reinforces brand — feels like a premium product page</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Needs scroll on 720px screen (but minimal)</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

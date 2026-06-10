@@ -1,0 +1,8 @@
+network:
+  version: 2
+# No interfaces are configured on purpose:
+#   * wlan0 is turned into the "VernisAP" hotspot by the runcmd block in
+#     user-data (nmcli, AP mode, ipv4.method shared for DHCP).
+#   * eth0 is left unconfigured so this wireless-only hotspot has no wired
+#     uplink for an AP client to NAT-pivot into. Plug in a cable only for
+#     emergency admin access (NetworkManager will DHCP it on demand).

@@ -84,6 +84,16 @@ ufw allow from "$LAN_CIDR" to any port 22 proto tcp \
 ufw allow from "fe80::/10" to any port 80,443,22 proto tcp \
     comment 'LAN IPv6 link-local' >/dev/null 2>&1 || true
 
+# Bluetooth-PAN provisioning interface (bt0): a phone pairs over BT, then
+# reaches the web UI at 10.44.0.1. The reset above wipes these, so re-add them
+# (matches scripts/setup-bluetooth-pan.sh) or BT onboarding breaks.
+ufw allow in on bt0 to any port 80,443 proto tcp \
+    comment 'Vernis web over BT-PAN' >/dev/null 2>&1 || true
+ufw allow in on bt0 to any port 22 proto tcp \
+    comment 'SSH over BT-PAN' >/dev/null 2>&1 || true
+ufw allow in on bt0 to any port 67 proto udp \
+    comment 'DHCP for BT-PAN' >/dev/null 2>&1 || true
+
 ufw deny 5001/tcp comment 'IPFS API — never public' >/dev/null
 ufw deny 8080/tcp comment 'IPFS Gateway — local only' >/dev/null
 

@@ -2845,8 +2845,9 @@
         gazerIframe.classList.remove("loaded");
         gazerIframe.src = "";
 
-        // Load static image preview
-        gazerPreview.src = imageUrl;
+        // Load static image preview via the local cache (works offline once
+        // it's been fetched online; falls back to the placeholder otherwise).
+        gazerPreview.src = "/api/lab-media?url=" + encodeURIComponent(imageUrl);
       });
 
       // Handle preview image load

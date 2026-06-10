@@ -1,0 +1,87 @@
+<h2>Where should saved generators live?</h2>
+<p class="subtitle">Each approach has different trade-offs for integration, complexity, and separation</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Real HTML File in NFT Directory</h3>
+      <p>Create a small .html file (e.g. <code>gazer-247.html</code>) in <code>/opt/vernis/nfts/</code> that loads the generator</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Zero special-casing — works with Manage Art, carousels, hide/show, delete out of the box</li>
+            <li>Gallery already handles iframes for .html files</li>
+            <li>Shows up in file count, storage stats, backup/restore</li>
+            <li>One source of truth — no second list to keep in sync</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>nft-list-detailed endpoint currently skips .html — needs extending</li>
+            <li>Thumbnail in Manage Art grid will be blank/generic (no image preview)</li>
+            <li>Mixes generated content with downloaded IPFS art on disk</li>
+            <li>Filename collisions possible if not careful with naming</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Separate Generators JSON File</h3>
+      <p>New file <code>/opt/vernis/gallery-generators.json</code> with saved entries. Gallery merges both lists.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Clean separation — IPFS art stays pure, generators are their own thing</li>
+            <li>Easy to store rich metadata (token number, type, source URL, preview image URL)</li>
+            <li>Can show Art Blocks preview thumbnails in Manage Art (static image URL is known)</li>
+            <li>No disk clutter — one JSON file vs many small .html files</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Gallery loader needs to merge two sources — more complex</li>
+            <li>Manage Art needs special handling for generator entries (different delete, no CID, etc.)</li>
+            <li>Carousels, hide/show, backup all need to know about generators separately</li>
+            <li>Second source of truth — potential sync issues</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Entries in Display Config</h3>
+      <p>Add a <code>generators</code> array to <code>display-config.json</code></p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Minimal new infrastructure — no new files or endpoints</li>
+            <li>Gallery already loads display-config every 30s</li>
+            <li>Simple to implement quickly</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Mixes content with display preferences — bad separation of concerns</li>
+            <li>No Manage Art integration at all — can't hide, carousel, or delete from UI</li>
+            <li>display-config POST overwrites the whole file — risk of data loss</li>
+            <li>Doesn't scale — becomes unwieldy as more generators are added</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

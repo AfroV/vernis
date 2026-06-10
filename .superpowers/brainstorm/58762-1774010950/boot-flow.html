@@ -1,0 +1,119 @@
+<h2>Vernis First Boot — Adaptive Flow</h2>
+<p class="subtitle">Option C: Art-first if pre-loaded, WiFi setup if empty. Always has "View Art" escape hatch.</p>
+
+<div class="section">
+<h3>Boot Decision Tree</h3>
+<div style="background:#1a1a2e;border-radius:12px;padding:32px;font-family:monospace;font-size:14px;line-height:2.2;color:#e0e0e0;">
+<div style="text-align:center;margin-bottom:16px;color:#00bcd4;font-size:16px;font-weight:bold;">Power On → Plymouth Splash → Server Ready</div>
+<div style="text-align:center;margin-bottom:24px;color:#888;">&#9660;</div>
+
+<div style="display:flex;justify-content:center;gap:8px;align-items:center;margin-bottom:8px;">
+  <span style="background:#333;padding:8px 16px;border-radius:8px;border:1px solid #555;">Check: has_art?</span>
+</div>
+<div style="display:flex;justify-content:center;gap:48px;margin-top:8px;">
+  <div style="text-align:center;">
+    <div style="color:#4caf50;margin-bottom:8px;">&#9660; YES</div>
+    <div style="background:#1b3a1b;padding:12px 20px;border-radius:8px;border:1px solid #4caf50;">
+      <strong style="color:#4caf50;">Gallery Mode</strong><br>
+      <span style="font-size:12px;color:#aaa;">Art plays immediately<br>Exit → Home Screen</span>
+    </div>
+  </div>
+  <div style="text-align:center;">
+    <div style="color:#ff9800;margin-bottom:8px;">&#9660; NO</div>
+    <div style="background:#3a2a1b;padding:12px 20px;border-radius:8px;border:1px solid #ff9800;">
+      <strong style="color:#ff9800;">Setup Screen</strong><br>
+      <span style="font-size:12px;color:#aaa;">WiFi setup + instructions<br>to add art from phone</span>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="section" style="margin-top:32px;">
+<h3>Setup Screen (No Art) — What the Pi shows</h3>
+<div style="background:#0a0a0a;border:2px solid #333;border-radius:16px;padding:0;overflow:hidden;max-width:420px;margin:0 auto;aspect-ratio:1/1;display:flex;flex-direction:column;">
+  <!-- Header -->
+  <div style="text-align:center;padding:24px 16px 12px;border-bottom:1px solid #222;">
+    <div style="font-family:Georgia,serif;font-size:28px;letter-spacing:4px;background:linear-gradient(135deg,#00bcd4,#e040fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">VERNIS</div>
+  </div>
+
+  <!-- WiFi Section -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px 24px;gap:16px;">
+    <div style="text-align:center;">
+      <div style="font-size:40px;margin-bottom:8px;">&#128246;</div>
+      <div style="color:#e0e0e0;font-size:16px;font-weight:bold;">Connect to WiFi</div>
+      <div style="color:#888;font-size:13px;margin-top:4px;">Set up internet to add your art collection</div>
+    </div>
+
+    <!-- WiFi Button -->
+    <div style="background:linear-gradient(135deg,#00bcd4,#0097a7);padding:14px;border-radius:10px;text-align:center;color:#fff;font-size:16px;font-weight:bold;cursor:pointer;">
+      &#128246; Set Up WiFi
+    </div>
+
+    <!-- Divider -->
+    <div style="display:flex;align-items:center;gap:12px;margin:4px 0;">
+      <div style="flex:1;height:1px;background:#333;"></div>
+      <span style="color:#666;font-size:12px;">then</span>
+      <div style="flex:1;height:1px;background:#333;"></div>
+    </div>
+
+    <!-- Phone instruction -->
+    <div style="background:#1a1a2e;padding:14px;border-radius:10px;text-align:center;border:1px solid #333;">
+      <div style="color:#aaa;font-size:13px;">Open on your phone or computer:</div>
+      <div style="color:#00bcd4;font-size:18px;font-weight:bold;margin-top:6px;font-family:monospace;">http://10.0.0.28</div>
+      <div style="color:#666;font-size:11px;margin-top:4px;">to add your wallet & art</div>
+    </div>
+  </div>
+
+  <!-- Bottom -->
+  <div style="padding:12px 24px;border-top:1px solid #222;display:flex;justify-content:space-between;align-items:center;">
+    <div style="color:#666;font-size:11px;">&#9881; Settings</div>
+    <div style="color:#666;font-size:11px;">&#9211; Power</div>
+  </div>
+</div>
+<p style="text-align:center;color:#888;font-size:13px;margin-top:12px;">720x720 Pi touchscreen mockup — no art loaded</p>
+</div>
+
+<div class="section" style="margin-top:32px;">
+<h3>Home Screen (After exiting gallery) — Has "View Art" button</h3>
+<div style="background:#0a0a0a;border:2px solid #333;border-radius:16px;padding:0;overflow:hidden;max-width:420px;margin:0 auto;aspect-ratio:1/1;display:flex;flex-direction:column;">
+  <!-- Header -->
+  <div style="text-align:center;padding:24px 16px 12px;border-bottom:1px solid #222;">
+    <div style="font-family:Georgia,serif;font-size:28px;letter-spacing:4px;background:linear-gradient(135deg,#00bcd4,#e040fb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">VERNIS</div>
+  </div>
+
+  <!-- Cards -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:16px 24px;gap:12px;">
+    <!-- View Art - Primary -->
+    <div style="background:linear-gradient(135deg,#00bcd4,#0097a7);padding:16px;border-radius:10px;text-align:center;color:#fff;font-size:18px;font-weight:bold;cursor:pointer;">
+      &#9654; View Art
+    </div>
+
+    <!-- Secondary actions -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="background:#1a1a2e;padding:14px;border-radius:10px;text-align:center;border:1px solid #333;">
+        <div style="font-size:20px;margin-bottom:4px;">&#128246;</div>
+        <div style="color:#ccc;font-size:13px;">WiFi</div>
+      </div>
+      <div style="background:#1a1a2e;padding:14px;border-radius:10px;text-align:center;border:1px solid #333;">
+        <div style="font-size:20px;margin-bottom:4px;">&#43;</div>
+        <div style="color:#ccc;font-size:13px;">Add Art</div>
+      </div>
+      <div style="background:#1a1a2e;padding:14px;border-radius:10px;text-align:center;border:1px solid #333;">
+        <div style="font-size:20px;margin-bottom:4px;">&#128444;</div>
+        <div style="color:#ccc;font-size:13px;">Manage</div>
+      </div>
+      <div style="background:#1a1a2e;padding:14px;border-radius:10px;text-align:center;border:1px solid #333;">
+        <div style="font-size:20px;margin-bottom:4px;">&#9881;</div>
+        <div style="color:#ccc;font-size:13px;">Settings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom -->
+  <div style="padding:12px 24px;border-top:1px solid #222;display:flex;justify-content:center;">
+    <div style="color:#555;font-size:11px;">Connected: VodafoneHome &bull; 10.0.0.28</div>
+  </div>
+</div>
+<p style="text-align:center;color:#888;font-size:13px;margin-top:12px;">720x720 Pi touchscreen mockup — art loaded, user exited gallery</p>
+</div>

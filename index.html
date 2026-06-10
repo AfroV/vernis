@@ -2142,6 +2142,126 @@
   <script src="/vernis-logo-longpress.js"></script>
   <script src="/vernis-pin-nudge.js"></script>
   <script src="/vernis-mode-pill.js"></script>
+
+  <script>
+  /* Hold the kiosk "Screen Off" button to power off (graceful shutdown).
+   *   tap                -> screen off (unchanged)
+   *   hold: after 1s a RED ring fills over the VERNIS logo ("Powering off…")
+   *   release before 8s  -> cancel
+   *   held to 8s         -> POST /api/shutdown
+   * Distinct from the 5s logo-hold PIN recovery (different element, colour, label).
+   */
+  (function () {
+    'use strict';
+    var RING_DELAY_MS = 1000;   // tap grace before the ring appears
+    var HOLD_TOTAL_MS = 8000;   // total hold to trigger shutdown
+    var CIRC = 289.03;          // 2*pi*46 — matches the recovery ring geometry
+    var SVG = 'http://www.w3.org/2000/svg';
+
+    function injectStyle() {
+      if (document.getElementById('vpo-style')) return;
+      var s = document.createElement('style');
+      s.id = 'vpo-style';
+      s.textContent =
+        '.vpo-ring{position:absolute;top:50%;left:50%;width:88px;height:88px;' +
+        'transform:translate(-50%,-50%);pointer-events:none;opacity:0;color:#ef4444;' +
+        'transition:opacity 200ms ease;overflow:visible;}' +
+        '.vpo-ring.active{opacity:1;filter:drop-shadow(0 0 8px rgba(239,68,68,.6));}' +
+        '.vpo-ring circle{transition:stroke-dashoffset 80ms linear;}' +
+        '.vpo-label{position:absolute;top:calc(50% + 66px);left:50%;transform:translateX(-50%);' +
+        'color:#ef4444;font-size:15px;font-weight:600;white-space:nowrap;pointer-events:none;' +
+        'opacity:0;transition:opacity 200ms ease;}' +
+        '.vpo-label.active{opacity:1;}';
+      document.head.appendChild(s);
+    }
+
+    function buildRing(host) {
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      var svg = document.createElementNS(SVG, 'svg');
+      svg.setAttribute('class', 'vpo-ring');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      svg.setAttribute('aria-hidden', 'true');
+      function circle(attrs) {
+        var c = document.createElementNS(SVG, 'circle');
+        Object.keys(attrs).forEach(function (k) { c.setAttribute(k, attrs[k]); });
+        return c;
+      }
+      var track = circle({ cx: 50, cy: 50, r: 46, fill: 'none',
+        stroke: 'rgba(239,68,68,.18)', 'stroke-width': 3 });
+      var fill = circle({ cx: 50, cy: 50, r: 46, fill: 'none', stroke: 'currentColor',
+        'stroke-width': 3, 'stroke-linecap': 'round', transform: 'rotate(-90 50 50)',
+        'stroke-dasharray': CIRC, 'stroke-dashoffset': CIRC });
+      svg.appendChild(track); svg.appendChild(fill);
+      host.appendChild(svg);
+      var label = document.createElement('div');
+      label.className = 'vpo-label';
+      label.textContent = 'Powering off… release to cancel';
+      host.appendChild(label);
+      return { svg: svg, fill: fill, label: label };
+    }
+
+    function attach() {
+      var btn = document.querySelector('.kiosk-power');
+      var logo = document.querySelector('.kiosk-logo');
+      if (!btn || !logo || btn.dataset.vpoAttached) return;
+      btn.dataset.vpoAttached = '1';
+      btn.removeAttribute('onclick');   // we own tap + hold now
+      injectStyle();
+      var R = buildRing(logo);
+      var startTs = 0, raf = 0, ringOn = false, fired = false;
+
+      function reset() {
+        cancelAnimationFrame(raf);
+        R.svg.classList.remove('active');
+        R.label.classList.remove('active');
+        R.label.textContent = 'Powering off… release to cancel';
+        R.fill.setAttribute('stroke-dashoffset', String(CIRC));
+        ringOn = false; startTs = 0;
+      }
+      function tick() {
+        var e = Date.now() - startTs;
+        if (e >= RING_DELAY_MS && !ringOn) {
+          R.svg.classList.add('active'); R.label.classList.add('active'); ringOn = true;
+        }
+        if (ringOn) {
+          var p = Math.min(1, (e - RING_DELAY_MS) / (HOLD_TOTAL_MS - RING_DELAY_MS));
+          R.fill.setAttribute('stroke-dashoffset', String(CIRC * (1 - p)));
+        }
+        if (e >= HOLD_TOTAL_MS) {
+          if (!fired) {
+            fired = true;
+            R.label.textContent = 'Powering off…';
+            fetch('/api/shutdown', { method: 'POST' }).catch(function () {});
+          }
+          return;   // hold the full ring + label until the device powers down
+        }
+        raf = requestAnimationFrame(tick);
+      }
+      function down(ev) {
+        if (ev.cancelable) ev.preventDefault();
+        fired = false; startTs = Date.now();
+        raf = requestAnimationFrame(tick);
+        try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
+      }
+      function up() {
+        if (fired) return;                       // shutdown already started
+        var e = startTs ? Date.now() - startTs : 0;
+        reset();
+        if (e > 0 && e < RING_DELAY_MS) {         // quick tap -> screen off
+          fetch('/api/screen/off', { method: 'POST' }).catch(function () {});
+        }
+        // held past 1s then released = cancelled -> do nothing
+      }
+      btn.addEventListener('pointerdown', down);
+      btn.addEventListener('pointerup', up);
+      btn.addEventListener('pointercancel', up);
+    }
+
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', attach);
+    else attach();
+  })();
+  </script>
 </body>
 
 </html>

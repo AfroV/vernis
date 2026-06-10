@@ -1,0 +1,52 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - link "Home" [ref=e4] [cursor=pointer]:
+      - /url: index.html
+    - link "Add Art" [ref=e5] [cursor=pointer]:
+      - /url: add.html
+    - link "Library" [ref=e6] [cursor=pointer]:
+      - /url: library.html
+    - link "Manage Art" [ref=e7] [cursor=pointer]:
+      - /url: manage.html
+    - link "Atelier" [ref=e8] [cursor=pointer]:
+      - /url: lab.html
+    - link "Settings" [ref=e9] [cursor=pointer]:
+      - /url: settings.html
+  - generic [ref=e10]:
+    - heading "Add Collection" [level=1] [ref=e11]
+    - paragraph [ref=e12]: Upload a CSV file to add a new collection to your library
+    - link "Import from Wallet" [ref=e13] [cursor=pointer]:
+      - /url: wallet-tool.html
+    - generic [ref=e14]: — or add by CID —
+    - generic [ref=e15]:
+      - heading "Quick Add by CID" [level=4] [ref=e16]
+      - paragraph [ref=e17]: Add a single NFT directly — paste a CID, IPFS URL, or directory CID with path
+      - generic [ref=e18]:
+        - generic [ref=e19]: IPFS CID or URL
+        - textbox "Qm.../6.json, bafy..., or https://ipfs.io/ipfs/..." [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]: Name (optional)
+        - textbox "e.g., My NFT" [ref=e23]
+      - button "Add to Gallery" [ref=e24] [cursor=pointer]
+    - generic [ref=e25]: — or add multiple NFTs via CSV —
+    - generic [ref=e55]:
+      - generic [ref=e56]: ✓
+      - heading "Collection Added!" [level=3] [ref=e57]
+      - paragraph [ref=e58]: "\"X.csv\" added with 227 items. Go to Library to install."
+      - generic [ref=e59]:
+        - link "Go to Library" [ref=e60] [cursor=pointer]:
+          - /url: library.html
+        - button "Add Another" [ref=e61] [cursor=pointer]
+    - generic [ref=e45]: — or upload general files —
+    - generic [ref=e46]:
+      - heading "Upload Files" [level=4] [ref=e47]
+      - paragraph [ref=e48]: Upload any file type — PDFs, documents, 3D models, archives, etc. Files are pinned to IPFS.
+      - generic [ref=e50] [cursor=pointer]:
+        - generic [ref=e51]: 📎
+        - heading "Drop files here" [level=3] [ref=e52]
+        - paragraph [ref=e53]: or click to browse — any file type accepted
+        - button "Choose Files" [ref=e54]
+  - generic [ref=e62]:
+    - generic [ref=e63]: ✓
+    - generic [ref=e64]: Added X.csv to library with 227 items
+    - generic [ref=e65] [cursor=pointer]: ✕

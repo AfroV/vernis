@@ -57,6 +57,49 @@ if not os.environ.get("PYTEST_CURRENT_TEST"):
     TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # ========================================
+# Network: primary IP detection
+# ========================================
+# Ranges that should never be shown as the device's reachable address:
+# NetworkManager hotspot/shared (10.42.x, 192.168.50.x), link-local, docker,
+# and loopback. A stale 10.42.x lease was being shown on the connect card.
+_NON_LAN_IP_PREFIXES = ("10.42.", "192.168.50.", "169.254.", "172.17.", "127.")
+
+def get_primary_ip():
+    """Return the device's current primary LAN IP (source IP of the default route).
+
+    Uses a UDP socket trick that consults the routing table without sending any
+    packets, so it reflects the live primary interface even when offline (as long
+    as a default route exists). Falls back to `hostname -I` with hotspot/virtual
+    addresses filtered out. Returns None only if no usable address is found.
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+        if ip and not ip.startswith(_NON_LAN_IP_PREFIXES):
+            return ip
+    except Exception:
+        pass
+
+    # Fallback: enumerate all assigned addresses and pick the first real LAN one.
+    try:
+        result = subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=5)
+        all_ips = result.stdout.split() if result.stdout else []
+        for ip in all_ips:
+            if ":" not in ip and not ip.startswith(_NON_LAN_IP_PREFIXES):
+                return ip
+        # Last resort: any non-loopback address, even a hotspot one.
+        for ip in all_ips:
+            if ":" not in ip and not ip.startswith("127."):
+                return ip
+    except Exception:
+        pass
+    return None
+
+# ========================================
 # Security: CID validation
 # ========================================
 _CID_RE = re.compile(r'^(Qm[a-zA-Z0-9]{44}|baf[a-z2-7]{50,})(/[\w\-\.]+)*$')
@@ -1978,23 +2021,12 @@ def generate_qrcode():
         }
         colors = theme_colors.get(theme, theme_colors['gallery'])
 
-        # Get actual IP address
-        def get_local_ip():
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                ip = s.getsockname()[0]
-                s.close()
-                return ip
-            except:
-                return None
-
         # Allow custom URL (e.g. Bluetooth PAN address)
         custom_url = request.args.get('url')
         if custom_url:
             host = custom_url
         else:
-            ip = get_local_ip()
+            ip = get_primary_ip()
             host = f"http://{ip}" if ip else request.host_url.rstrip('/')
 
         # Generate QR code with high error correction for logo overlay
@@ -2643,24 +2675,8 @@ def status():
         except:
             pass
 
-        # Get device IP address (prefer main network, skip hotspot 192.168.50.x)
-        try:
-            ip_result = subprocess.run(
-                ["hostname", "-I"],
-                capture_output=True, text=True, timeout=5
-            )
-            all_ips = ip_result.stdout.strip().split() if ip_result.stdout.strip() else []
-            # Filter out hotspot IPs (192.168.50.x) and prefer main network
-            ip_address = "Unknown"
-            for ip in all_ips:
-                if not ip.startswith("192.168.50."):
-                    ip_address = ip
-                    break
-            # Fallback to first IP if all are hotspot
-            if ip_address == "Unknown" and all_ips:
-                ip_address = all_ips[0]
-        except:
-            ip_address = "Unknown"
+        # Get device IP address (live primary LAN IP, hotspot/stale addresses filtered)
+        ip_address = get_primary_ip() or "Unknown"
 
         return jsonify({
             "ssid": ssid,

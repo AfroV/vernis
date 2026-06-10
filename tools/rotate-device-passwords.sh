@@ -112,16 +112,22 @@ write_handover() {
     cat > "$out" <<EOF
 # Vernis device — $name
 
-**IP on your local network:** \`$ip\`
+**Reach it at:** \`http://$name.local\`
 **Username:** \`$name\`
 **Password:** \`$pass\`
 
+## First time — get it on your WiFi
+If the device isn't on your network yet, power it on and look for a WiFi
+network named **\`Vernis-…\`** in your phone/laptop WiFi list. Join it, then
+enter your home WiFi details. The device then joins your network and is
+reachable at the address above.
+
 ## Web UI
-Open in any browser on the same WiFi: <http://$ip>
+Open in any browser on the same WiFi: <http://$name.local>
 
 ## Change the password later
 \`\`\`
-ssh $name@$ip
+ssh $name@$name.local
 passwd
 sudo /opt/vernis/scripts/update-owner-password.sh
 \`\`\`
@@ -129,7 +135,7 @@ The second command re-syncs the PIN-recovery hash with your new password.
 
 ## Forgot the PIN?
 - **From the device:** hold the kiosk logo for 5 seconds, then enter the password above.
-- **Via SSH:** \`ssh $name@$ip\` → \`sudo /opt/vernis/scripts/reset-pin.sh\`
+- **Via SSH:** \`ssh $name@$name.local\` → \`sudo /opt/vernis/scripts/reset-pin.sh\`
 
 Generated: $(date -u +"%Y-%m-%d %H:%M UTC")
 EOF
