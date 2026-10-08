@@ -369,7 +369,7 @@
     function escHTML(s) {
       var d = document.createElement('div');
       d.textContent = s;
-      return d.textContent;
+      return d.innerHTML;
     }
 
     function isKiosk() {

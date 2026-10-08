@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Curator • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="manifest" href="curator.webmanifest">
+  <meta name="theme-color" content="#111111">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Curator">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <script src="vernis-pin-modal.js"></script>
+  <script src="vernis-lock-guard.js"></script>
+  <script src="vernis-pin-prompt.js"></script>
+  <script>
+    (function () {
+      var theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme + '-' + mode);
+    })();
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      --gold: var(--accent-primary, #d4af37);
+      --gold-rgb: var(--accent-primary-rgb, 212, 175, 55);
+      --hair: rgba(var(--gold-rgb), 0.22);
+      background:
+        radial-gradient(120% 60% at 50% -10%, rgba(var(--gold-rgb), 0.08), transparent 60%),
+        var(--bg-primary, #0f0e0c);
+      color: var(--text-primary, #e8e0d4);
+      font-family: var(--font-body, 'Lato', -apple-system, sans-serif);
+      display: flex; flex-direction: column;
+      padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+    }
+    svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+    header { display: flex; align-items: center; gap: 10px; padding: 16px 18px 14px; border-bottom: 1px solid var(--hair); }
+    header a { color: var(--gold); text-decoration: none; display: flex; padding: 6px 6px 6px 0; opacity: 0.85; }
+    .who { flex: 1; min-width: 0; line-height: 1.1; }
+    .who h1 { font-family: var(--font-display, 'Playfair Display', Georgia, serif); font-size: 26px; font-weight: 400; margin: 0; letter-spacing: 0.01em; }
+    .who .model { margin-top: 4px; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted, #8b7b68);
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .icon-btn { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--hair); background: transparent; color: var(--gold);
+                display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .25s ease; flex: none; }
+    .icon-btn:hover { border-color: rgba(var(--gold-rgb), 0.6); background: rgba(var(--gold-rgb), 0.06); }
+    .icon-btn[aria-pressed="false"] { color: var(--text-muted, #8b7b68); }
+    #live { display: none; height: 42px; padding: 0 18px 0 14px; border-radius: 21px; border: 1px solid rgba(var(--gold-rgb), 0.55);
+            background: transparent; color: var(--gold); font: 600 12px/1 var(--font-body, sans-serif); letter-spacing: 0.16em;
+            text-transform: uppercase; cursor: pointer; transition: all .3s ease; align-items: center; gap: 9px; flex: none; }
+    #live .ld { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 10px rgba(var(--gold-rgb), 0.8); }
+    #live:hover { background: rgba(var(--gold-rgb), 0.08); }
+    #live.live-on { background: var(--gold); color: var(--bg-primary, #0f0e0c); border-color: var(--gold); }
+    #live.live-on .ld { background: var(--bg-primary, #0f0e0c); box-shadow: none; animation: breathe 1.6s ease-in-out infinite; }
+
+    /* Live stage: a gold orb that moves with the voices */
+    #livebar { display: none; flex-direction: column; align-items: center; gap: 18px; padding: 40px 16px 20px; border-bottom: 1px solid var(--hair); }
+    #livebar.on { display: flex; }
+    #orb { position: relative; width: 96px; height: 96px; border-radius: 50%;
+           background: radial-gradient(circle at 36% 30%, #fff3c4 0%, #f2d675 18%, var(--gold) 46%, #8a6a1c 100%);
+           box-shadow: 0 0 46px rgba(var(--gold-rgb), 0.38), inset -8px -10px 22px rgba(60, 40, 5, 0.45);
+           transition: transform .08s linear, box-shadow .2s ease; }
+    #orb::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 1px solid rgba(var(--gold-rgb), 0.35); animation: halo 2.8s ease-out infinite; }
+    #livebar.speaking #orb { box-shadow: 0 0 70px rgba(var(--gold-rgb), 0.55), inset 0 0 18px rgba(0, 0, 0, 0.25); }
+    #livebar .state { font-family: var(--font-accent, 'Cormorant Garamond', Georgia, serif); font-style: italic; font-size: 21px; color: var(--text-secondary, #d4cfc4); }
+    #livebar .state small { display: block; margin-top: 4px; text-align: center; font-family: var(--font-body, sans-serif); font-style: normal;
+                            font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted, #8b7b68); }
+    @keyframes halo { 0% { transform: scale(0.92); opacity: 0.7; } 100% { transform: scale(1.35); opacity: 0; } }
+    @keyframes breathe { 50% { opacity: 0.35; } }
+
+    #status { font-size: 12px; text-align: center; padding: 8px 18px; color: var(--text-muted, #8b7b68); line-height: 1.6; }
+    #status code { font-size: 11px; color: var(--text-secondary, #d4cfc4); background: rgba(var(--gold-rgb), 0.08); padding: 1px 5px; border-radius: 4px; }
+
+    #log { flex: 1; overflow-y: auto; padding: 22px 18px; display: flex; flex-direction: column; gap: 16px; }
+    .msg { max-width: 82%; line-height: 1.55; font-size: 16px; white-space: pre-wrap; word-wrap: break-word; animation: rise .35s ease; }
+    .msg.user { align-self: flex-end; padding: 11px 16px; border-radius: 18px 18px 4px 18px; background: rgba(var(--gold-rgb), 0.1);
+                border: 1px solid rgba(var(--gold-rgb), 0.32); color: var(--text-primary, #e8e0d4); }
+    .msg.ai { align-self: flex-start; padding: 2px 0 2px 16px; border-left: 2px solid rgba(var(--gold-rgb), 0.7); color: var(--text-primary, #e8e0d4); font-size: 16.5px; }
+    .msg.err { align-self: center; max-width: 90%; text-align: center; font-size: 14px; color: var(--text-muted, #8b7b68); padding: 8px 14px;
+               border: 1px solid var(--hair); border-radius: 12px; }
+    .msg.err a { color: var(--gold); }
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 9px; border-radius: 10px;
+            color: rgba(var(--gold-rgb), 0.85); border: 1px solid rgba(var(--gold-rgb), 0.25); }
+    .chip.bad { color: var(--text-muted, #8b7b68); border-color: var(--border-medium, #3d352d); }
+    .hint { margin: auto 24px; text-align: center; }
+    .hint .q { font-family: var(--font-display, 'Playfair Display', serif); font-size: 24px; color: var(--text-primary, #e8e0d4); margin-bottom: 14px; }
+    .hint .ex { font-family: var(--font-accent, 'Cormorant Garamond', serif); font-style: italic; font-size: 18px; color: var(--text-muted, #8b7b68); line-height: 1.7; }
+    .typing { align-self: flex-start; padding-left: 18px; font-family: var(--font-accent, 'Cormorant Garamond', serif); font-style: italic; font-size: 17px; color: var(--text-muted, #8b7b68); }
+
+    #tip { display: none; text-align: center; font-size: 12.5px; color: var(--text-muted, #8b7b68); padding: 0 18px 8px; }
+    form { display: flex; gap: 10px; align-items: flex-end; padding: 12px 14px 16px; border-top: 1px solid var(--hair); }
+    textarea { flex: 1; resize: none; min-height: 50px; max-height: 140px; padding: 14px 18px; border-radius: 25px; border: 1px solid var(--hair);
+               background: var(--bg-input, #1e1914); color: var(--text-primary, #e8e0d4); font: inherit; font-size: 16px; line-height: 1.35;
+               transition: border-color .2s ease; }
+    textarea:focus { outline: none; border-color: rgba(var(--gold-rgb), 0.6); }
+    textarea::placeholder { color: var(--text-muted, #8b7b68); }
+    textarea:disabled { opacity: 0.45; }
+    #mic, #send { width: 50px; height: 50px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .25s ease; }
+    #mic { border: 1px solid var(--hair); background: transparent; color: var(--gold); }
+    #mic.listening { background: rgba(var(--gold-rgb), 0.15); border-color: var(--gold); box-shadow: 0 0 0 6px rgba(var(--gold-rgb), 0.12); animation: breathe 1.4s infinite; }
+    #mic:disabled { opacity: 0.35; }
+    #send { border: none; background: var(--gold); color: var(--bg-primary, #0f0e0c); }
+    #send svg { stroke-width: 2.2; }
+    #send:disabled { opacity: 0.4; }
+    body.is-live form { opacity: 0.55; }
+    #speak[aria-pressed="false"] .wave { display: none; }
+    /* Vernis turns off text selection for the kiosk; the conversation should be copyable */
+    #log, #log *, #status, #tip, #livebar .state { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; cursor: auto; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <a href="/" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="who"><h1 id="provider">Curator</h1><div class="model" id="model"></div></div>
+    <button id="live" title="Live conversation"><span class="ld"></span><span class="lt">Live</span></button>
+    <button class="icon-btn" id="speak" aria-pressed="true" title="Read replies aloud">
+      <svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="wave" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/></svg></button>
+  </header>
+
+  <div id="livebar" role="status" aria-live="polite">
+    <div id="orb"></div>
+    <div class="state"><span id="livestate">Connecting…</span><small>Live conversation</small></div>
+  </div>
+  <div id="status">Connecting to your frame…</div>
+  <div id="log" aria-live="polite">
+    <div class="hint" id="welcome">
+      <div class="q">Ask about the art on your frame</div>
+      <div class="ex">“What’s on screen?” · “Show me XCOPY” · “Next one” · “Is my archive safe?”</div>
+    </div>
+  </div>
+
+  <div id="tip"></div>
+  <form id="form" autocomplete="off">
+    <button type="button" id="mic" aria-label="Speak"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
+    <textarea id="input" rows="1" placeholder="Ask your curator…" enterkeyhint="send"></textarea>
+    <button type="submit" id="send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+  </form>
+
+  <script>
+    // Report page errors to the frame's log and on screen, so problems on a phone are visible.
+    window.onerror = function (msg, src, line) {
+      try {
+        var text = String(msg) + ' (' + String(src || '').split('/').pop() + ':' + line + ')';
+        var tok = ''; try { tok = localStorage.getItem('vernis-app-token') || ''; } catch (e) {}
+        var h = { 'Content-Type': 'application/json' };
+        if (tok) h['X-Vernis-App-Token'] = tok;
+        fetch('/api/curator/client-log', { method: 'POST', headers: h, body: JSON.stringify({ message: text }) });
+        var st = document.getElementById('status');
+        if (st) { st.textContent = 'Page error: ' + text; st.style.color = 'var(--text-secondary)'; }
+      } catch (e) {}
+    };
+  </script>
+  <script>
+    (function () {
+      'use strict';
+      var log = document.getElementById('log');
+      var input = document.getElementById('input');
+      var send = document.getElementById('send');
+      var mic = document.getElementById('mic');
+      var tip = document.getElementById('tip');
+      var speakBtn = document.getElementById('speak');
+      var history = [];
+      var busy = false;
+
+      // Paired by QR code: the token arrives in the #fragment (never sent to a server).
+      var appToken = '', justPaired = false;
+      try {
+        var pm = location.hash.match(/pair=([\w-]+)/);
+        if (pm) {
+          localStorage.setItem('vernis-app-token', pm[1]);
+          window.history.replaceState(null, '', location.pathname);
+          justPaired = true;
+        }
+        appToken = localStorage.getItem('vernis-app-token') || '';
+      } catch (e) {}
+      function appHeaders() { return appToken ? { 'X-Vernis-App-Token': appToken } : {}; }
+
+      var voiceCfg = { tts: 'browser', stt: 'browser', piper_url: '', stt_ready: false, language: 'en' };
+      var lastInputWasVoice = false;
+
+      function showTip(text) {
+        tip.textContent = text;
+        tip.style.display = text ? 'block' : 'none';
+      }
+
+      // -- Read aloud ------------------------------------------------------------
+      // Piper on a voice server (premium), or the browser's own voice as fallback.
+      // One <audio> element, unlocked by the first tap, so iOS lets later replies play.
+      var player = new Audio();
+      player.preload = 'auto';
+      var speakToken = 0;
+      var speakOn = true;
+      try { speakOn = localStorage.getItem('vernis-curator-speak') !== 'off'; } catch (e) {}
+      function setSpeak(on) {
+        speakOn = on;
+        speakBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        try { localStorage.setItem('vernis-curator-speak', on ? 'on' : 'off'); } catch (e) {}
+        if (!on) stopAudio();
+      }
+      setSpeak(speakOn);
+      speakBtn.onclick = function () { setSpeak(!speakOn); };
+
+      // (The <audio> element is created above, before setSpeak() can call stopAudio().)
+      var SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+      var primed = false;
+      function primeAudio() {
+        if (primed) return;
+        primed = true;
+        player.src = SILENT;
+        player.play().catch(function () {});
+        if (window.speechSynthesis) {
+          var u = new SpeechSynthesisUtterance(' ');
+          u.volume = 0;
+          speechSynthesis.speak(u);
+        }
+      }
+
+      function stopAudio() {
+        speakToken++;
+        if (player) player.pause();
+        if (window.speechSynthesis) speechSynthesis.cancel();
+      }
+
+      function sentences(text) {
+        var parts = text.match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) || [text];
+        var out = [];
+        parts.forEach(function (p) {
+          p = p.trim();
+          if (!p) return;
+          if (out.length && out[out.length - 1].length < 40) out[out.length - 1] += ' ' + p;
+          else out.push(p);
+        });
+        return out;
+      }
+
+      function fetchSpeech(chunk) {
+        return VernisPinPrompt.withPin(function (headers) {
+          return fetch('/api/curator/speak', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, headers, appHeaders()),
+            body: JSON.stringify({ text: chunk })
+          });
+        }).then(function (r) {
+          if (!r.ok) throw new Error('voice server ' + r.status);
+          return r.blob();
+        });
+      }
+
+      function playBlob(blob, token) {
+        return new Promise(function (resolve) {
+          if (token !== speakToken) return resolve();
+          var url = URL.createObjectURL(blob);
+          player.onended = player.onerror = function () { URL.revokeObjectURL(url); resolve(); };
+          player.src = url;
+          player.play().catch(function () { resolve(); });
+        });
+      }
+
+      // Speak sentence by sentence, fetching the next while the current one plays.
+      function speakPiper(text, done) {
+        var token = ++speakToken;
+        var chunks = sentences(text);
+        var next = fetchSpeech(chunks[0]);
+        var i = 0;
+        function step() {
+          if (token !== speakToken) return;
+          var current = next;
+          i++;
+          if (i < chunks.length) next = fetchSpeech(chunks[i]);
+          current.then(function (blob) { return playBlob(blob, token); })
+            .then(function () { if (i < chunks.length) step(); else if (token === speakToken) done(); })
+            .catch(function () {
+              if (token !== speakToken) return;
+              showTip('Voice server unavailable, using the browser voice.');
+              speakBrowser(chunks.slice(i - 1).join(' '), done);
+            });
+        }
+        step();
+      }
+
+      function speakBrowser(text, done) {
+        if (!window.speechSynthesis) return done();
+        speechSynthesis.cancel();
+        var lang = /[æøå]/i.test(text) ? 'nb-NO' : (voiceCfg.language === 'en' ? 'en-US' : (navigator.language || 'en-US'));
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = lang;
+        var base = lang.split('-')[0];
+        var voices = speechSynthesis.getVoices();
+        var v = voices.find(function (x) { return x.lang === lang; }) ||
+                voices.find(function (x) { return x.lang && x.lang.indexOf(base) === 0; });
+        if (v) u.voice = v;
+        u.onend = u.onerror = function () { done(); };
+        speechSynthesis.speak(u);
+      }
+
+      function speak(text) {
+        var after = function () { if (conversationOn && lastInputWasVoice) setTimeout(startListening, 350); };
+        if (!speakOn || !text || voiceCfg.tts === 'off') return after();
+        if (voiceCfg.tts === 'piper' && voiceCfg.piper_url) speakPiper(text, after);
+        else speakBrowser(text, after);
+      }
+
+      // -- Conversation: tap 🎤 once, then it keeps listening after every reply ----------
+      // until 30 s pass without speech, or 🎤 is tapped again.
+      var SILENCE_MS = 30000;
+      var conversationOn = false;
+
+      // -- Listen ----------------------------------------------------------------
+      // Grok speech-to-text from a recording (needs HTTPS for the microphone), the
+      // browser's own recognition, or the keyboard's dictation key as a last resort.
+      var Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      var canRecord = window.isSecureContext && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && !!window.MediaRecorder;
+      var listening = false;
+      var stopListening = null;
+
+      function setListening(on, label) {
+        listening = on;
+        mic.classList.toggle('listening', on);
+        showTip(label || '');
+      }
+
+      function startListening() {
+        if (listening || busy) return;
+        stopAudio();
+        if (voiceCfg.stt === 'grok' && voiceCfg.stt_ready && canRecord) return listenGrok();
+        if (Rec && window.isSecureContext) return listenBrowser();
+        showTip(window.isSecureContext
+          ? 'This browser can\'t listen. Use the 🎤 on your keyboard to dictate.'
+          : 'Tap the 🎤 on your keyboard to dictate. (Speaking to the curator directly needs HTTPS.)');
+        input.focus();
+      }
+
+      function updateMic() {
+        var can = (voiceCfg.stt === 'grok' && voiceCfg.stt_ready && canRecord) || (!!Rec && window.isSecureContext);
+        mic.style.display = can ? '' : 'none';
+        if (liveBtn) liveBtn.style.display = (liveAvailable() && voiceCfg.stt_ready) ? 'inline-flex' : 'none';
+        if (!can) input.placeholder = 'Ask your curator… (🎤 on your keyboard to speak)';
+      }
+      updateMic();
+
+      var micCtx = null;
+      function micContext() {
+        if (!micCtx) micCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (micCtx.state !== 'running') micCtx.resume();
+        return micCtx;
+      }
+
+      mic.onclick = function () {
+        primeAudio();
+        micContext();   // must start inside the tap, or Chrome keeps it suspended (silent levels)
+        if (listening && stopListening) { conversationOn = false; stopListening(); showTip('Conversation ended.'); return; }
+        conversationOn = true;
+        startListening();
+      };
+
+      function listenGrok() {
+        navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function (stream) {
+          var type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(function (t) {
+            return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t);
+          }) || '';
+          var recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+          var parts = [];
+          recorder.ondataavailable = function (e) { if (e.data && e.data.size) parts.push(e.data); };
+
+          // Stop by itself after a pause in speech (simple level detector).
+          var ctx = micContext();
+          var analyser = ctx.createAnalyser();
+          analyser.fftSize = 1024;
+          var source = ctx.createMediaStreamSource(stream);
+          source.connect(analyser);
+          var buf = new Float32Array(analyser.fftSize);
+          var started = Date.now(), heard = false, quietSince = 0, floor = 1, timer;
+          function level() {
+            analyser.getFloatTimeDomainData(buf);
+            var sum = 0;
+            for (var k = 0; k < buf.length; k++) sum += buf[k] * buf[k];
+            return Math.sqrt(sum / buf.length);
+          }
+          timer = setInterval(function () {
+            var l = level(), t = Date.now() - started;
+            if (t < 300) { floor = Math.min(floor, l); return; }
+            // quietest moment at the start = room noise; speech must clearly rise above it
+            var threshold = Math.min(0.05, Math.max(0.012, floor * 2.5));
+            if (l > threshold) { if (!heard) holdArtwork(); heard = true; quietSince = 0; }
+            else if (heard) { quietSince = quietSince || Date.now(); if (Date.now() - quietSince > 1200) finish(); }
+            if ((!heard && t > SILENCE_MS) || t > SILENCE_MS + 30000) finish();
+          }, 60);
+
+          var cancelled = false;
+          function finish() {
+            if (recorder.state !== 'inactive') recorder.stop();
+          }
+          stopListening = finish;
+          recorder.onstop = function () {
+            clearInterval(timer);
+            stream.getTracks().forEach(function (tr) { tr.stop(); });
+            source.disconnect();          // the context stays alive for the next turn
+            stopListening = null;
+            if (!heard || cancelled) {
+              conversationOn = false;
+              setListening(false, heard ? '' : 'Conversation paused after 30 seconds of silence. Tap 🎤 to continue.');
+              return;
+            }
+            setListening(false, 'Transcribing…');
+            var blob = new Blob(parts, { type: recorder.mimeType || type || 'audio/webm' });
+            var fd = new FormData();
+            fd.append('audio', blob, /mp4/.test(blob.type) ? 'speech.m4a' : 'speech.webm');
+            VernisPinPrompt.withPin(function (headers) {
+              return fetch('/api/curator/listen', { method: 'POST', headers: Object.assign({}, headers, appHeaders()), body: fd });
+            }).then(function (r) { return r.json(); }).then(function (d) {
+              showTip('');
+              if (d.text) { lastInputWasVoice = true; submit(d.text, true); }
+              else showTip(d.message || 'Didn\'t catch that, try again.');
+            }).catch(function () { showTip('Speech recognition failed.'); });
+          };
+          recorder.start(250);
+          setListening(true, 'Listening… tap 🎤 to end the conversation');
+        }).catch(function () {
+          setListening(false, 'Microphone permission was denied.');
+        });
+      }
+
+      function listenBrowser() {
+        var rec = new Rec();
+        rec.lang = voiceCfg.language === 'en' ? 'en-US' : (navigator.language || 'en-US');
+        rec.interimResults = true;
+        rec.continuous = false;
+        var finalText = '';
+        rec.onresult = function (e) {
+          var interim = '';
+          for (var i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+            else interim += e.results[i][0].transcript;
+          }
+          input.value = (finalText + interim).trim();
+        };
+        rec.onerror = function (e) {
+          showTip(e.error === 'not-allowed' ? 'Microphone permission was denied.' : 'Didn\'t catch that, try again.');
+        };
+        rec.onend = function () {
+          stopListening = null;
+          setListening(false);
+          if (finalText.trim()) { lastInputWasVoice = true; submit(finalText.trim(), true); }
+        };
+        stopListening = function () { rec.stop(); };
+        setListening(true, 'Listening…');
+        rec.start();
+      }
+
+      // -- Live mode: real-time conversation with Grok Voice Agent ---------------------
+      // The frame mints a short-lived token; audio streams straight between this page and
+      // Grok (PCM16, 24 kHz). Tool calls are run by the frame via /api/curator/tool.
+      var liveBtn = document.getElementById('live');
+      var live = null;
+      var WORKLET = "class P extends AudioWorkletProcessor{process(i){var c=i[0]&&i[0][0];" +
+                    "if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor('vernis-mic',P)";
+
+      function liveAvailable() {
+        return canRecord && typeof AudioWorkletNode !== 'undefined' && !!(window.AudioContext || window.webkitAudioContext);
+      }
+      liveBtn.onclick = function () {
+        primeAudio();
+        if (live) { stopLive('Live conversation ended.'); return; }
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        var ctx = new Ctx({ sampleRate: 24000 });   // created and resumed inside the tap
+        ctx.resume();
+        startLive(ctx);
+      };
+      updateMic();
+
+      function b64FromInt16(int16) {
+        var u8 = new Uint8Array(int16.buffer), s = '';
+        for (var i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+        return btoa(s);
+      }
+      function int16FromB64(b64) {
+        var bin = atob(b64), u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        return new Int16Array(u8.buffer);
+      }
+
+      function liveState(text, speaking) {
+        var bar = document.getElementById('livebar');
+        document.getElementById('livestate').textContent = text;
+        bar.classList.toggle('speaking', !!speaking);
+      }
+
+      function setLiveUI(state) {
+        var bar = document.getElementById('livebar');
+        if (state === 'on') { document.getElementById('provider').textContent = 'Grok'; document.getElementById('model').textContent = 'grok-voice · Ara'; }
+        if (state === 'off') fetchHeader();
+        bar.classList.toggle('on', state !== 'off');
+        document.body.classList.toggle('is-live', state === 'on');
+        if (state === 'connecting') liveState('Connecting…');
+        if (state === 'on') liveState('Listening…');
+        liveBtn.classList.toggle('live-on', state === 'on');
+        liveBtn.querySelector('.lt').textContent = state === 'on' ? 'End' : state === 'connecting' ? 'Connecting' : 'Live';
+        mic.disabled = state !== 'off';
+        input.disabled = state !== 'off';
+        if (state === 'on') showTip('Just talk. You can interrupt any time.');
+      }
+
+      function livePost(url, body) {
+        return VernisPinPrompt.withPin(function (headers) {
+          return fetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, headers, appHeaders()),
+                              body: JSON.stringify(body || {}) });
+        }).then(function (r) { return r.json(); });
+      }
+
+      function startLive(ctx) {
+        if (busy || live) { ctx.close(); return; }
+        stopAudio();
+        if (listening && stopListening) stopListening();
+        setLiveUI('connecting');
+        var session;
+        livePost('/api/curator/live/session').then(function (s) {
+          if (!s.token) throw new Error(s.message || 'Could not start a live conversation.');
+          session = s;
+          return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+        }).then(function (stream) {
+          if (ctx.state !== 'running') ctx.resume();
+          var out = ctx.createAnalyser();
+          out.fftSize = 512;
+          out.connect(ctx.destination);
+          var L = live = { ctx: ctx, stream: stream, ws: null, playAt: 0, sources: [], lastActivity: Date.now(),
+                           out: out, mic: 0, heard: 0, startedAt: Date.now() };
+          animateOrb(L);
+          var moduleUrl = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
+          return ctx.audioWorklet.addModule(moduleUrl).then(function () {
+            if (live !== L) return;
+            var src = ctx.createMediaStreamSource(stream);
+            var node = new AudioWorkletNode(ctx, 'vernis-mic');
+            var mute = ctx.createGain();
+            mute.gain.value = 0;
+            src.connect(node);
+            node.connect(mute);            // keeps the worklet running without playing the mic back
+            mute.connect(ctx.destination);
+            var chunks = [], count = 0;
+            var pending = [];              // audio captured while the connection opens
+            node.port.onmessage = function (e) {
+              var sum = 0, d = e.data;
+              for (var k = 0; k < d.length; k++) sum += d[k] * d[k];
+              var lvl = Math.sqrt(sum / d.length);
+              L.mic = Math.max(lvl, L.mic * 0.85);
+              if (lvl > L.heard) L.heard = lvl;
+              chunks.push(e.data);
+              count += e.data.length;
+              if (count < 2400) return;    // send ~100 ms at a time
+              var out = new Int16Array(count), o = 0;
+              chunks.forEach(function (c) {
+                for (var i = 0; i < c.length; i++) { var v = Math.max(-1, Math.min(1, c[i])); out[o++] = v < 0 ? v * 0x8000 : v * 0x7fff; }
+              });
+              chunks = []; count = 0;
+              var msg = JSON.stringify({ type: 'input_audio_buffer.append', audio: b64FromInt16(out) });
+              if (L.ws && L.ws.readyState === 1 && L.ready) L.ws.send(msg);
+              else if (pending.length < 30) pending.push(msg);   // keep up to ~3 s
+            };
+            var ws = L.ws = new WebSocket(session.url, ['xai-client-secret.' + session.token]);
+            ws.onopen = function () {
+              ws.send(JSON.stringify({ type: 'session.update', session: session.session }));
+              L.ready = true;
+              pending.forEach(function (msg) { ws.send(msg); });
+              pending = [];
+              setLiveUI('on');
+            };
+            ws.onmessage = function (ev) { try { handleLive(JSON.parse(ev.data)); } catch (err) {} };
+            ws.onerror = function () { if (live === L) stopLive('The live connection failed.'); };
+            ws.onclose = function () { if (live === L) stopLive('Live conversation ended.'); };
+            L.idle = setInterval(function () {
+              if (!L.warned && Date.now() - L.startedAt > 6000 && L.heard < 0.004) {
+                L.warned = true;
+                liveState('I can’t hear you…');
+                showTip('Allow the microphone for this page (icon at the left of the address bar), and check the Mac’s input device.');
+              }
+              if (Date.now() - L.lastActivity > 30000) stopLive('Live ended after 30 seconds of silence. Tap Live to talk again.');
+            }, 5000);
+          });
+        }).catch(function (e) {
+          if (!live || live.ctx !== ctx) { try { ctx.close(); } catch (x) {} }
+          stopLive(e && e.name === 'NotAllowedError' ? 'Microphone permission was denied.' : (e && e.message) || 'Could not start live mode.');
+        });
+      }
+
+      function animateOrb(L) {
+        var orb = document.getElementById('orb');
+        var buf = new Float32Array(L.out.fftSize), level = 0;
+        (function frame() {
+          if (live !== L) { orb.style.transform = ''; return; }
+          L.out.getFloatTimeDomainData(buf);
+          var sum = 0;
+          for (var i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+          var target = Math.min(1, Math.max(Math.sqrt(sum / buf.length), L.mic) * 6);
+          L.mic *= 0.9;
+          level += (target - level) * 0.25;
+          orb.style.transform = 'scale(' + (1 + level * 0.45).toFixed(3) + ')';
+          requestAnimationFrame(frame);
+        })();
+      }
+
+      function stopPlayback() {
+        if (!live) return;
+        live.sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
+        live.sources = [];
+        live.playAt = 0;
+      }
+
+      function playPcm(b64) {
+        var L = live;
+        var pcm = int16FromB64(b64);
+        var buf = L.ctx.createBuffer(1, pcm.length, 24000);
+        var ch = buf.getChannelData(0);
+        for (var i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 0x8000;
+        var src = L.ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(L.out);
+        var at = Math.max(L.ctx.currentTime + 0.04, L.playAt);
+        src.start(at);
+        L.playAt = at + buf.duration;
+        L.sources.push(src);
+        src.onended = function () { L.sources = L.sources.filter(function (x) { return x !== src; }); };
+      }
+
+      function handleLive(m) {
+        var L = live;
+        if (!L) return;
+        switch (m.type) {
+          case 'input_audio_buffer.speech_started':
+            L.lastActivity = Date.now();
+            stopPlayback();                 // you can interrupt the curator
+            holdArtwork();
+            liveState('Listening…');
+            break;
+          case 'input_audio_buffer.speech_stopped':
+            L.lastActivity = Date.now();
+            liveState('Thinking…');
+            break;
+          case 'conversation.item.input_audio_transcription.completed':
+            if (m.transcript) { add('user', m.transcript); history.push({ role: 'user', content: m.transcript }); }
+            break;
+          case 'response.output_audio.delta':
+            L.lastActivity = Date.now();
+            if (speakOn) playPcm(m.delta);
+            liveState('Speaking…', true);
+            break;
+          case 'response.done':
+            // back to listening once the queued audio has played
+            setTimeout(function () { if (live && (!live.sources.length)) liveState('Listening…'); },
+                       Math.max(0, (live.playAt - live.ctx.currentTime) * 1000) + 150);
+            break;
+          case 'response.output_audio_transcript.done':
+            if (m.transcript) { add('ai', m.transcript); history.push({ role: 'assistant', content: m.transcript }); }
+            break;
+          case 'response.function_call_arguments.done':
+            liveState('Checking the frame…');
+            livePost('/api/curator/tool', { name: m.name, arguments: m.arguments }).then(function (d) {
+              if (!live || !live.ws) return;
+              live.ws.send(JSON.stringify({ type: 'conversation.item.create',
+                item: { type: 'function_call_output', call_id: m.call_id, output: JSON.stringify(d.result || d) } }));
+              live.ws.send(JSON.stringify({ type: 'response.create' }));
+            });
+            break;
+          case 'error':
+            showTip('Live: ' + ((m.error && m.error.message) || 'error'));
+            break;
+        }
+      }
+
+      function stopLive(message) {
+        var L = live;
+        live = null;
+        if (L) {
+          clearInterval(L.idle);
+          try { if (L.ws) L.ws.close(); } catch (e) {}
+          if (L.stream) L.stream.getTracks().forEach(function (t) { t.stop(); });
+          try { L.ctx.close(); } catch (e) {}
+        }
+        setLiveUI('off');
+        if (message) showTip(message);
+      }
+
+      var headerText = ['Curator', ''];
+      function fetchHeader() {   // restore the chat AI's name after Live mode
+        document.getElementById('provider').textContent = headerText[0];
+        document.getElementById('model').textContent = headerText[1];
+      }
+
+      // Hold the artwork the moment the owner starts talking, so it can't move on mid-question.
+      var lastHold = 0;
+      function holdArtwork() {
+        if (Date.now() - lastHold < 4000) return;
+        lastHold = Date.now();
+        fetch('/api/curator/hold', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, appHeaders()), body: '{}' })
+          .catch(function () {});
+      }
+
+      // -- Chat ------------------------------------------------------------------
+      function add(cls, text) {
+        var w = document.getElementById('welcome');
+        if (w) w.remove();
+        var d = document.createElement('div');
+        d.className = 'msg ' + cls;
+        d.textContent = text;
+        log.appendChild(d);
+        log.scrollTop = log.scrollHeight;
+        return d;
+      }
+
+      function addChips(el, actions) {
+        if (!actions || !actions.length) return;
+        var c = document.createElement('div');
+        c.className = 'chips';
+        actions.forEach(function (a) {
+          var s = document.createElement('span');
+          s.className = 'chip' + (a.ok ? '' : ' bad');
+          var arg = a.args && a.args.query ? ' ' + a.args.query : '';
+          s.textContent = a.tool + arg + (a.ok ? ' ✓' : ' ✗');
+          c.appendChild(s);
+        });
+        el.appendChild(c);
+      }
+
+      function submit(text, fromVoice) {
+        text = (text || '').trim();
+        if (!text || busy) return;
+        if (!fromVoice) lastInputWasVoice = false;
+        holdArtwork();
+        primeAudio();
+        stopAudio();
+        showTip('');
+        busy = true;
+        send.disabled = true;
+        input.value = '';
+        autosize();
+        add('user', text);
+        history.push({ role: 'user', content: text });
+        var typing = document.createElement('div');
+        typing.className = 'typing';
+        typing.textContent = 'Curator is looking…';
+        log.appendChild(typing);
+        log.scrollTop = log.scrollHeight;
+
+        VernisPinPrompt.withPin(function (headers) {
+          return fetch('/api/curator/chat', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, headers, appHeaders()),
+            body: JSON.stringify({ messages: history.slice(-20) })
+          });
+        }).then(function (r) {
+          return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+        }).then(function (res) {
+          typing.remove();
+          if (!res.ok || !res.d.reply) {
+            history.pop();
+            var m = (res.d && (res.d.message || res.d.error)) || 'Something went wrong.';
+            var el = add('err', m);
+            if (res.d && res.d.error === 'no_key') {
+              el.appendChild(document.createElement('br'));
+              var a = document.createElement('a');
+              a.href = '/settings.html#section-curator';
+              a.textContent = 'Open Settings';
+              a.style.color = 'inherit';
+              el.appendChild(a);
+            }
+            return;
+          }
+          history.push({ role: 'assistant', content: res.d.reply });
+          var el2 = add('ai', res.d.reply);
+          addChips(el2, res.d.actions);
+          if (res.d.source === 'local' || res.d.source === 'cached') {
+            var chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.textContent = res.d.source === 'local' ? '⚡ no AI used' : '⚡ saved answer';
+            (el2.querySelector('.chips') || el2.appendChild(Object.assign(document.createElement('div'), { className: 'chips' }))).appendChild(chip);
+          }
+          speak(res.d.reply);
+        }).catch(function () {
+          typing.remove();
+          history.pop();
+          add('err', 'Could not reach the frame.');
+        }).then(function () {
+          busy = false;
+          send.disabled = false;
+        });
+      }
+
+      document.getElementById('form').onsubmit = function (e) {
+        e.preventDefault();
+        submit(input.value);
+      };
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input.value); }
+      });
+      function autosize() {
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+      }
+      input.addEventListener('input', autosize);
+
+      fetch('/api/curator/config').then(function (r) { return r.json(); }).then(function (c) {
+        if (c.voice) voiceCfg = c.voice;
+        updateMic();
+        var st = document.getElementById('status');
+        if (!window.isSecureContext && voiceCfg.stt_ready) {
+          st.innerHTML = 'Connected ✓ · <b>Live conversation</b> needs Chrome to trust this frame: open ' +
+            '<code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, add <code>' + location.origin +
+            '</code>, choose Enabled and Relaunch.';
+        } else {
+          st.textContent = 'Connected to your frame ✓';
+          setTimeout(function () { st.style.display = 'none'; }, 2500);
+        }
+        var p = c.providers && c.providers[c.provider];
+        if (p) {
+          headerText = [p.label.replace(/ \(.*\)/, ''), p.live_model || p.model || ''];
+          fetchHeader();
+        }
+      }).catch(function () {
+        var st = document.getElementById('status');
+        st.textContent = 'Can\'t reach your frame. Is this phone on the same Wi-Fi?';
+        st.style.color = 'var(--text-secondary)';
+      });
+
+      if (window.speechSynthesis) speechSynthesis.getVoices();  // warm the browser voice list
+      if (justPaired) add('ai', 'Connected. This phone can now talk to your frame. Tap 🎤 on your keyboard and ask me anything about the art.');
+    })();
+  </script>
+</body>
+
+</html>

@@ -1382,10 +1382,12 @@
         const nfts = Array.isArray(data) ? data : (data.nfts || []);
         hiddenFiles = data.hidden || nfts.filter(nft => nft.hidden).map(nft => nft.filename) || [];
 
-        // Build generator URL map for live iframe loading
+        // Build generator URL map for live iframe loading. Only the URL forms
+        // Vernis writes itself may load as a live page (mirrors the backend).
+        var SAFE_GENERATOR_URL = /^(https:\/\/generator\.artblocks\.io\/0x[0-9a-fA-F]{40}\/\d{1,20}|http:\/\/(127\.0\.0\.1|localhost)\/lab\.html\?type=(gazer|pixelchain|punk|glyph|burner)&id=\d{1,20}&fullscreen=1(&mode=(pixel|svg|ascii|hex))?)$/;
         generatorUrls = {};
         nfts.forEach(nft => {
-          if (nft.generator_url) generatorUrls[nft.url] = nft.generator_url;
+          if (nft.generator_url && SAFE_GENERATOR_URL.test(nft.generator_url)) generatorUrls[nft.url] = nft.generator_url;
         });
 
         // Filter out hidden NFTs
@@ -1428,7 +1430,8 @@
       // Move back in history, skip missing files silently
       let attempts = 0;
       while (attempts < navHistory.length) {
-        navHistoryPos = Math.min(navHistoryPos + 1, navHistory.length - 1);
+        // -1 and 0 both mean "at head" (the artwork on screen), so step from 0
+        navHistoryPos = Math.min(Math.max(navHistoryPos, 0) + 1, navHistory.length - 1);
         let histUrl = navHistory[navHistory.length - 1 - navHistoryPos];
         if (files.indexOf(histUrl) !== -1) {
           showArtwork(histUrl, true);
@@ -2090,7 +2093,7 @@
           .then(() => closeGalleryPowerModal())
           .catch(err => alert('Failed: ' + err.message));
       } else if (galleryPendingAction === 'shutdown') {
-        fetch('/api/shutdown')
+        fetch('/api/shutdown', { method: 'POST' })
           .then(() => {
             closeGalleryPowerModal();
             document.body.innerHTML = `

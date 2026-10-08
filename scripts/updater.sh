@@ -109,6 +109,14 @@ fi
 # Update systemd services if changed
 if [ -d "systemd" ]; then
     cp -r systemd/* /etc/systemd/system/
+    # The shipped units say User=pi; on devices without a pi account that
+    # makes them fail with status=217/USER. Use the account that owns Vernis.
+    VUSER=$(stat -c %U /opt/vernis/app.py 2>/dev/null || true)
+    if [ -n "$VUSER" ] && [ "$VUSER" != "root" ] && ! id pi >/dev/null 2>&1; then
+        for f in systemd/*.service; do
+            sed -i "s/^User=pi$/User=$VUSER/" "/etc/systemd/system/$(basename "$f")"
+        done
+    fi
     systemctl daemon-reload
     echo "  Systemd services updated"
 fi

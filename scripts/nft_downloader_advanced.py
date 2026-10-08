@@ -11,6 +11,7 @@ Features:
 """
 import argparse
 import csv
+import hashlib
 import json
 import os
 import re
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import time
 import threading
+import urllib.parse
 from pathlib import Path
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -139,6 +141,11 @@ class AdvancedNFTDownloader:
         self.bytes_downloaded = 0
         self.start_time = None
         self.current_file = None
+        # Content hash -> saved filename, for in-run dedup. A directory-wrapped
+        # CID references the same image two ways (<dir>/<name> and the file's
+        # own bare CID); without this we'd write byte-identical copies under
+        # two different hashes.
+        self._content_hashes = {}
 
         # IPFS pinning support
         self.ipfs_env = os.environ.copy()
@@ -279,6 +286,17 @@ class AdvancedNFTDownloader:
                 cid = filepath.stem  # Get filename without extension
                 if cid and cid != "download_progress":
                     self.downloaded.add(cid)
+
+        # Seed the content-hash index from media already on disk so a resume or
+        # re-run won't write a second byte-identical copy under a different
+        # identifier (the directory-CID twin case). Bookkeeping/index files are
+        # skipped; only real media is content-addressed for dedup.
+        media_exts = [".gif", ".png", ".jpg", ".jpeg", ".mp4", ".glb", ".webp", ".svg", ".avif"]
+        for ext in media_exts:
+            for filepath in self.output_dir.glob(f"*{ext}"):
+                h = self._md5_file(filepath)
+                if h:
+                    self._content_hashes.setdefault(h, filepath.name)
 
         if self.downloaded:
             print(f"Loaded {len(self.downloaded)} previously downloaded items")
@@ -477,6 +495,43 @@ class AdvancedNFTDownloader:
         extensions = [".json", ".gif", ".png", ".jpg", ".mp4", ".glb", ".html", ".bin", ".webp", ".svg", ".avif"]
         return any((self.output_dir / f"{identifier}{ext}").exists() for ext in extensions)
 
+    def _is_directory_index(self, data, ext, verify_result):
+        """True if the fetched content is an IPFS gateway directory-index page
+        rather than a real artwork. Happens when a CSV lists a folder-wrapped
+        (directory) CID instead of a single file. We follow such a CID's
+        entries but never save the index page itself."""
+        if ext != ".html":
+            return False
+        if verify_result == "directory_verified":
+            return True
+        head = data[:4096].lower()
+        return (b"directory of content-addressed files hosted on ipfs" in head
+                or b"<title>index of" in head)
+
+    def _md5_file(self, path):
+        """Chunked md5 of a file (memory-safe for large videos)."""
+        h = hashlib.md5()
+        try:
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+        except OSError:
+            return None
+        return h.hexdigest()
+
+    def _reserve_content(self, data, filename):
+        """Content dedup. If these exact bytes were already saved (this run or
+        already on disk), return the existing filename; otherwise reserve them
+        under `filename` and return None. Atomic under self.lock so parallel
+        workers can't both write the same content."""
+        key = hashlib.md5(data).hexdigest()
+        with self.lock:
+            existing = self._content_hashes.get(key)
+            if existing:
+                return existing
+            self._content_hashes[key] = filename
+            return None
+
     def download_ipfs_cid(self, cid, nested=False):
         """Download IPFS CID (with optional /path for directory CIDs) and follow nested CIDs"""
         cid = cid.strip()
@@ -540,6 +595,7 @@ class AdvancedNFTDownloader:
             return False
 
         # Verify CID integrity (only for bare CIDs, not directory paths)
+        verify_result = None
         if cid == base_cid:
             verify_result = self._verify_cid(data, base_cid)
             if verify_result == 'unverified':
@@ -549,24 +605,53 @@ class AdvancedNFTDownloader:
                     self._save_progress()
                 return False
 
-        # Detect file type and save
+        # Detect file type
         ext = self._detect_file_type(data)
-        filepath = self.output_dir / f"{safe_id}{ext}"
-        filepath.write_bytes(data)
-        self.saved_files.append(filepath.name)
 
-        # Pin to IPFS (use base CID only — can't pin a path)
-        if self._pin_to_ipfs(base_cid):
-            print(f"  ✓ Saved & Pinned: {safe_id}{ext}")
+        # Directory-wrapped CID: the gateway returns an HTML directory-index
+        # page, not an artwork. Persisting it leaves a junk look-alike ".html"
+        # file (every directory index renders the same), so we skip the write
+        # but still follow the directory's entries below.
+        is_dir_index = self._is_directory_index(data, ext, verify_result)
+
+        if is_dir_index:
+            print(f"  📁 Directory CID — following entries, not saving index page: {cid}")
+            # Recursively pin the whole directory for preservation.
+            self._pin_to_ipfs(base_cid)
+            with self.lock:
+                self.downloaded.add(safe_id)
+                self.failed.pop(safe_id, None)
+                # No file on disk for this id, so don't tag it into the source map.
+                self.run_identifiers.discard(safe_id)
+            self._save_progress()
         else:
-            print(f"  ✓ Saved: {safe_id}{ext}")
+            # Content dedup: a directory entry can arrive as both <dir>/<name>
+            # and the file's own bare CID — same bytes, two identifiers. Keep one.
+            dup_name = self._reserve_content(data, f"{safe_id}{ext}")
+            if dup_name:
+                print(f"  ⏭ Duplicate content (identical to {dup_name}) — skipping: {safe_id}{ext}")
+                with self.lock:
+                    self.downloaded.add(safe_id)
+                    self.failed.pop(safe_id, None)
+                    self.run_identifiers.discard(safe_id)
+                return True
 
-        # Mark as successfully downloaded
-        with self.lock:
-            self.downloaded.add(safe_id)
-            self.run_identifiers.add(safe_id)
-            self.failed.pop(safe_id, None)
-        self._save_progress()
+            filepath = self.output_dir / f"{safe_id}{ext}"
+            filepath.write_bytes(data)
+            self.saved_files.append(filepath.name)
+
+            # Pin to IPFS (use base CID only — can't pin a path)
+            if self._pin_to_ipfs(base_cid):
+                print(f"  ✓ Saved & Pinned: {safe_id}{ext}")
+            else:
+                print(f"  ✓ Saved: {safe_id}{ext}")
+
+            # Mark as successfully downloaded
+            with self.lock:
+                self.downloaded.add(safe_id)
+                self.run_identifiers.add(safe_id)
+                self.failed.pop(safe_id, None)
+            self._save_progress()
 
         # Extract and download nested CIDs (may include directory paths)
         if ext in [".json", ".html"] and not nested:
@@ -680,16 +765,20 @@ class AdvancedNFTDownloader:
         return None
 
     def _handle_data_uri_metadata(self, data_uri, identifier):
-        """Handle data:application/json;base64,... token URIs. Returns metadata dict or None."""
+        """Handle data:application/json[;base64|;utf8],... token URIs. Returns metadata dict or None."""
         import base64
         try:
             # data:application/json;base64,eyJ...
             header, encoded = data_uri.split(',', 1)
             if 'base64' in header:
-                raw = base64.b64decode(encoded)
-            else:
-                raw = encoded.encode('utf-8')
-            return json.loads(raw)
+                return json.loads(base64.b64decode(encoded))
+            # Non-base64 data URIs are percent-encoded (RFC 2397), e.g. SERFIES
+            # uses ;utf8 with "%23" for '#'. Fall back to the raw text for
+            # contracts that skip the encoding and break on unquoting.
+            try:
+                return json.loads(urllib.parse.unquote(encoded))
+            except ValueError:
+                return json.loads(encoded)
         except Exception:
             return None
 
@@ -713,6 +802,13 @@ class AdvancedNFTDownloader:
     def download_nft(self, contract, token_id, chain='ethereum', image_url_fallback=''):
         """Download NFT by resolving tokenURI on-chain, then downloading from IPFS.
         Falls back to image_url_fallback (e.g. OpenSea CDN) only if on-chain fails."""
+        contract, token_id = str(contract).strip(), str(token_id).strip()
+        # Both end up in file names: accept only a plain address / token id.
+        if not re.fullmatch(r"[A-Za-z0-9]{1,64}", contract) or not re.fullmatch(r"[A-Za-z0-9]{1,80}", token_id):
+            print(f"  ✗ Skipping invalid contract/token: {contract[:40]!r} #{token_id[:40]!r}")
+            with self.lock:
+                self.failed[f"{contract[:40]}_{token_id[:40]}"] = "Invalid contract address or token ID"
+            return False
         identifier = f"{contract}_{token_id}"
 
         # Check if already downloaded
@@ -851,9 +947,21 @@ class AdvancedNFTDownloader:
                         header, encoded = image_field.split(',', 1)
                         if 'base64' in header:
                             img_data = base64.b64decode(encoded)
-                        else:
+                        elif encoded.lstrip().startswith('<'):
+                            # Raw markup (e.g. unencoded SVG) — leave literal '%' alone
                             img_data = encoded.encode('utf-8')
+                        else:
+                            img_data = urllib.parse.unquote(encoded).encode('utf-8')
                         ext = self._detect_file_type(img_data)
+                        # Same art already on disk (e.g. saved earlier under a
+                        # name decoded differently) — reuse it, don't duplicate.
+                        dup_name = self._reserve_content(img_data, f"{filename}{ext}")
+                        if dup_name:
+                            print(f"  ⏭ Duplicate content (identical to {dup_name}) — skipping")
+                            with self.lock:
+                                self.saved_files.append(dup_name)
+                            self._save_progress()
+                            return True
                         filepath = self.output_dir / f"{filename}{ext}"
                         filepath.write_bytes(img_data)
                         self.saved_files.append(filepath.name)

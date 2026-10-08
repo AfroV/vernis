@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Preview • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+      cursor: none;
+    }
+
+    .stage { position: fixed; inset: 0; }
+
+    .stage img, .stage video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity .35s ease;
+    }
+    .stage img.on, .stage video.on { opacity: 1; }
+
+    /* Shown only while waiting for the first image, so the artist isn't
+       staring at an unexplained black screen. */
+    #waiting {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255, 255, 255, .35);
+      font-family: 'Inter', -apple-system, sans-serif;
+      font-size: 15px; letter-spacing: .04em;
+      transition: opacity .3s ease;
+    }
+    #waiting.hidden { opacity: 0; }
+  </style>
+</head>
+
+<body>
+  <div class="stage" id="stage"></div>
+  <div id="waiting">Waiting for artwork&hellip;</div>
+
+  <script>
+    let currentStored = null;
+    let ended = false;
+
+    const stage = document.getElementById('stage');
+    const waiting = document.getElementById('waiting');
+
+    function swapTo(file) {
+      if (!file || file.stored === currentStored) return;
+      currentStored = file.stored;
+      waiting.classList.add('hidden');
+
+      const isVideo = /\.mp4$/i.test(file.stored);
+      const el = document.createElement(isVideo ? 'video' : 'img');
+      el.src = '/api/preview/file/' + encodeURIComponent(file.stored);
+      if (isVideo) { el.muted = true; el.loop = true; el.autoplay = true; el.playsInline = true; }
+
+      // Fade the new element in over the old one, then drop the old one, so
+      // stepping through images never flashes black between them.
+      stage.appendChild(el);
+      const reveal = () => {
+        el.classList.add('on');
+        [...stage.children].forEach(c => {
+          if (c !== el) setTimeout(() => c.remove(), 400);
+        });
+      };
+      if (isVideo) { el.addEventListener('loadeddata', reveal, { once: true }); }
+      else { el.decode ? el.decode().then(reveal).catch(reveal) : el.addEventListener('load', reveal, { once: true }); }
+    }
+
+    function goHome() {
+      if (ended) return;
+      ended = true;
+      // Fallback path only: the backend normally drives the kiosk back via
+      // CDP. This covers the case where CDP was unreachable.
+      fetch('/api/remote/gallery-state')
+        .then(r => r.json())
+        .then(d => { window.location.href = d.running ? '/gallery.html' : '/'; })
+        .catch(() => { window.location.href = '/'; });
+    }
+
+    function poll() {
+      fetch('/api/preview/status')
+        .then(r => r.json())
+        .then(d => {
+          const files = d.files || [];
+          if (!files.length || !d.enabled) { goHome(); return; }
+          swapTo(files[Math.max(0, Math.min(d.index || 0, files.length - 1))]);
+        })
+        .catch(() => { });
+    }
+
+    poll();
+    setInterval(poll, 1000);
+  </script>
+</body>
+
+</html>

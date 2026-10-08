@@ -22,7 +22,16 @@ pkill -f lxsession-xdg 2>/dev/null
 # physical orientation and would appear sideways on an HDMI TV.
 SWAYBG_PID=""
 SPLASH_IMG="/usr/share/plymouth/themes/vernis/splash.png"
+SPLASH_UPRIGHT="/usr/share/plymouth/themes/vernis/splash-upright.png"
 HDMI_AT_BOOT=$(wlr-randr 2>/dev/null | grep -c "^HDMI")
+# kanshi (killed above, but it may already have won the race) can apply the
+# saved output transform before we get here. If the compositor is already
+# rotating the screen, the pre-rotated splash.png would be double-rotated —
+# use the upright art instead.
+DPI_TRANSFORM_NOW=$(wlr-randr 2>/dev/null | awk '/^DPI/{f=1;next} f&&/Transform:/{print $2; exit}')
+if [ -n "$DPI_TRANSFORM_NOW" ] && [ "$DPI_TRANSFORM_NOW" != "normal" ] && [ -f "$SPLASH_UPRIGHT" ]; then
+    SPLASH_IMG="$SPLASH_UPRIGHT"
+fi
 if [ -n "$WAYLAND_DISPLAY" ] && [ -f "$SPLASH_IMG" ] && [ "$HDMI_AT_BOOT" -eq 0 ] && command -v swaybg >/dev/null 2>&1; then
     swaybg -i "$SPLASH_IMG" -m fill -c '#0f0d0d' &
     SWAYBG_PID=$!
@@ -36,8 +45,11 @@ echo "[$(date)] Waiting for Vernis server..."
 MAX_WAIT=60
 WAITED=0
 
+# Try HTTP first — most devices serve plain :80; HTTPS is opt-in. Checking
+# only https on an http-only device makes every boot eat the full 60s timeout.
 while [ $WAITED -lt $MAX_WAIT ]; do
-    if curl -sk -o /dev/null -w "%{http_code}" https://localhost/favicon.svg 2>/dev/null | grep -q "200"; then
+    if curl -s -m 2 -o /dev/null -w "%{http_code}" http://localhost/favicon.svg 2>/dev/null | grep -q "200" || \
+       curl -sk -m 2 -o /dev/null -w "%{http_code}" https://localhost/favicon.svg 2>/dev/null | grep -q "200"; then
         echo "[$(date)] Server ready after ${WAITED}s"
         break
     fi
@@ -187,25 +199,47 @@ else
     xsetroot -cursor_name left_ptr 2>/dev/null
 fi
 
-# Wait for Flask API to be ready (up to 30 seconds)
+# Wait for Flask API to be ready. Probe /api/setup/check — a pure file-stat
+# with no nmcli call and no CIFS glob — so the readiness check itself can't
+# time out behind slow network storage. Ceiling is 65s (not 30s) because on
+# devices with external CIFS storage the backend blocks in
+# _wait_for_external_storage for up to 60s before it binds port 5000
+# (see backend/app.py), and a 30s loop would give up and launch Chromium
+# before the API is live.
 echo "[$(date)] Waiting for API..."
-for _wait in $(seq 1 30); do
-    if curl -s --max-time 2 http://localhost:5000/api/setup/status >/dev/null 2>&1; then
+for _wait in $(seq 1 65); do
+    if curl -s --max-time 2 http://localhost:5000/api/setup/check >/dev/null 2>&1; then
         echo "[$(date)] API ready after ${_wait}s"
         break
     fi
     sleep 1
 done
 
-# Check if gallery has art — if so, start in gallery mode
+# Decide start page: gallery if art exists, else home. setup/status now also
+# globs external storage. Retry a few times before giving up: on devices with
+# a network-mounted (CIFS) library the share can take longer than the backend's
+# storage wait to settle, and a single check could see has_art:false and wrongly
+# land on the home screen. We default to index.html (NOT gallery) so a genuinely
+# empty device never opens a blank gallery — we only switch to gallery on a
+# positive has_art:true.
 START_PAGE="index.html"
-HAS_ART=$(curl -s --max-time 5 http://localhost:5000/api/setup/status 2>/dev/null | grep -o '"has_art": *true')
-if [ -n "$HAS_ART" ]; then
-    START_PAGE="gallery.html"
-    echo "[$(date)] Art found — starting in gallery mode"
-else
-    echo "[$(date)] No art — starting on home screen"
-fi
+for _art_try in 1 2 3 4 5; do
+    STATUS=$(curl -s --max-time 10 http://localhost:5000/api/setup/status 2>/dev/null)
+    if echo "$STATUS" | grep -q '"has_art": *true'; then
+        START_PAGE="gallery.html"
+        echo "[$(date)] Art found — starting in gallery mode"
+        break
+    fi
+    # If external storage is configured but not mounted yet, art may still
+    # appear once the share settles — keep retrying. Otherwise stop early.
+    if echo "$STATUS" | grep -q '"external_unavailable": *true'; then
+        echo "[$(date)] External storage not ready (try ${_art_try}/5) — waiting..."
+        sleep 3
+    else
+        echo "[$(date)] No art — starting on home screen"
+        break
+    fi
+done
 
 echo "[$(date)] Launching Chromium..."
 exec chromium $CHROME_FLAGS http://127.0.0.1/$START_PAGE

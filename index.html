@@ -446,6 +446,36 @@
     .kiosk .kiosk-power { display: flex; }
     .kiosk-power svg { width: 18px; height: 18px; }
 
+    /* Connect / Curator flip card */
+    .flip-switch {
+      display: inline-flex; align-self: center; gap: 2px; padding: 3px; margin: -18px auto 22px;
+      border: 1px solid var(--border-medium); border-radius: 22px; position: relative; z-index: 2;
+    }
+    .flip-switch button {
+      border: 0; background: transparent; color: var(--text-muted); cursor: pointer;
+      font: 600 11px/1 var(--font-body); letter-spacing: 0.16em; text-transform: uppercase;
+      padding: 9px 16px; border-radius: 18px; transition: background .3s ease, color .3s ease;
+    }
+    .flip-switch button.on { background: var(--accent-primary); color: var(--bg-primary); }
+    .flip-stage { perspective: 1400px; flex: 1; display: flex; }
+    .flip-inner {
+      flex: 1; display: grid; transform-style: preserve-3d;
+      transition: transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+    .flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+    .flip-face {
+      grid-area: 1 / 1; display: flex; flex-direction: column;
+      -webkit-backface-visibility: hidden; backface-visibility: hidden;
+    }
+    .flip-back { transform: rotateY(180deg); }
+    .flip-face .qr-box {
+      margin: 20px auto; width: 180px; height: 180px; border-radius: 16px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px var(--shadow-md);
+    }
+    .flip-face .btn { margin-top: auto; }
+    .kiosk-connect-overlay .flip-switch { margin: 0 auto 28px; }
+    .kiosk-connect-overlay .flip-switch button { font-size: 17px; padding: 14px 24px; border-radius: 26px; }
+
     /* Kiosk connect overlay */
     .kiosk-connect-overlay {
       position: fixed; inset: 0; z-index: 10000;
@@ -693,11 +723,15 @@
       <div class="side-line side-line-r"></div>
     </div>
     <button class="kiosk-back-btn" onclick="closeKioskConnect()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Back</button>
+    <div class="flip-switch" role="tablist" aria-label="Manage or Curator">
+      <button class="on" id="kflip-manage" onclick="kioskConnectMode(false)">Manage Vernis</button>
+      <button id="kflip-curator" onclick="kioskConnectMode(true)">Talk to Curator</button>
+    </div>
     <div class="kiosk-connect-qr" id="kiosk-qr" onclick="openQrFullscreen()">
       <span style="color: var(--text-muted); font-size: 14px;">Loading...</span>
     </div>
     <div class="kiosk-connect-url" id="kiosk-url"></div>
-    <div class="kiosk-connect-hint">Open this link on your phone or computer to manage your Vernis</div>
+    <div class="kiosk-connect-hint" id="kiosk-hint">Open this link on your phone or computer to manage your Vernis</div>
     <a href="connect.html" style="display:block;text-align:center;margin-top:16px;color:var(--accent-primary);font-size:30px;text-decoration:none;opacity:0.7;">More connection options (Bluetooth)</a>
   </div>
 
@@ -888,6 +922,7 @@
     <nav class="nav">
       <a href="index.html">Home</a>
       <a href="add.html">Add Art</a>
+      <a href="preview.html">Preview</a>
       <a href="library.html">Library</a>
       <a href="manage.html">Manage Art</a>
       <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
@@ -904,6 +939,7 @@
   <div class="mobile-menu" id="mobileMenu">
     <a href="index.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
     <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="preview.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></span> Preview</a>
     <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
     <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
     <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
@@ -1145,17 +1181,31 @@
         <a href="gallery.html" class="btn">View Art</a>
       </div>
 
-      <div class="card glass-card" id="connect-card">
-        <h3>Connect</h3>
-        <p>Access Vernis from your phone or computer. Scan the QR code or use the link below.</p>
-        <div id="qr-code"
-          style="margin: 20px auto; width: 180px; height: 180px; background: transparent; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px var(--shadow-md); overflow: hidden;">
-          <span style="color: var(--text-muted); font-size: 12px;">Loading...</span>
+      <div class="card glass-card flip-card" id="connect-card">
+        <div class="flip-switch" role="tablist" aria-label="Connect or Curator">
+          <button class="on" id="flip-connect" onclick="flipConnectCard(false)">Connect</button>
+          <button id="flip-curator" onclick="flipConnectCard(true)">Curator</button>
         </div>
-        <div id="connect-url"
-          style="font-size: 14px; color: var(--text-secondary); word-break: break-all; text-align: center; min-height: 20px; margin-top: 15px;">
-          <span style="color: var(--text-muted);">Loading URL...</span>
-        </div>
+        <div class="flip-stage"><div class="flip-inner">
+          <div class="flip-face flip-front">
+            <h3>Connect</h3>
+            <p>Access Vernis from your phone or computer. Scan the QR code or use the link below.</p>
+            <div id="qr-code"
+              style="margin: 20px auto; width: 180px; height: 180px; background: transparent; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px var(--shadow-md); overflow: hidden;">
+              <span style="color: var(--text-muted); font-size: 12px;">Loading...</span>
+            </div>
+            <div id="connect-url"
+              style="font-size: 14px; color: var(--text-secondary); word-break: break-all; text-align: center; min-height: 20px; margin-top: 15px;">
+              <span style="color: var(--text-muted);">Loading URL...</span>
+            </div>
+          </div>
+          <div class="flip-face flip-back" aria-hidden="true">
+            <h3>Curator</h3>
+            <p>Talk to your frame about the art, by voice or text, with the AI you choose.</p>
+            <div class="qr-box" id="curator-qr"><span style="color: var(--text-muted); font-size: 12px;">Scan to talk</span></div>
+            <a href="curator.html" class="btn">Open Curator</a>
+          </div>
+        </div></div>
       </div>
 
       <div class="card glass-card">
@@ -1414,7 +1464,9 @@
 
   <script>
     // HTML escape utility
-    function escHTML(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function escHTML(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    // Text for inside a quoted JS string in an HTML attribute: onclick="f('${jsStr(x)}')"
+    function jsStr(s) { return escHTML(JSON.stringify(String(s == null ? '' : s)).slice(1, -1).replace(/'/g, "\\'")); }
 
     // Auth token for protected endpoints
     var _vernisToken = '';
@@ -1628,6 +1680,58 @@
       qrContainer.appendChild(img);
     })();
 
+    // === CONNECT / CURATOR FLIP ===
+    var frameIp = null;
+    function frameAddress() {
+      if (frameIp) return Promise.resolve(frameIp);
+      return fetch('/api/status').then(function (r) { return r.json(); }).then(function (d) {
+        frameIp = d.ip_address || location.hostname;
+        return frameIp;
+      }).catch(function () { return location.hostname; });
+    }
+    function curatorQrImg(ip) {
+      var img = document.createElement('img');
+      var theme = localStorage.getItem('vernis-theme-style') || 'gallery';
+      img.src = '/api/qrcode?theme=' + encodeURIComponent(theme) + '&url=' + encodeURIComponent('http://' + ip + '/curator.html');
+      img.alt = 'QR code for the Curator';
+      img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+      return img;
+    }
+    function flipConnectCard(toCurator) {
+      var card = document.getElementById('connect-card');
+      card.classList.toggle('flipped', toCurator);
+      document.getElementById('flip-connect').classList.toggle('on', !toCurator);
+      document.getElementById('flip-curator').classList.toggle('on', toCurator);
+      card.querySelector('.flip-front').setAttribute('aria-hidden', toCurator ? 'true' : 'false');
+      card.querySelector('.flip-back').setAttribute('aria-hidden', toCurator ? 'false' : 'true');
+      var box = document.getElementById('curator-qr');
+      if (toCurator && !box.querySelector('img')) {
+        frameAddress().then(function (ip) { box.innerHTML = ''; box.appendChild(curatorQrImg(ip)); });
+      }
+    }
+    function kioskConnectMode(toCurator) {
+      document.getElementById('kflip-manage').classList.toggle('on', !toCurator);
+      document.getElementById('kflip-curator').classList.toggle('on', toCurator);
+      frameAddress().then(function (ip) {
+        var qr = document.getElementById('kiosk-qr');
+        var img;
+        if (toCurator) {
+          img = curatorQrImg(ip);
+        } else {
+          img = document.createElement('img');
+          img.src = '/api/qrcode?theme=' + (localStorage.getItem('vernis-theme-style') || 'gallery');
+          img.alt = 'QR Code';
+          img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+        }
+        qr.innerHTML = '';
+        qr.appendChild(img);
+        document.getElementById('kiosk-url').textContent = 'http://' + ip + (toCurator ? '/curator.html' : '');
+        document.getElementById('kiosk-hint').textContent = toCurator
+          ? 'Scan with your phone to talk to your frame about the art'
+          : 'Open this link on your phone or computer to manage your Vernis';
+      });
+    }
+
     // === KIOSK CONNECT OVERLAY ===
     function kioskScreenOff() {
       fetch('/api/screen/off', { method: 'POST' }).catch(function(){});
@@ -1649,6 +1753,9 @@
     function showConnectOverlay(statusData) {
       var overlay = document.getElementById('kiosk-connect');
       overlay.style.display = 'flex';
+      document.getElementById('kflip-manage').classList.add('on');
+      document.getElementById('kflip-curator').classList.remove('on');
+      document.getElementById('kiosk-hint').textContent = 'Open this link on your phone or computer to manage your Vernis';
       var qr = document.getElementById('kiosk-qr');
       var theme = localStorage.getItem('vernis-theme-style') || 'gallery';
       var img = document.createElement('img');
@@ -1765,8 +1872,7 @@
           var bars = n.signal >= 70 ? '\u2582\u2584\u2586\u2588' : n.signal >= 50 ? '\u2582\u2584\u2586' : n.signal >= 30 ? '\u2582\u2584' : '\u2582';
           var lock = n.security ? '\uD83D\uDD12 ' : '';
           var conn = n.connected ? ' <span style="color:var(--accent-primary);font-weight:600;">(connected)</span>' : '';
-          var safe = escHTML(n.ssid).replace(/'/g, '&#39;');
-          return '<div class="kiosk-wifi-item" onclick="selectKioskWifi(\'' + safe + '\')">' +
+          return '<div class="kiosk-wifi-item" onclick="selectKioskWifi(\'' + jsStr(n.ssid) + '\')">' +
             '<span>' + lock + escHTML(n.ssid) + conn + '</span>' +
             '<span class="kiosk-wifi-signal">' + bars + ' ' + n.signal + '%</span></div>';
         }).join('');
@@ -2094,7 +2200,7 @@
             showError('Failed to turn off screen');
           });
       } else if (pendingAction === 'shutdown') {
-        fetch('/api/shutdown', { headers: authHeaders() })
+        fetch('/api/shutdown', { method: 'POST', headers: authHeaders() })
           .then(r => r.json())
           .then(data => {
             closePowerModal();

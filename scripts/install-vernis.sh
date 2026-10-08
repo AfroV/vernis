@@ -25,21 +25,36 @@ echo ""
 echo "[1/17] Installing dependencies..."
 sudo apt update
 sudo apt install -y python3-pip python3-flask xinput xdotool unclutter \
-    chromium curl libssl-dev gcc wayvnc ufw fail2ban wtype mpv wlrctl log2ram \
-    librsvg2-bin imagemagick swaybg \
+    curl libssl-dev gcc wayvnc ufw fail2ban wtype mpv wlrctl log2ram \
+    librsvg2-bin imagemagick swaybg ffmpeg \
     bluez bluez-tools bridge-utils dnsmasq python3-dbus python3-gi
+# chromium installed separately, guarded: step 11 (setup-auto-updates.sh) pins it
+# to Pin-Priority -1 to hold it from auto-upgrades, which makes a later
+# `apt install chromium` fail with "no installation candidate" even though it is
+# installed. On a clean run chromium isn't present yet, so it installs fine; on a
+# retry (after the pin exists) it's already present, so we skip.
+if ! command -v chromium >/dev/null 2>&1; then
+    sudo apt install -y chromium
+else
+    echo "chromium already installed: $(chromium --version 2>/dev/null || echo present)"
+fi
 sudo pip3 install qrcode pillow requests pycryptodome websocket-client bcrypt --break-system-packages
 
 # Disable rpcbind (unnecessary NFS service, exposes port 111)
 sudo systemctl disable --now rpcbind rpcbind.socket 2>/dev/null || true
 echo "rpcbind disabled"
 
-# Install Caddy from official repo (latest stable)
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-sudo apt update
-sudo apt install -y caddy
+# Install Caddy from official repo (latest stable) — idempotent (safe to re-run)
+if ! command -v caddy >/dev/null 2>&1; then
+    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+    # --yes so gpg overwrites the keyring on a re-run instead of failing under set -e
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+    sudo apt update
+    sudo apt install -y caddy
+else
+    echo "Caddy already installed: $(caddy version 2>/dev/null | head -1)"
+fi
 
 # Step 2: Install IPFS (Kubo) for pinning support
 echo "[2/17] Installing IPFS (Kubo)..."
@@ -146,6 +161,19 @@ EOF
 
     echo '{"by_ip": {}, "global": [], "hard_locked_at": null}' | sudo tee /opt/vernis/security-failures.json > /dev/null
     sudo chmod 0600 /opt/vernis/security-failures.json
+
+    # All four files are created root:root by the sudo tee/touch above. The
+    # `*.json` find later in this script rescues the three JSON files, but
+    # audit.log (*.log) slips through — leaving it root-owned means Flask
+    # (running as $USER_NAME) cannot append, so append_audit() silently drops
+    # every security event. Chown all four here so it is self-contained.
+    # `|| true` because the script runs under `set -e` and a chown must never
+    # abort the whole install.
+    sudo chown "$USER_NAME:$USER_NAME" \
+        "$SECURITY_FILE" \
+        /opt/vernis/audit.log \
+        /opt/vernis/security-sessions.json \
+        /opt/vernis/security-failures.json 2>/dev/null || true
 fi
 
 # Deploy files from staging directory (web/, backend/, scripts/ next to install script)
@@ -174,7 +202,12 @@ if [ -n "$DEPLOY_DIR" ]; then
     if [ -d "$DEPLOY_DIR/scripts" ]; then
         sudo cp -r "$DEPLOY_DIR/scripts/"* /opt/vernis/scripts/
         sudo chown -R $USER_NAME:$USER_NAME /opt/vernis/scripts
-        echo "  Scripts deployed to /opt/vernis/scripts/"
+        # Restore the execute bit — it is lost when scripts travel through a
+        # tar bundle / scp without preserved modes. Services that ExecStart a
+        # script directly (vernis-touch, vernis-watchdog, vernis-touch-wake) and
+        # labwc's autostart of kiosk-launcher.sh fail with 203/EXEC otherwise.
+        sudo chmod +x /opt/vernis/scripts/*.sh /opt/vernis/scripts/*.py 2>/dev/null || true
+        echo "  Scripts deployed to /opt/vernis/scripts/ (made executable)"
     fi
     echo "Application files deployed"
 else
@@ -189,7 +222,7 @@ sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
     auto_https off
 }
 
-localhost, :80 {
+http://localhost, :80 {
     root * /var/www/vernis
     file_server
 
@@ -212,7 +245,13 @@ localhost, :80 {
 
     encode gzip
 
-    header {
+    # Global no-cache for HTML/JS/CSS/API so kiosks always run the latest code
+    # and PIN/security pages are never cached — but EXCLUDE /api/thumbnail/*,
+    # which would otherwise force 2500+ thumbnails to re-download on every
+    # visit. Thumbnails set their own Cache-Control in Flask (cacheable raster
+    # thumbs, no-cache for placeholders/errors), so we must not overwrite it.
+    @nocache not path /api/thumbnail/*
+    header @nocache {
         Cache-Control "no-cache, no-store, must-revalidate"
     }
 }
@@ -225,7 +264,10 @@ echo "[5/17] Configuring Flask API service..."
 sudo tee /etc/systemd/system/vernis-api.service > /dev/null << APIEOF
 [Unit]
 Description=Vernis Flask API
-After=network.target
+# remote-fs.target: start after fstab network mounts (CIFS/NFS external
+# storage) are attempted, so the NFT library isn't missing at boot
+After=network-online.target remote-fs.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -454,18 +496,22 @@ fi
 
 # Step 10.7: Disable WiFi power save (prevents kworker CPU spikes from brcmfmac interrupt storms)
 echo "Disabling WiFi power save..."
-mkdir -p /etc/NetworkManager/conf.d
-cat > /etc/NetworkManager/conf.d/wifi-powersave.conf << 'WIFIEOF'
+sudo mkdir -p /etc/NetworkManager/conf.d
+sudo tee /etc/NetworkManager/conf.d/wifi-powersave.conf > /dev/null << 'WIFIEOF'
 [connection]
 wifi.powersave = 2
 WIFIEOF
-iw wlan0 set power_save off 2>/dev/null || true
+sudo iw wlan0 set power_save off 2>/dev/null || true
 echo "WiFi power save disabled"
 
 # Step 10.8: Setup Bluetooth PAN (Personal Area Network)
+# Non-fatal: BT PAN is an optional secondary provisioning path. The device works
+# over WiFi without it, so a BT/dnsmasq hiccup must never abort the critical
+# display/splash/firewall steps that follow.
 echo "Setting up Bluetooth PAN..."
 if [ -f /opt/vernis/scripts/setup-bluetooth-pan.sh ]; then
-    bash /opt/vernis/scripts/setup-bluetooth-pan.sh
+    bash /opt/vernis/scripts/setup-bluetooth-pan.sh || \
+        echo "WARN: Bluetooth PAN setup failed (non-fatal — device works over WiFi; re-run scripts/setup-bluetooth-pan.sh later)"
 else
     echo "setup-bluetooth-pan.sh not found. Copy scripts first, then run:"
     echo "  bash /opt/vernis/scripts/setup-bluetooth-pan.sh"
@@ -484,7 +530,10 @@ fi
 echo "[12/17] Checking for display setup script..."
 if [ -f /opt/vernis/scripts/setup-waveshare-4dpi.sh ]; then
     echo "Running Waveshare 4inch DPI LCD setup..."
-    sudo bash /opt/vernis/scripts/setup-waveshare-4dpi.sh
+    # Non-fatal: the dpi-backlight-disable and over_voltage=4 corrections below are
+    # the critical display-correctness steps and must run even if this hiccups.
+    sudo bash /opt/vernis/scripts/setup-waveshare-4dpi.sh || \
+        echo "WARN: Waveshare display setup did not complete cleanly (continuing — re-run scripts/setup-waveshare-4dpi.sh later if the screen is wrong)"
 else
     echo "Display setup script not found. Copy files first, then run:"
     echo "  sudo bash /opt/vernis/scripts/setup-waveshare-4dpi.sh"
@@ -570,7 +619,12 @@ echo "Setting up Vernis boot splash..."
 if [ -f /var/www/vernis/assets/vernis-nft.svg ]; then
     # Convert SVG to 720x720 PNG
     rsvg-convert -w 720 -h 720 /var/www/vernis/assets/vernis-nft.svg -o /tmp/vernis-splash-raw.png
-    # Rotate 270° CW (90° CCW) to compensate for DPI panel physical orientation
+    # Plymouth splash: pre-rotate -rotate 270 — the DRM boot phase shows the
+    # DPI panel +90° off, verified on vernis2 (2026-06-13). Do NOT change to
+    # -rotate 90: that makes the boot splash upside down. The kiosk splash
+    # (swaybg) runs after the compositor transform is active and needs the
+    # UPRIGHT copy instead — splash-upright.png below, selected at runtime
+    # by kiosk-launcher.sh based on the live wlr-randr transform.
     convert /tmp/vernis-splash-raw.png -rotate 270 /tmp/vernis-splash.png
     # Create Plymouth theme
     sudo mkdir -p /usr/share/plymouth/themes/vernis
@@ -658,7 +712,8 @@ sudo systemctl enable dnsmasq 2>/dev/null || true
 # Step 13.5: Setup tmpfs RAM disk for temp work (reduces SD card writes)
 echo "Setting up tmpfs RAM disk..."
 if [ -f /opt/vernis/scripts/setup-tmpfs.sh ]; then
-    sudo bash /opt/vernis/scripts/setup-tmpfs.sh auto
+    sudo bash /opt/vernis/scripts/setup-tmpfs.sh auto || \
+        echo "WARN: tmpfs setup did not complete (non-fatal — reduces SD wear; re-run scripts/setup-tmpfs.sh auto later)"
 else
     echo "setup-tmpfs.sh not found. Copy scripts first, then run:"
     echo "  sudo bash /opt/vernis/scripts/setup-tmpfs.sh auto"
@@ -666,14 +721,16 @@ fi
 
 # Step 14: Start services
 echo "[14/17] Starting services..."
+# Non-fatal starts: both units are already enabled, so they come up on the final
+# reboot regardless. A transient start failure here must not abort steps 15-17.
 if [ -f /opt/vernis/app.py ]; then
-    sudo systemctl start vernis-api
-    echo "Flask API started"
+    sudo systemctl start vernis-api && echo "Flask API started" || \
+        echo "WARN: vernis-api did not start now (enabled — will start on reboot; check: systemctl status vernis-api)"
 else
     echo "app.py not found - copy files first, then run: sudo systemctl start vernis-api"
 fi
-sudo systemctl start ipfs
-echo "IPFS daemon started"
+sudo systemctl start ipfs && echo "IPFS daemon started" || \
+    echo "WARN: ipfs did not start now (enabled — will start on reboot; check: systemctl status ipfs)"
 
 # Step 15: Fix mislabeled AVIF files (saved as .mp4 by old downloader)
 echo "[15/17] Fixing mislabeled AVIF files..."
@@ -699,8 +756,13 @@ fi
 
 # Step 16: Enable fail2ban
 echo "[16/17] Enabling fail2ban..."
-sudo systemctl enable --now fail2ban
-echo "fail2ban enabled (SSH brute-force protection)"
+# Non-fatal: enabled regardless, so it starts on reboot even if it won't start now.
+if sudo systemctl enable --now fail2ban; then
+    echo "fail2ban enabled (SSH brute-force protection)"
+else
+    sudo systemctl enable fail2ban 2>/dev/null || true
+    echo "WARN: fail2ban did not start now (enabled — will start on reboot; check: systemctl status fail2ban)"
+fi
 
 # Step 17: Configure log2ram (reduce SD card writes)
 echo "[17/17] Configuring log2ram..."

@@ -2,12 +2,37 @@
 
 ## Pi Device Credentials
 
-| Name | Host | Username | Password | Auth Method |
-|------|------|----------|----------|-------------|
-| afrol | 10.0.0.28 | afrol | <device-password> | Password |
-| afroz | 10.0.0.34 | afroz | <device-password> | Password |
-| afrom | 10.0.0.39 | afrom | <device-password> | Password |
-| afromini | 10.2.0.8 | afromini | <device-password> | Password |
+**Passwords are NOT in this file — it is committed to git.** They live in
+`secrets.env` in the repo root (gitignored). Load them before any ssh:
+
+```bash
+set -a && . ./secrets.env && set +a     # exports VERNIS_PASS_<name>
+sshpass -p "$VERNIS_PASS_afrom" ssh afrom@10.0.0.49 "hostname"
+```
+
+| Name | Last known host | Username | Secret | Auth Method |
+|------|-----------------|----------|--------|-------------|
+| afrol | 10.0.0.28 | afrol | `$VERNIS_PASS_afrol` | Password |
+| afroz | 10.0.0.34 | afroz | `$VERNIS_PASS_afroz` | Password |
+| afrom | 10.0.0.49 | afrom | `$VERNIS_PASS_afrom` | Password |
+| afromini | 10.2.0.8 | afromini | `$VERNIS_PASS_afromini` | Password |
+
+**IPs are DHCP and move — do not trust this table.** afrom was 10.0.0.39 and
+was found at 10.0.0.49 on 2026-09-02. Confirm which device an IP actually is
+before deploying to it:
+
+```bash
+curl -s http://<ip>/api/setup/status    # returns the device hostname
+```
+
+`VERNIS_PASS_afroz` and `VERNIS_PASS_afromini` were consolidated from
+`pi-devices.json` on 2026-10-03 and have **not** been confirmed by a live
+login — both devices were offline. If one of those fails, suspect the value.
+
+**SSH rate limit:** several rapid password logins trip a REJECT rule on the Pi.
+SSH then reports `Connection refused` *while HTTP still answers* — that means
+rate-limited, not dead. Wait it out and batch the whole deploy into ONE ssh
+connection rather than one per file.
 
 ## Deployment
 
@@ -18,16 +43,16 @@
 To deploy files:
 ```bash
 # For afroz (password) - WEB UI FILES (html, css, js)
-cat file.html | sshpass -p '<device-password>' ssh afroz@10.0.0.34 "cat > /tmp/file.html && echo '<device-password>' | sudo -S mv /tmp/file.html /var/www/vernis/"
+cat file.html | sshpass -p "$VERNIS_PASS_afroz" ssh afroz@10.0.0.34 "cat > /tmp/file.html && echo '$VERNIS_PASS_afroz' | sudo -S mv /tmp/file.html /var/www/vernis/"
 
 # For afroz (password) - BACKEND FILES (app.py)
-cat app.py | sshpass -p '<device-password>' ssh afroz@10.0.0.34 "cat > /tmp/app.py && echo '<device-password>' | sudo -S mv /tmp/app.py /opt/vernis/"
+cat app.py | sshpass -p "$VERNIS_PASS_afroz" ssh afroz@10.0.0.34 "cat > /tmp/app.py && echo '$VERNIS_PASS_afroz' | sudo -S mv /tmp/app.py /opt/vernis/"
 
 # Restart Flask after backend changes
-sshpass -p '<device-password>' ssh afroz@10.0.0.34 "echo '<device-password>' | sudo -S systemctl restart vernis-api"
+sshpass -p "$VERNIS_PASS_afroz" ssh afroz@10.0.0.34 "echo '$VERNIS_PASS_afroz' | sudo -S systemctl restart vernis-api"
 
 # For afromini (password) - WEB UI FILES
-cat file.html | sshpass -p '<device-password>' ssh afromini@10.2.0.8 "cat > /tmp/file.html && echo '<device-password>' | sudo -S mv /tmp/file.html /var/www/vernis/"
+cat file.html | sshpass -p "$VERNIS_PASS_afromini" ssh afromini@10.2.0.8 "cat > /tmp/file.html && echo '$VERNIS_PASS_afromini' | sudo -S mv /tmp/file.html /var/www/vernis/"
 
 # For afro (SSH key) - WEB UI FILES
 cat file.html | ssh afro@10.2.0.14 "cat > /tmp/file.html && sudo mv /tmp/file.html /var/www/vernis/"

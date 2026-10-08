@@ -19,6 +19,7 @@
     </script>
     <script src="vernis-pin-modal.js"></script>
     <script src="vernis-lock-guard.js"></script>
+    <script src="vernis-pin-prompt.js"></script>
     <script src="vernis-notifications.js"></script>
     <script src="vernis-keyboard.js"></script>
     <style>
@@ -1236,6 +1237,7 @@
       <nav class="nav">
         <a href="index.html">Home</a>
         <a href="add.html">Add Art</a>
+        <a href="preview.html">Preview</a>
         <a href="library.html">Library</a>
         <a href="manage.html">Manage Art</a>
         <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
@@ -1267,6 +1269,12 @@
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg
         ></span>
         Add Art</a
+      >
+      <a href="preview.html"
+        ><span class="menu-icon"
+          ><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></span
+        >
+        Preview</a
       >
       <a href="library.html"
         ><span class="menu-icon"
@@ -1401,6 +1409,17 @@
           <polygon points="12 2 3 12 12 22 21 12" />
         </svg>
         Ethereum RPC
+      </div>
+      <div
+        class="menu-section-link"
+        data-menu-section="curator"
+        onclick="goToSection('curator')"
+      >
+        <svg viewBox="0 0 24 24" stroke-width="2" fill="none">
+          <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4" />
+        </svg>
+        AI Curator
       </div>
       <div
         class="menu-section-link"
@@ -1956,6 +1975,13 @@
           </svg>
           Ethereum RPC
         </div>
+        <div class="sidebar-item" data-section="curator">
+          <svg viewBox="0 0 24 24" stroke-width="2" fill="none">
+            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4" />
+          </svg>
+          AI Curator
+        </div>
         <div class="sidebar-item" data-section="wallets">
           <svg viewBox="0 0 24 24" stroke-width="2" fill="none">
             <rect x="2" y="6" width="20" height="14" rx="2" />
@@ -2357,6 +2383,55 @@
             </div>
           </div>
 
+
+          <div class="settings-card">
+            <h3>Preview Mode</h3>
+            <p class="small" style="color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+              Lets an artist send artwork from their own computer to this
+              display for a quick look. Previews are temporary &mdash; they never
+              enter the library, and everything is wiped when the session ends.
+            </p>
+            <div class="toggle-group">
+              <div class="toggle-label">
+                <div>Enable Preview Mode</div>
+                <div class="small">
+                  Off by default. While this is on, anyone on this network can
+                  put an image on the display.
+                </div>
+              </div>
+              <div
+                class="toggle"
+                id="toggle-preview"
+                onclick="toggleSwitch(this); savePreviewConfig()"
+              ></div>
+            </div>
+
+            <div id="preview-details" style="display: none; margin-top: 14px;">
+              <div class="small" style="color: var(--text-muted); line-height: 1.7;">
+                Open this address on the artist's computer:<br />
+                <strong id="preview-url" style="color: var(--accent-primary); font-size: 15px;"></strong>
+              </div>
+              <div class="slider-group" style="padding: 16px 0 4px;">
+                <label>
+                  <span>Auto-wipe after idle</span>
+                  <span class="range-value" id="preview-ttl-val">30 min</span>
+                </label>
+                <input
+                  type="range"
+                  id="preview-ttl"
+                  min="5"
+                  max="120"
+                  value="30"
+                  step="5"
+                  oninput="document.getElementById('preview-ttl-val').textContent = this.value + ' min'"
+                  onchange="savePreviewConfig()"
+                />
+                <div class="small" style="margin-top: 2px">
+                  Wipes the preview and restores the display if the artist walks away.
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="settings-card">
             <h3>Background Color</h3>
             <p
@@ -3028,6 +3103,143 @@
               </button>
             </div>
             <div id="rpc-test-status" style="margin-top:10px; font-size:13px; color:var(--text-muted); display:none;"></div>
+          </div>
+        </section>
+
+        <!-- AI Curator Section -->
+        <section class="settings-section" id="section-curator">
+          <div class="section-header">
+            <h1>AI Curator</h1>
+            <p>Talk to your frame from your phone or laptop</p>
+          </div>
+
+          <div class="settings-card">
+            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
+              Choose the AI that answers on <a href="curator.html" style="color:var(--accent-primary);">the Curator page</a>.
+              Your API key is stored only on this frame and is never shown again. The curator can show,
+              switch and describe artworks and report archive health; it cannot delete or unpin anything.
+            </p>
+
+            <div id="curator-connected" style="display:flex; align-items:center; gap:10px; padding:12px 14px; margin-bottom:16px; border-radius:10px; background:var(--bg-tertiary);">
+              <span id="curator-connected-dot" style="width:10px; height:10px; border-radius:50%; background:var(--text-muted); flex:none;"></span>
+              <span id="curator-connected-text">Checking…</span>
+            </div>
+
+            <select id="curator-provider" style="display:none;" onchange="curatorShowProvider()"></select>
+            <div class="profile-grid" id="curator-provider-grid"></div>
+
+            <div class="form-group">
+              <label>Model</label>
+              <div style="display:flex; gap:8px;">
+                <input type="text" class="form-input" id="curator-model" list="curator-model-list" placeholder="e.g. grok-4.7" style="flex:1;" />
+                <button class="btn btn-secondary" onclick="curatorLoadModels()">Load models</button>
+              </div>
+              <datalist id="curator-model-list"></datalist>
+            </div>
+
+            <div class="form-group" id="curator-key-group">
+              <label>API key</label>
+              <input type="password" class="form-input" id="curator-key" autocomplete="off" placeholder="Paste your API key" />
+              <div class="small" style="margin-top: 4px" id="curator-key-hint"></div>
+            </div>
+
+            <div class="form-group" id="curator-url-group">
+              <label>Server address</label>
+              <div style="display:flex; gap:8px;">
+                <input type="text" class="form-input" id="curator-url" placeholder="http://192.168.1.20:1234/v1" style="flex:1;" />
+                <button class="btn btn-secondary" onclick="curatorDiscover()">Find on my network</button>
+              </div>
+              <div id="curator-found" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+              <div class="small" style="margin-top: 6px">
+                In LM Studio, open <b>Developer</b> and turn on <b>Serve on Local Network</b> so the frame can reach it.
+                Leave the model as <b>auto</b> to use whichever model is loaded.
+              </div>
+            </div>
+
+            <div class="toggle-group">
+              <div class="toggle-label">
+                <div>Save tokens</div>
+                <div class="small">Answer simple commands on the frame and reuse earlier answers</div>
+              </div>
+              <div class="toggle active" id="curator-save-tokens"
+                   onclick="toggleSwitch(this); curatorPost('/api/curator/config', { provider: curatorCfg.provider, save_tokens: this.classList.contains('active') })"></div>
+            </div>
+
+            <div class="button-row">
+              <button class="btn" onclick="curatorSave()">Use this AI</button>
+              <button class="btn btn-secondary" onclick="curatorTest()">Test</button>
+              <button class="btn btn-secondary" id="curator-clear-key" onclick="curatorClearKey()">Remove key</button>
+            </div>
+            <div id="curator-status" style="margin-top:10px; font-size:13px; color:var(--text-muted); display:none;"></div>
+          </div>
+
+          <div class="settings-card">
+            <h3 style="margin-top:0;">Voice</h3>
+            <div class="form-group">
+              <label>Curator voice</label>
+              <select class="form-input" id="curator-tts" onchange="curatorShowVoice()">
+                <option value="piper">Piper voice server (natural, free, runs at home)</option>
+                <option value="browser">Browser voice (built into the phone)</option>
+                <option value="off">Off (text only)</option>
+              </select>
+            </div>
+            <div class="form-group" id="curator-piper-group">
+              <label>Voice server address</label>
+              <input type="text" class="form-input" id="curator-piper-url" placeholder="http://192.168.1.20:5005" />
+              <div class="small" style="margin-top: 4px">
+                A computer at home running Piper (<code>python -m piper.http_server --port 5005</code>).
+                Falls back to the browser voice if it can't be reached.
+              </div>
+              <label style="margin-top:12px;">Voice</label>
+              <select class="form-input" id="curator-piper-voice">
+                <option value="">Server default</option>
+                <option value="en_US-lessac-high">Lessac (US English, female, high quality)</option>
+                <option value="en_US-ljspeech-high">LJ (US English, female, high quality)</option>
+                <option value="en_GB-cori-high">Cori (British English, female, high quality)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Listening</label>
+              <select class="form-input" id="curator-stt">
+                <option value="grok">Grok speech recognition (uses your Grok key)</option>
+                <option value="browser">Browser speech recognition (free)</option>
+              </select>
+              <div class="small" style="margin-top: 4px">
+                Talking directly to the curator needs the page to be opened over HTTPS; on plain http use the
+                microphone on your keyboard.
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Language</label>
+              <select class="form-input" id="curator-lang">
+                <option value="en">English</option>
+                <option value="no">Norsk</option>
+              </select>
+            </div>
+            <div class="button-row">
+              <button class="btn" onclick="curatorSaveVoice()">Save voice</button>
+              <button class="btn btn-secondary" onclick="curatorTestVoice()">Test voice</button>
+            </div>
+            <div id="curator-voice-status" style="margin-top:10px; font-size:13px; color:var(--text-muted); display:none;"></div>
+          </div>
+
+          <div class="settings-card" id="curator-connect">
+            <h3 style="margin-top:0;">Connect an app</h3>
+            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 14px;">
+              Let your phone or an AI app on your computer talk to this frame.
+              Everything stays on your home network.
+            </p>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+              <button class="btn" onclick="curatorConnect('phone')">📱 Phone</button>
+              <button class="btn btn-secondary" onclick="curatorConnect('lmstudio')">LM Studio</button>
+              <button class="btn btn-secondary" onclick="curatorConnect('claude-code')">Claude Code</button>
+              <button class="btn btn-secondary" onclick="curatorConnect('other')">Other app</button>
+            </div>
+            <div id="curator-connect-result" style="display:none; margin-top:16px; padding:16px; border:1px solid var(--border-medium); border-radius:12px;"></div>
+            <div style="margin-top:18px;">
+              <div class="small" style="margin-bottom:6px;">Connected</div>
+              <div id="curator-apps" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
           </div>
         </section>
 
@@ -5171,7 +5383,9 @@
       function authJsonHeaders() { var h = { 'Content-Type': 'application/json' }; if (_vernisToken) h['X-Vernis-Token'] = _vernisToken; return h; }
 
       // HTML escape utility
-      function escHTML(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+      function escHTML(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+      // Text for inside a quoted JS string in an HTML attribute: onclick="f('${jsStr(x)}')"
+      function jsStr(s) { return escHTML(JSON.stringify(String(s == null ? '' : s)).slice(1, -1).replace(/'/g, "\\'")); }
 
       // ========================================
       // Theme Management
@@ -5296,6 +5510,70 @@
           ).innerHTML = `Connected to <strong style="color:var(--accent-primary);">${escHTML(d.ssid || '')}</strong>`;
         });
 
+
+      // ========================================
+      // Preview Mode
+      // ========================================
+      let _previewIp = null;
+
+      function updatePreviewDetails() {
+        const on = document
+          .getElementById("toggle-preview")
+          .classList.contains("active");
+        document.getElementById("preview-details").style.display = on
+          ? "block"
+          : "none";
+        // Settings is usually open on the Pi itself, where location.host is
+        // localhost — useless to hand an artist. Prefer the LAN address.
+        const host = _previewIp || window.location.host;
+        document.getElementById("preview-url").textContent =
+          "http://" + host + "/preview.html";
+      }
+
+      function loadPreviewConfig() {
+        fetch("/api/status")
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.ip_address) _previewIp = d.ip_address;
+          })
+          .catch(() => {})
+          .finally(() => {
+            fetch("/api/preview/config")
+              .then((r) => r.json())
+              .then((cfg) => {
+                document
+                  .getElementById("toggle-preview")
+                  .classList.toggle("active", !!cfg.enabled);
+                const mins = Math.round((cfg.ttl_seconds || 1800) / 60);
+                document.getElementById("preview-ttl").value = mins;
+                document.getElementById("preview-ttl-val").textContent =
+                  mins + " min";
+                updatePreviewDetails();
+              })
+              .catch(() => {});
+          });
+      }
+
+      function savePreviewConfig() {
+        updatePreviewDetails();
+        const enabled = document
+          .getElementById("toggle-preview")
+          .classList.contains("active");
+        const ttl =
+          parseInt(document.getElementById("preview-ttl").value, 10) * 60;
+        fetch("/api/preview/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled: enabled, ttl_seconds: ttl }),
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.error) showError(d.error);
+          })
+          .catch((e) => showError("Could not save Preview Mode: " + e.message));
+      }
+
+      loadPreviewConfig();
       // Storage Health
       function checkStorageHealth() {
         fetch("/api/health/storage")
@@ -5864,8 +6142,7 @@
               const connected = n.connected
                 ? ' <span style="color: var(--accent-primary); font-weight: 600;">(connected)</span>'
                 : "";
-              var safeSSID = escHTML(n.ssid).replace(/'/g, '&#39;');
-              return `<div onclick="selectWifiNetwork('${safeSSID}')" style="padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); transition: background 0.15s;"
+              return `<div onclick="selectWifiNetwork('${jsStr(n.ssid)}')" style="padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); transition: background 0.15s;"
             onpointerdown="this.style.background='var(--bg-tertiary)'" onpointerup="this.style.background=''" onpointerleave="this.style.background=''">
             <span>${lock} ${escHTML(n.ssid)}${connected}</span>
             <span style="color: var(--text-muted); font-size: 12px; letter-spacing: 1px;">${bars} ${
@@ -6160,7 +6437,7 @@
       async function handleReboot() {
         if (await vernisConfirm("Reboot Vernis device now?")) {
           showInfo("Rebooting device...");
-          fetch("/api/reboot", { headers: authHeaders() });
+          fetch("/api/reboot", { method: "POST", headers: authHeaders() });
         }
       }
 
@@ -6171,7 +6448,7 @@
           )
         ) {
           showInfo("Shutting down device...");
-          fetch("/api/shutdown", { headers: authHeaders() });
+          fetch("/api/shutdown", { method: "POST", headers: authHeaders() });
         }
       }
 
@@ -6244,7 +6521,10 @@
           document.getElementById("github-owner").value = config.owner || "";
           document.getElementById("github-repo").value = config.repo || "";
           document.getElementById("github-path").value = config.path || "";
-          document.getElementById("github-token").value = config.token || "";
+          // The saved token is never sent back; leave blank to keep it
+          document.getElementById("github-token").value = "";
+          document.getElementById("github-token").placeholder =
+            config.has_token ? "Saved (leave blank to keep)" : "ghp_...";
           if (config.enabled) {
             document
               .getElementById("toggle-github-enabled")
@@ -6303,6 +6583,363 @@
             config.custom_rpc_url || "";
         })
         .catch(() => {});
+
+      // ---- AI Curator ------------------------------------------------------
+      var curatorCfg = null;
+
+      function curatorStatus(text, color) {
+        var el = document.getElementById("curator-status");
+        el.style.display = text ? "block" : "none";
+        el.style.color = color || "var(--text-muted)";
+        el.textContent = text || "";
+      }
+
+      function curatorPost(url, body) {
+        return VernisPinPrompt.withPin(function (headers) {
+          return fetch(url, {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, headers),
+            body: JSON.stringify(body),
+          });
+        }).then(function (r) { return r.json(); });
+      }
+
+      function loadCuratorConfig() {
+        fetch("/api/curator/config")
+          .then(function (r) { return r.json(); })
+          .then(function (cfg) {
+            curatorCfg = cfg;
+            var sel = document.getElementById("curator-provider");
+            sel.innerHTML = "";
+            Object.keys(cfg.providers).forEach(function (k) {
+              var o = document.createElement("option");
+              o.value = k;
+              o.textContent = cfg.providers[k].label;
+              sel.appendChild(o);
+            });
+            sel.value = cfg.provider;
+            curatorShowProvider();
+            document.getElementById("curator-save-tokens").classList.toggle("active", cfg.save_tokens !== false);
+            curatorRenderProviders();
+            if (cfg.voice) {
+              document.getElementById("curator-tts").value = cfg.voice.tts;
+              document.getElementById("curator-piper-url").value = cfg.voice.piper_url || "";
+              document.getElementById("curator-piper-voice").value = cfg.voice.piper_voice || "";
+              document.getElementById("curator-stt").value = cfg.voice.stt;
+              document.getElementById("curator-lang").value = cfg.voice.language;
+              curatorShowVoice();
+            }
+          })
+          .catch(function () {});
+      }
+
+      var CURATOR_ICONS = { grok: "𝕏", claude: "✳", openai: "◎", ollama: "🦙", lmstudio: "◆" };
+
+      function curatorProviderStatus(k, p) {
+        if (!p.needs_key) return p.model && p.model !== "auto" ? "Model: " + p.model : "Uses the loaded model";
+        return p.has_key ? "Key saved" : "Not set up";
+      }
+
+      function curatorRenderProviders() {
+        if (!curatorCfg) return;
+        var sel = document.getElementById("curator-provider").value;
+        var grid = document.getElementById("curator-provider-grid");
+        grid.innerHTML = Object.keys(curatorCfg.providers).map(function (k) {
+          var p = curatorCfg.providers[k];
+          var cls = "profile-card" + (k === curatorCfg.provider ? " active" : "") + (k === sel ? " selected" : "");
+          return '<div class="' + cls + '" onclick="curatorPickProvider(\'' + k + '\')">' +
+            '<div class="profile-icon">' + CURATOR_ICONS[k] + '</div>' +
+            '<div class="profile-name">' + curatorEsc(p.label.replace(/ \(.*\)/, "")) + '</div>' +
+            '<div class="profile-desc" style="margin-bottom:0;">' + curatorEsc(curatorProviderStatus(k, p)) + '</div></div>';
+        }).join("");
+        var a = curatorCfg.providers[curatorCfg.provider];
+        var ready = !a.needs_key || a.has_key;
+        document.getElementById("curator-connected-dot").style.background = ready ? "var(--success)" : "var(--warning)";
+        document.getElementById("curator-connected-text").innerHTML = ready
+          ? "Connected: <b>" + curatorEsc(a.label.replace(/ \(.*\)/, "")) + "</b>" +
+            (a.live_model ? " · " + curatorEsc(a.live_model) : (a.model && a.model !== "auto" ? " · " + curatorEsc(a.model) : ""))
+          : "<b>" + curatorEsc(a.label.replace(/ \(.*\)/, "")) + "</b> needs an API key";
+      }
+
+      function curatorPickProvider(k) {
+        document.getElementById("curator-provider").value = k;
+        curatorShowProvider();
+        curatorRenderProviders();
+        var p = curatorCfg.providers[k];
+        if (p.needs_key && !p.has_key) {
+          var key = document.getElementById("curator-key");
+          key.focus();
+          key.scrollIntoView({ behavior: "smooth", block: "center" });
+          showError(p.label.replace(/ \(.*\)/, "") + " needs an API key first. Paste it below and press Use this AI.");
+          return;
+        }
+        if (k !== curatorCfg.provider) curatorSave();  // ready to go: switch right away
+      }
+
+      function curatorShowProvider() {
+        if (!curatorCfg) return;
+        var k = document.getElementById("curator-provider").value;
+        var p = curatorCfg.providers[k];
+        document.getElementById("curator-model").value = p.model || "";
+        document.getElementById("curator-key").value = "";
+        document.getElementById("curator-key-group").style.display = p.needs_key ? "" : "none";
+        document.getElementById("curator-clear-key").style.display = p.has_key ? "" : "none";
+        document.getElementById("curator-key-hint").textContent = p.has_key
+          ? "A key is saved (" + p.key_hint + "). Paste a new one to replace it."
+          : "No key saved yet.";
+        var local = k === "ollama" || k === "lmstudio";
+        document.getElementById("curator-url-group").style.display = local ? "" : "none";
+        document.getElementById("curator-url").value = local ? p.base_url : "";
+        document.getElementById("curator-model-list").innerHTML = "";
+        curatorStatus("");
+      }
+
+      function curatorSave() {
+        var k = document.getElementById("curator-provider").value;
+        var body = { provider: k, model: document.getElementById("curator-model").value.trim() };
+        var key = document.getElementById("curator-key").value.trim();
+        if (key) body.api_key = key;
+        if (k === "ollama" || k === "lmstudio") body.base_url = document.getElementById("curator-url").value.trim();
+        return curatorPost("/api/curator/config", body).then(function (d) {
+          if (d.error) { showError(d.error); return false; }
+          curatorCfg = d;
+          curatorShowProvider();
+          curatorRenderProviders();
+          showSuccess("Now using " + d.providers[d.provider].label.replace(/ \(.*\)/, ""));
+          return true;
+        }).catch(function () { showError("Could not save AI Curator settings"); return false; });
+      }
+
+      function curatorClearKey() {
+        var k = document.getElementById("curator-provider").value;
+        curatorPost("/api/curator/config", { provider: k, clear_key: true }).then(function (d) {
+          if (d.error) { showError(d.error); return; }
+          curatorCfg = d;
+          curatorShowProvider();
+          curatorRenderProviders();
+          showSuccess("Key removed");
+        });
+      }
+
+      function curatorLoadModels() {
+        var k = document.getElementById("curator-provider").value;
+        curatorStatus("Loading models…");
+        fetch("/api/curator/models?provider=" + encodeURIComponent(k))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.error) { curatorStatus("Could not load models: " + d.error, "var(--error)"); return; }
+            var list = document.getElementById("curator-model-list");
+            list.innerHTML = "";
+            d.models.forEach(function (m) {
+              var o = document.createElement("option");
+              o.value = m;
+              list.appendChild(o);
+            });
+            curatorStatus(d.models.length + " models available. Click the Model field to pick one.");
+          })
+          .catch(function () { curatorStatus("Could not load models", "var(--error)"); });
+      }
+
+      function curatorTest() {
+        curatorSave().then(function (saved) {
+          if (!saved) return;
+          curatorStatus("Asking the curator…");
+          curatorPost("/api/curator/chat", { messages: [{ role: "user", content: "In one short sentence: what is on my frame right now?" }] })
+            .then(function (d) {
+              if (d.reply) curatorStatus("✓ " + d.reply + "  (" + Math.round(d.ms / 100) / 10 + " s)", "var(--success)");
+              else curatorStatus("✗ " + (d.message || d.error), "var(--error)");
+            })
+            .catch(function () { curatorStatus("✗ Could not reach the frame", "var(--error)"); });
+        });
+      }
+
+      function curatorDiscover() {
+        var box = document.getElementById("curator-found");
+        box.innerHTML = '<div class="small">Looking for LM Studio and Ollama on your network… (a few seconds)</div>';
+        fetch("/api/curator/discover").then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.found || !d.found.length) {
+            box.innerHTML = '<div class="small" style="color:var(--error)">Nothing found. Is LM Studio running with <b>Serve on Local Network</b> on?</div>';
+            return;
+          }
+          box.innerHTML = d.found.map(function (f, i) {
+            var label = (f.provider === "lmstudio" ? "LM Studio" : "Ollama") + " on " + f.host;
+            return '<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border-light); border-radius:10px;">' +
+              '<div style="flex:1;"><div>' + curatorEsc(label) + '</div><div class="small">' +
+              (f.model ? "Loaded: " + curatorEsc(f.model) : "No model loaded") + '</div></div>' +
+              '<button class="btn" onclick="curatorUseServer(' + i + ')">Use</button></div>';
+          }).join("");
+          window._curatorFound = d.found;
+        }).catch(function () { box.innerHTML = '<div class="small" style="color:var(--error)">Search failed.</div>'; });
+      }
+
+      function curatorUseServer(i) {
+        var f = window._curatorFound[i];
+        curatorPost("/api/curator/config", { provider: f.provider, base_url: f.base_url, model: "auto" }).then(function (d) {
+          if (d.error) { showError(d.error); return; }
+          curatorCfg = d;
+          document.getElementById("curator-provider").value = f.provider;
+          curatorShowProvider();
+          curatorRenderProviders();
+          document.getElementById("curator-found").innerHTML = "";
+          showSuccess("Using " + (f.model || "the loaded model") + " — try it on the Curator page");
+        });
+      }
+
+      function curatorShowVoice() {
+        document.getElementById("curator-piper-group").style.display =
+          document.getElementById("curator-tts").value === "piper" ? "" : "none";
+      }
+
+      function curatorVoiceStatus(text, color) {
+        var el = document.getElementById("curator-voice-status");
+        el.style.display = text ? "block" : "none";
+        el.style.color = color || "var(--text-muted)";
+        el.textContent = text || "";
+      }
+
+      function curatorSaveVoice() {
+        var voice = {
+          tts: document.getElementById("curator-tts").value,
+          piper_url: document.getElementById("curator-piper-url").value.trim(),
+          piper_voice: document.getElementById("curator-piper-voice").value,
+          stt: document.getElementById("curator-stt").value,
+          language: document.getElementById("curator-lang").value,
+        };
+        return curatorPost("/api/curator/config", { provider: curatorCfg.provider, voice: voice }).then(function (d) {
+          if (d.error) { showError(d.error); return false; }
+          curatorCfg = d;
+          showSuccess("Voice saved");
+          return true;
+        }).catch(function () { showError("Could not save voice settings"); return false; });
+      }
+
+      function curatorTestVoice() {
+        curatorSaveVoice().then(function (saved) {
+          if (!saved) return;
+          if (document.getElementById("curator-tts").value !== "piper") {
+            curatorVoiceStatus("Saved. The browser voice is tested on the Curator page.");
+            return;
+          }
+          curatorVoiceStatus("Asking the voice server…");
+          var t0 = Date.now();
+          VernisPinPrompt.withPin(function (headers) {
+            return fetch("/api/curator/speak", {
+              method: "POST",
+              headers: Object.assign({ "Content-Type": "application/json" }, headers),
+              body: JSON.stringify({ text: "Hello. I'm the curator of your Vernis frame." }),
+            });
+          }).then(function (r) {
+            if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || r.status); });
+            return r.blob();
+          }).then(function (blob) {
+            curatorVoiceStatus("✓ Voice server answered in " + ((Date.now() - t0) / 1000).toFixed(1) + " s", "var(--success)");
+            new Audio(URL.createObjectURL(blob)).play().catch(function () {});
+          }).catch(function (e) { curatorVoiceStatus("✗ " + e.message, "var(--error)"); });
+        });
+      }
+
+      // ---- Connect an app ----------------------------------------------------
+      function curatorEsc(t) {
+        return String(t).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+
+      function curatorCopy(id, btn) {
+        var el = document.getElementById(id);
+        var text = el.value;
+        var done = function () { btn.textContent = "Copied ✓"; setTimeout(function () { btn.textContent = "Copy"; }, 2000); };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(done, function () { el.select(); document.execCommand("copy"); done(); });
+        } else {
+          el.removeAttribute("readonly");
+          el.select();
+          el.setSelectionRange(0, text.length);
+          document.execCommand("copy");
+          el.setAttribute("readonly", "");
+          done();
+        }
+      }
+
+      function curatorCopyBox(id, text, rows) {
+        return '<textarea id="' + id + '" readonly rows="' + rows + '" class="form-input" ' +
+          'style="width:100%; font-family:ui-monospace,Menlo,monospace; font-size:12px; resize:none;">' +
+          curatorEsc(text) + '</textarea>' +
+          '<button class="btn" style="margin-top:8px;" onclick="curatorCopy(\'' + id + '\', this)">Copy</button>';
+      }
+
+      function curatorConnect(kind) {
+        var box = document.getElementById("curator-connect-result");
+        box.style.display = "block";
+        box.innerHTML = '<div class="small">Creating a key…</div>';
+        curatorPost("/api/curator/apps", { kind: kind }).then(function (d) {
+          if (d.error) { box.innerHTML = '<div style="color:var(--error)">' + curatorEsc(d.error) + "</div>"; return; }
+          var steps, body = "";
+          if (kind === "phone") {
+            body = '<div style="text-align:center;">' +
+              '<img src="' + d.qr + '" alt="QR code" style="width:220px; height:220px; image-rendering:pixelated; background:#fff; border-radius:8px;">' +
+              '<p style="font-size:17px; margin:12px 0 4px;"><b>Scan with your phone\'s camera</b></p>' +
+              '<p class="small">The Curator opens on your phone, already connected. Add it to your home screen for one-tap access.</p></div>';
+          } else if (kind === "lmstudio") {
+            steps = [
+              "In LM Studio, open the <b>Program</b> tab in the right sidebar and click <b>Install → Edit mcp.json</b>.",
+              "Paste this. If the file already lists other servers, add only the <code>\"vernis\"</code> part inside <code>mcpServers</code>." + curatorCopyBox("cc-snippet", d.snippet, 7),
+              "Save, load a model with tool support (hammer icon), and ask: <i>“What’s on my frame?”</i>"];
+          } else if (kind === "claude-code") {
+            steps = [
+              "Open Terminal on your computer.",
+              "Paste this and press Enter:" + curatorCopyBox("cc-snippet", d.snippet, 3),
+              "Start <code>claude</code> and ask: <i>“What’s on my frame?”</i>"];
+          } else {
+            steps = [
+              "In your app's MCP settings, add a server with this address (Streamable HTTP):" + curatorCopyBox("cc-url", d.mcp_url, 1),
+              "Add this header so the frame knows it's you:" + curatorCopyBox("cc-header", "Authorization: Bearer " + d.token, 1),
+              "Apps that take a JSON config (Cursor and others) can use this instead:" + curatorCopyBox("cc-snippet", d.snippet, 7)];
+          }
+          if (steps) {
+            body = '<ol style="margin:0; padding-left:20px; line-height:1.6;">' +
+              steps.map(function (st) { return '<li style="margin-bottom:12px;">' + st + "</li>"; }).join("") + "</ol>";
+          }
+          box.innerHTML = '<div style="font-weight:600; margin-bottom:10px;">Connect ' + curatorEsc(d.name) + "</div>" + body +
+            '<div class="small" style="margin-top:10px;">This key is shown only once. To disconnect, remove the app below.</div>';
+          loadCuratorApps();
+        }).catch(function () { box.innerHTML = '<div style="color:var(--error)">Could not create a key.</div>'; });
+      }
+
+      function curatorAgo(ts) {
+        if (!ts) return "not used yet";
+        var s = Date.now() / 1000 - ts;
+        if (s < 120) return "used just now";
+        if (s < 7200) return "used " + Math.round(s / 60) + " min ago";
+        if (s < 172800) return "used " + Math.round(s / 3600) + " h ago";
+        return "used " + Math.round(s / 86400) + " days ago";
+      }
+
+      function loadCuratorApps() {
+        fetch("/api/curator/apps").then(function (r) { return r.json(); }).then(function (d) {
+          var list = document.getElementById("curator-apps");
+          if (!d.apps || !d.apps.length) {
+            list.innerHTML = '<div class="small" style="color:var(--text-muted)">No apps connected yet.</div>';
+            return;
+          }
+          list.innerHTML = d.apps.map(function (a) {
+            return '<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border-light); border-radius:10px;">' +
+              '<div style="flex:1;"><div>' + curatorEsc(a.name) + '</div><div class="small">' + curatorAgo(a.last_used) + "</div></div>" +
+              '<button class="btn btn-secondary" onclick="curatorRemoveApp(\'' + curatorEsc(a.id) + '\')">Remove</button></div>';
+          }).join("");
+        }).catch(function () {});
+      }
+
+      function curatorRemoveApp(id) {
+        curatorPost("/api/curator/apps/remove", { id: id }).then(function (d) {
+          if (d.error) { showError(d.error); return; }
+          showSuccess("App disconnected");
+          loadCuratorApps();
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", loadCuratorApps);
+      document.addEventListener("DOMContentLoaded", loadCuratorConfig);
 
       function saveEthRpcConfig() {
         const config = {
@@ -6626,9 +7263,7 @@
                   isActive ? "var(--accent-primary)" : "transparent"
                 };">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="font-weight: 600; color: var(--text-primary);">${
-                      drive.name
-                    }</div>
+                    <div style="font-weight: 600; color: var(--text-primary);">${escHTML(drive.name)}</div>
                     ${statusBadge}
                   </div>
                   <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
@@ -6649,7 +7284,7 @@
                   </div>
                   ${
                     !isActive && drive.writable
-                      ? `<button class="btn" onclick="useExternalDrive('${drive.path}')" style="width: 100%;">Use This Drive</button>`
+                      ? `<button class="btn" onclick="useExternalDrive('${jsStr(drive.path)}')" style="width: 100%;">Use This Drive</button>`
                       : ""
                   }
                 </div>
@@ -8599,7 +9234,7 @@
 
       function rebootDevice() {
         VernisNotifications.show("Rebooting device...", "info");
-        fetch("/api/reboot", { headers: authHeaders() })
+        fetch("/api/reboot", { method: "POST", headers: authHeaders() })
           .then(() => {
             document.body.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:var(--bg-primary);color:var(--text-primary);">
@@ -8827,10 +9462,10 @@
                   : '<span style="font-size: 10px; color: var(--text-muted);">WHITE</span>';
                 html += `
                 <label class="light-item" style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" value="${light.id}" ${checked} onchange="updateSelectedLights()">
-                  <span class="light-name" style="flex: 1;">${light.name}</span>
+                  <input type="checkbox" value="${escHTML(light.id)}" ${checked} onchange="updateSelectedLights()">
+                  <span class="light-name" style="flex: 1;">${escHTML(light.name)}</span>
                   ${colorIndicator}
-                  <button onclick="event.preventDefault(); testSingleLight('${light.id}')" style="background: var(--bg-tertiary, #333); border: 1px solid var(--border-color, #444); color: var(--text-primary, #fff); padding: 10px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap;">Test</button>
+                  <button onclick="event.preventDefault(); testSingleLight('${jsStr(light.id)}')" style="background: var(--bg-tertiary, #333); border: 1px solid var(--border-color, #444); color: var(--text-primary, #fff); padding: 10px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap;">Test</button>
                 </label>
               `;
               });

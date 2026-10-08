@@ -21,7 +21,21 @@ fi
 
 GITHUB_REPO="$1"
 GITHUB_BRANCH="$2"
-TEMP_DIR="/tmp/vernis-github-update"
+
+# Only the official repo, or one the owner listed over SSH, may be installed:
+# whatever is cloned here is copied into /opt/vernis and run as root.
+ALLOWED_REPOS_FILE="/etc/vernis/allowed-update-repos"
+REPO_LC=$(printf '%s' "$GITHUB_REPO" | tr '[:upper:]' '[:lower:]')
+if [ "$REPO_LC" != "afrov/vernis" ] && \
+   ! { [ -f "$ALLOWED_REPOS_FILE" ] && grep -qixF -- "$GITHUB_REPO" "$ALLOWED_REPOS_FILE"; }; then
+    echo "❌ Refusing to update from $GITHUB_REPO (not an allowed update repo)"
+    exit 1
+fi
+case "$GITHUB_BRANCH" in
+    -*|*..*|*[!A-Za-z0-9._/-]*) echo "❌ Invalid branch name"; exit 1 ;;
+esac
+
+TEMP_DIR=$(mktemp -d /tmp/vernis-github-update.XXXXXX)
 
 echo "=========================================="
 echo "Vernis v3 - GitHub Update"
@@ -31,9 +45,6 @@ echo "Repository: $GITHUB_REPO"
 echo "Branch: $GITHUB_BRANCH"
 echo ""
 
-# Create temp directory
-rm -rf "$TEMP_DIR"
-mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR"
 
 # Clone the repository
@@ -59,6 +70,7 @@ cp *.css /var/www/vernis/ 2>/dev/null || true
 cp *.js /var/www/vernis/ 2>/dev/null || true
 cp *.json /var/www/vernis/ 2>/dev/null || true
 cp *.svg /var/www/vernis/ 2>/dev/null || true
+cp *.webmanifest /var/www/vernis/ 2>/dev/null || true
 if [ -d "assets" ]; then
     mkdir -p /var/www/vernis/assets
     cp assets/* /var/www/vernis/assets/ 2>/dev/null || true
@@ -68,6 +80,7 @@ echo "✅ Web files installed"
 
 # Copy backend
 cp backend/app.py /opt/vernis/
+cp backend/curator.py backend/curator_claude.py /opt/vernis/ 2>/dev/null || true
 echo "✅ Backend installed"
 
 # Copy scripts if they exist
@@ -88,6 +101,11 @@ echo "✅ Services restarted"
 echo "[5/6] Running system updates..."
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+# ffmpeg makes video and AVIF thumbnails. Optional: never fail the update for it
+if ! command -v ffmpeg > /dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg || \
+        echo "⚠ ffmpeg not installed - video/AVIF thumbnails use a fallback"
+fi
 echo "✅ System updated"
 
 echo "[6/6] Cleaning up..."

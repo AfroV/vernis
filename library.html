@@ -1493,6 +1493,7 @@
     <nav class="nav">
       <a href="index.html">Home</a>
       <a href="add.html">Add Art</a>
+      <a href="preview.html">Preview</a>
       <a href="library.html">Library</a>
       <a href="manage.html">Manage Art</a>
       <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
@@ -1509,6 +1510,7 @@
   <div class="mobile-menu" id="mobileMenu">
     <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
     <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="preview.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></span> Preview</a>
     <a href="library.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
     <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
     <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
@@ -1673,7 +1675,9 @@
 
   <script>
     // HTML escape utility
-    function escHTML(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function escHTML(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    // Text for inside a quoted JS string in an HTML attribute: onclick="f('${jsStr(x)}')"
+    function jsStr(s) { return escHTML(JSON.stringify(String(s == null ? '' : s)).slice(1, -1).replace(/'/g, "\\'")); }
     function truncName(name, max) { max = max || 24; return name.length > max ? name.slice(0, max - 1) + '…' : name; }
 
     let collections = [];
@@ -2093,7 +2097,8 @@
           ? '<span class="badge" style="background: linear-gradient(135deg, #6e5494, #8957A8); right: auto; left: 20px;">GitHub</span>'
           : '';
         const featuredBadge = col.featured ? '<span class="badge">Featured</span>' : '';
-        const sf = escHTML(col.filename).replace(/'/g, "&#39;");
+        const sf = escHTML(col.filename);
+        const sfJs = jsStr(col.filename);
         const hasCover = col.cover_url ? 'has-cover' : '';
         const coverImg = col.cover_url
           ? `<img src="${escHTML(col.cover_url)}" class="card-cover" alt="${escHTML(col.name)}" onerror="this.style.display='none'">`
@@ -2103,48 +2108,48 @@
           : '';
 
         return `
-    <div class="card ${hasCover}" id="card-${col.filename.replace(/\./g, '_')}" data-filename="${sf}">
+    <div class="card ${hasCover}" id="card-${escHTML(col.filename.replace(/\./g, '_'))}" data-filename="${sf}">
       ${coverImg}
       ${featuredBadge}
       ${sourceBadge}
       <div class="card-menu">
-        <button class="card-menu-btn" onclick="toggleCardMenu(event, '${sf}')" title="More options">
+        <button class="card-menu-btn" onclick="toggleCardMenu(event, '${sfJs}')" title="More options">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
         </button>
         <div class="card-menu-dropdown" id="menu-${col.filename.replace(/\./g, '_')}">
-          <button class="card-menu-item" onclick="renameCollection('${sf}')">
+          <button class="card-menu-item" onclick="renameCollection('${sfJs}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
             Rename
           </button>
-          <button class="card-menu-item" onclick="viewCollectionInfo('${sf}')">
+          <button class="card-menu-item" onclick="viewCollectionInfo('${sfJs}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             View Info
           </button>
-          <button class="card-menu-item" onclick="resyncCollection('${sf}')">
+          <button class="card-menu-item" onclick="resyncCollection('${sfJs}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Re-sync (Re-download All)
           </button>
-          <button class="card-menu-item" onclick="clearCollectionFiles('${sf}')">
+          <button class="card-menu-item" onclick="clearCollectionFiles('${sfJs}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
             Clear Downloaded Files
           </button>
-          <button class="card-menu-item danger" onclick="deleteCollection('${sf}')">
+          <button class="card-menu-item danger" onclick="deleteCollection('${sfJs}')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
             Remove Collection</button>
         </div>
       </div>
       ${authorLine}
       <h3>${escHTML(col.name)}${isReadOnly ? ' <span class="readonly-badge" title="External storage is read-only. Pinning disabled.">🔒</span>' : ''}</h3>
-      <div class="meta"><span class="nft-count">${col.count || '?'}</span> NFTs</div>
+      <div class="meta"><span class="nft-count">${escHTML(col.count || '?')}</span> NFTs</div>
       <div class="desc">${escHTML(col.description || 'Collection of NFTs')}</div>
       <div class="actions">
-        <button class="btn-library-primary" onclick="installCollection('${sf}')" ${isReadOnly ? 'disabled title="Storage is read-only"' : ''}>Install</button>
+        <button class="btn-library-primary" onclick="installCollection('${sfJs}')" ${isReadOnly ? 'disabled title="Storage is read-only"' : ''}>Install</button>
       </div>
       ${col.wallet ? `
       <div class="card-autoupdate">
-        <div class="card-autoupdate-toggle ${col.autoupdate ? 'on' : ''}" onclick="toggleAutoupdate('${sf}', this.closest('.card'))" title="Auto-update daily"></div>
+        <div class="card-autoupdate-toggle ${col.autoupdate ? 'on' : ''}" onclick="toggleAutoupdate('${sfJs}', this.closest('.card'))" title="Auto-update daily"></div>
         <div class="card-autoupdate-status">${col.autoupdate ? ('Last: ' + formatRelativeTime(col.last_checked)) : 'Auto-update off'}</div>
-        <button class="card-check-now" onclick="checkNowCollection('${sf}', this.closest('.card'))" title="Check for new NFTs now">
+        <button class="card-check-now" onclick="checkNowCollection('${sfJs}', this.closest('.card'))" title="Check for new NFTs now">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
       </div>
@@ -2154,7 +2159,7 @@
         <div class="card-progress-bar"></div>
       </div>
       <div class="card-progress-text">
-        ${(col.failed_count && col.failed_count > 0) ? `<span class="card-failure-chevron" onclick="event.stopPropagation(); toggleFailureExpand('${sf}', this.closest('.card'))">&#x25BE; ${col.failed_count} failed</span>` : ''}
+        ${(col.failed_count && col.failed_count > 0) ? `<span class="card-failure-chevron" onclick="event.stopPropagation(); toggleFailureExpand('${sfJs}', this.closest('.card'))">&#x25BE; ${col.failed_count} failed</span>` : ''}
       </div>
     </div>
   `;
@@ -2603,7 +2608,7 @@
       }
       if (progressText) {
         const msg = errorMsg || 'Failed to start';
-        progressText.innerHTML = `${escHTML(msg)} <a class="retry-link" onclick="installCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Retry</a>`;
+        progressText.innerHTML = `${escHTML(msg)} <a class="retry-link" onclick="installCollection('${jsStr(filename)}')">Retry</a>`;
       }
     }
 
@@ -2731,7 +2736,7 @@
             progressContainer.classList.remove('preparing', 'active');
             progressContainer.classList.add('error');
             if (progressText) {
-              progressText.innerHTML = `Lost connection to backend. <a class="retry-link" onclick="installCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Retry</a>`;
+              progressText.innerHTML = `Lost connection to backend. <a class="retry-link" onclick="installCollection('${jsStr(filename)}')">Retry</a>`;
             }
             if (btn) {
               btn.textContent = 'Install';
@@ -2857,7 +2862,7 @@
         const succeeded = data.completed - data.failed;
         showError(`${data.failed} files failed to download`);
         if (progressText) {
-          progressText.innerHTML = `${succeeded} preserved, <a href="#" onclick="showFailedItems(event)" style="color: var(--error-color, #ef4444); text-decoration: underline;">${data.failed} failed</a> · <a class="retry-link" onclick="resyncCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Retry failed</a>`;
+          progressText.innerHTML = `${succeeded} preserved, <a href="#" onclick="showFailedItems(event)" style="color: var(--error-color, #ef4444); text-decoration: underline;">${data.failed} failed</a> · <a class="retry-link" onclick="resyncCollection('${jsStr(filename)}')">Retry failed</a>`;
         }
         if (btn) {
           btn.textContent = 'Retry Failed';
@@ -2872,7 +2877,7 @@
         progressContainer.classList.add('error');
         showError(`Download failed — ${data.failed} errors`);
         if (progressText) {
-          progressText.innerHTML = `Download failed. <a href="#" onclick="showFailedItems(event)" style="color: var(--error-color, #ef4444); text-decoration: underline;">See errors</a> · <a class="retry-link" onclick="resyncCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Try again</a>`;
+          progressText.innerHTML = `Download failed. <a href="#" onclick="showFailedItems(event)" style="color: var(--error-color, #ef4444); text-decoration: underline;">See errors</a> · <a class="retry-link" onclick="resyncCollection('${jsStr(filename)}')">Try again</a>`;
         }
         if (btn) {
           btn.textContent = 'Try Again';
@@ -2892,7 +2897,7 @@
       } else {
         // Stopped but not complete (user interrupted or stalled)
         if (progressText) {
-          progressText.innerHTML = `${data.completed}/${data.total} files · <a class="retry-link" onclick="installCollection('${escHTML(filename).replace(/'/g,'&#39;')}')">Resume</a>`;
+          progressText.innerHTML = `${data.completed}/${data.total} files · <a class="retry-link" onclick="installCollection('${jsStr(filename)}')">Resume</a>`;
         }
         if (btn) {
           btn.textContent = 'Resume';

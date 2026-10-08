@@ -726,6 +726,7 @@
     <nav class="nav">
       <a href="index.html">Home</a>
       <a href="add.html">Add Art</a>
+      <a href="preview.html">Preview</a>
       <a href="library.html">Library</a>
       <a href="manage.html">Manage Art</a>
       <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
@@ -742,6 +743,7 @@
   <div class="mobile-menu" id="mobileMenu">
     <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
     <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="preview.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></span> Preview</a>
     <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
     <a href="manage.html" class="active-page"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
     <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
@@ -1099,7 +1101,7 @@
             <span class="collection-toggle-name" title="${label}">${label}</span>
             <span class="collection-toggle-count">(${counts[csvFile]})</span>
           </div>
-          <div class="collection-toggle-switch${isOn ? ' active' : ''}" onclick="toggleCollectionSwitch(this, '${csvFile.replace(/'/g, "\\'")}')"></div>
+          <div class="collection-toggle-switch${isOn ? ' active' : ''}" onclick="toggleCollectionSwitch(this, '${jsStr(csvFile)}')"></div>
         </div>`;
       });
 
@@ -1414,7 +1416,7 @@
         const isVideo = nft.filename.endsWith('.mp4');
         const meta = getNFTMetadata(nft.filename);
         const displayName = meta.name || nft.filename;
-        const safeFilename = escHTML(nft.filename).replace(/'/g, "&#39;");
+        const safeFilename = escHTML(nft.filename);
         const safeDisplayName = escHTML(displayName);
         const collectionBadge = meta.collection ? `<span style="color:var(--accent-primary);font-size:11px;">${escHTML(meta.collection)}</span>` : '';
         const storageType = meta.storage_type || 'copy';
@@ -1427,13 +1429,13 @@
         return `
       <div class="nft-card ${isSelected ? 'selected' : ''} ${isHidden ? 'hidden-nft' : ''}"
            data-filename="${safeFilename}"
-           onclick="toggleSelect('${safeFilename}')">
+           onclick="toggleSelect('${jsStr(nft.filename)}')">
         <div class="checkbox-overlay"></div>
         ${isHidden ? '<div class="hidden-badge">Hidden</div>' : ''}
         ${storageBadgeHtml}
         ${isVideo ?
             `<video class="nft-img" src="${nft.url}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>` :
-            `<img class="nft-img" src="/api/thumbnail/${encodeURIComponent(nft.filename)}" alt="${safeFilename}" loading="lazy" onload="this.classList.add('thumb-loaded')" onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='${nft.url}'}else{this.onerror=null;this.classList.add('thumb-loaded');this.style.display='none';this.parentNode.insertAdjacentHTML('afterbegin','<div style=\\'width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(180,130,255,0.15),rgba(100,200,255,0.1));color:#b482ff;font-size:13px;font-weight:600;\\'>${meta.async_type==='layer'?'Layer':meta.async_type==='state'?'State':'?'}</div>')}">`
+            `<img class="nft-img" src="/api/thumbnail/${encodeURIComponent(nft.filename)}" alt="${safeFilename}" loading="lazy" onload="this.classList.add('thumb-loaded')" onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='${jsStr(nft.url)}'}else{this.onerror=null;this.classList.add('thumb-loaded');this.style.display='none';this.parentNode.insertAdjacentHTML('afterbegin','<div style=\\'width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(180,130,255,0.15),rgba(100,200,255,0.1));color:#b482ff;font-size:13px;font-weight:600;\\'>${meta.async_type==='layer'?'Layer':meta.async_type==='state'?'State':'?'}</div>')}">`
           }
         <div class="nft-info">
           <div class="nft-name" title="${safeFilename}">${safeDisplayName}${asyncBadge}</div>
@@ -2016,6 +2018,8 @@
     function escHTML(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
+    // Text for inside a quoted JS string in an HTML attribute: onclick="f('${jsStr(x)}')"
+    function jsStr(s) { return escHTML(JSON.stringify(String(s == null ? '' : s)).slice(1, -1).replace(/'/g, "\\'")); }
 
     var _storageIcons = {
       ipfs: '<svg viewBox="0 0 24 24" fill="white"><path d="M12 1L3 6.5v11L12 23l9-5.5v-11L12 1zm0 2.3l6.5 4L12 11.2 5.5 7.3 12 3.3zM4.5 8.6l6.5 4v8.1l-6.5-4V8.6zm9 12.1v-8.1l6.5-4v8.1l-6.5 4z"/></svg>',
@@ -2121,7 +2125,7 @@
           iconHtml = getFileIcon(f.filename);
         }
 
-        html += '<div class="file-row' + sel + '" onclick="toggleIpfsSelect(\'' + safeName.replace(/'/g, "\\'") + '\')">';
+        html += '<div class="file-row' + sel + '" onclick="toggleIpfsSelect(\'' + jsStr(f.filename) + '\')">';
         html += '<div class="file-checkbox"></div>';
         html += '<div class="file-icon">' + iconHtml + '</div>';
         html += '<div class="file-info">';

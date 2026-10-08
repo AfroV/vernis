@@ -71,7 +71,11 @@ if [ "$OVERLAYS_INSTALLED" = "0" ]; then
         echo "Look for: '4DPIC-DTBO.zip' (for Bookworm/Bullseye)"
         echo "Extract and copy .dtbo files to: $OVERLAYS_DIR/"
         echo ""
-        read -p "Press Enter after manually installing overlays, or Ctrl+C to cancel..."
+        if [ -t 0 ]; then
+            read -p "Press Enter after manually installing overlays, or Ctrl+C to cancel..."
+        else
+            echo "(non-interactive: continuing without manual overlay install)"
+        fi
     fi
 
     # Cleanup
@@ -156,10 +160,13 @@ echo "Reference: https://www.waveshare.com/wiki/4inch_DPI_LCD_(C)"
 echo ""
 echo "==========================================="
 
-# Ask to reboot
-read -p "Reboot now? (y/n): " REBOOT_NOW
-if [ "$REBOOT_NOW" = "y" ] || [ "$REBOOT_NOW" = "Y" ]; then
-    echo "Rebooting in 5 seconds..."
-    sleep 5
-    reboot
+# Ask to reboot — only when run interactively (a TTY). In the automated installer
+# there is no stdin, so `read` would hit EOF and (under set -e) abort the install.
+if [ -t 0 ]; then
+    read -p "Reboot now? (y/n): " REBOOT_NOW
+    if [ "$REBOOT_NOW" = "y" ] || [ "$REBOOT_NOW" = "Y" ]; then
+        echo "Rebooting in 5 seconds..."
+        sleep 5
+        reboot
+    fi
 fi

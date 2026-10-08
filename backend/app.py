@@ -18,6 +18,15 @@ import io
 import threading
 import socket
 import platform
+from urllib.parse import urlparse
+
+# Force a locale-independent environment for everything we spawn — the
+# backend parses English output from df/mount/iwlist etc., and a missing or
+# non-English system locale (e.g. de_DE) breaks both the parsing and some
+# tools outright. C.UTF-8 keeps unicode filenames working.
+os.environ['LC_ALL'] = 'C.UTF-8'
+os.environ['LANG'] = 'C.UTF-8'
+os.environ.pop('LANGUAGE', None)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB upload limit
@@ -25,6 +34,7 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB upload limit
 # Trust exactly one proxy hop (Caddy at localhost). Higher values would let a
 # client spoof its IP via X-Forwarded-For.
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import RequestEntityTooLarge
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
 # Configuration
@@ -44,6 +54,9 @@ STORAGE_CONFIG_FILE = Path("/opt/vernis/storage-config.json")
 ETH_RPC_CONFIG_FILE = Path("/opt/vernis/eth-rpc-config.json")
 SETUP_COMPLETE_FILE = Path("/opt/vernis/setup-complete.json")
 THEME_FILE = Path("/opt/vernis/theme.json")
+
+# Art file extensions surfaced in the gallery/manage listings (incl. avif).
+LIST_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'html', 'avif']
 
 # Skip filesystem setup during pytest runs so the module can be imported
 # on dev machines without /opt write access.
@@ -611,6 +624,17 @@ _AUTH_EXEMPT_PATHS = {
     '/api/setup/status', '/api/setup/check',
 }
 
+def _origin_is_this_device(origin):
+    """True when an Origin header names the host this request was sent to."""
+    try:
+        o = urlparse(origin)
+        if o.scheme not in ("http", "https") or not o.hostname:
+            return False
+        return o.hostname.lower() == (urlparse("//" + request.host).hostname or "").lower()
+    except ValueError:
+        return False
+
+
 @app.before_request
 def _enforce_security():
     """Mode-based access control. See spec §5.2.
@@ -622,8 +646,28 @@ def _enforce_security():
     5. Mode B — allow CONTROL, require session for DELETE.
     6. Mode C — require session for CONTROL and DELETE.
     """
+    # Browsers always send Origin on a cross-origin POST/PUT/DELETE. Refuse
+    # state changes from any other site (or a sandboxed "null" origin), so a
+    # web page or NFT can't drive the frame through a visitor's browser.
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("Origin")
+        if origin is not None and not _origin_is_this_device(origin):
+            return jsonify({"error": "cross_origin_request_refused"}), 403
+
     if request.remote_addr in ("127.0.0.1", "::1"):
         return None
+
+    # AI Curator: /api/mcp checks its own bearer token; a phone paired by QR code
+    # may use the curator's chat and voice (only those) without a PIN session.
+    if request.path == "/api/mcp":
+        return None
+    if request.path.startswith("/api/curator/"):
+        try:
+            from curator import phone_request_allowed
+            if phone_request_allowed(request):
+                return None
+        except Exception:
+            pass
 
     cls = classify_endpoint(request.path, request.method)
     if cls in ("read", "bootstrap"):
@@ -944,12 +988,45 @@ def get_auth_token():
     return jsonify({"token": _AUTH_TOKEN})
 
 
+# True while external storage is configured but its mount is missing (e.g. a
+# network share or USB drive that comes up after boot). Lets the UI tell
+# "library is empty" apart from "library drive isn't mounted yet".
+EXTERNAL_STORAGE_UNAVAILABLE = False
+
+def external_storage_available(external_path):
+    """Check the configured external path is actually usable.
+
+    A bare mountpoint directory still passes .exists() when nothing is
+    mounted on it (common with network shares that mount late at boot), so a
+    plain existence check silently falls back to internal storage and the
+    library looks empty. Accept the path only if a real mount sits at or
+    below /mnt//media, or it already holds a non-empty vernis-nfts folder
+    (covers deliberate non-mountpoint setups).
+    """
+    try:
+        p = Path(external_path).resolve()
+        if not p.exists():
+            return False
+        stop = {Path('/'), Path('/mnt'), Path('/media'), Path('/media/pi')}
+        q = p
+        while q not in stop:
+            if os.path.ismount(q):
+                return True
+            q = q.parent
+        nft_dir = p / "vernis-nfts"
+        if nft_dir.is_dir() and any(nft_dir.iterdir()):
+            return True
+        return False
+    except OSError:
+        return False
+
 def get_active_nft_dir(for_writing=False):
     """Get the active NFT directory (external if configured, otherwise internal)
 
     Args:
         for_writing: If True and readonly_mode is enabled, returns internal storage
     """
+    global EXTERNAL_STORAGE_UNAVAILABLE
     try:
         if STORAGE_CONFIG_FILE.exists():
             with open(STORAGE_CONFIG_FILE, 'r') as f:
@@ -958,11 +1035,17 @@ def get_active_nft_dir(for_writing=False):
                 # If readonly_mode is enabled and we need to write, use internal storage
                 if for_writing and config.get('readonly_mode', False):
                     return NFT_DIR
-                external_nft_dir = Path(config['external_path']) / "vernis-nfts"
-                if external_nft_dir.exists() or Path(config['external_path']).exists():
+                if external_storage_available(config['external_path']):
+                    EXTERNAL_STORAGE_UNAVAILABLE = False
+                    external_nft_dir = Path(config['external_path']) / "vernis-nfts"
                     if not for_writing or not config.get('readonly_mode', False):
                         external_nft_dir.mkdir(parents=True, exist_ok=True)
                     return external_nft_dir
+                # Configured but not mounted (yet) — fall back to internal
+                # for reads, but flag it so the status endpoint can report it.
+                EXTERNAL_STORAGE_UNAVAILABLE = True
+                return NFT_DIR
+        EXTERNAL_STORAGE_UNAVAILABLE = False
     except:
         pass
     return NFT_DIR
@@ -1047,6 +1130,30 @@ def get_update_config():
         "github_repo": "",
         "github_branch": "main"
     }
+
+# The update button runs what it downloads as root, so it only ever pulls the
+# official repo. A developer device can allow another repo by listing it
+# (one "owner/name" per line) in this root-owned file over SSH.
+OFFICIAL_UPDATE_REPO = "AfroV/vernis"
+EXTRA_UPDATE_REPOS_FILE = Path("/etc/vernis/allowed-update-repos")
+
+def update_source():
+    """(repo, branch) the updater may use, from update-config.json."""
+    config = get_update_config()
+    allowed = {OFFICIAL_UPDATE_REPO.lower()}
+    try:
+        for line in EXTRA_UPDATE_REPOS_FILE.read_text().splitlines():
+            if line.strip() and not line.startswith("#"):
+                allowed.add(line.strip().lower())
+    except OSError:
+        pass
+    repo = (config.get("github_repo") or "").strip()
+    if repo.lower() not in allowed:
+        repo = OFFICIAL_UPDATE_REPO
+    branch = (config.get("github_branch") or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9._/][A-Za-z0-9._/-]{0,99}", branch) or ".." in branch:
+        branch = "main"
+    return repo, branch
 
 def fetch_github_csv_files():
     """Fetch list of CSV files from GitHub repository (supports both flat files and folder structure)"""
@@ -1273,29 +1380,38 @@ def pinned_art():
     try:
         files = []
         # Get files from internal storage
-        for ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'html']:
+        for ext in LIST_EXTS:
             files.extend([f"/nfts/{f.name}" for f in NFT_DIR.glob(f"*.{ext}")])
 
         # Also get files from external storage if configured
         active_dir = get_active_nft_dir()
         if active_dir != NFT_DIR:
-            for ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'html']:
+            for ext in LIST_EXTS:
                 files.extend([f"/nfts-ext/{f.name}" for f in active_dir.glob(f"*.{ext}")])
 
         return jsonify(files)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def _sandbox_active_art(resp, filename):
+    """HTML/SVG artworks come from the internet. Opened directly they would run
+    script on this device's origin, so serve them in a CSP sandbox: art still
+    animates, but in an opaque origin that can't act as the frame."""
+    if filename.lower().endswith(('.html', '.htm', '.svg', '.xml', '.xhtml')):
+        resp.headers['Content-Security-Policy'] = 'sandbox allow-scripts'
+        resp.headers['X-Content-Type-Options'] = 'nosniff'
+    return resp
+
 @app.route("/nfts/<path:filename>")
 def serve_nft(filename):
     """Serve NFT files from internal storage"""
-    return send_from_directory(NFT_DIR, filename)
+    return _sandbox_active_art(send_from_directory(NFT_DIR, filename), filename)
 
 @app.route("/nfts-ext/<path:filename>")
 def serve_nft_external(filename):
     """Serve NFT files from external storage"""
     active_dir = get_active_nft_dir()
-    return send_from_directory(active_dir, filename)
+    return _sandbox_active_art(send_from_directory(active_dir, filename), filename)
 
 @app.route("/api/upload-csv", methods=["POST"])
 def upload_csv():
@@ -1935,6 +2051,8 @@ def add_single():
                 "message": f"Downloading IPFS CID: {cid}"
             })
         elif contract and token_id:
+            if not re.fullmatch(r"[A-Za-z0-9]{1,64}", contract) or not re.fullmatch(r"[A-Za-z0-9]{1,80}", token_id):
+                return jsonify({"error": "Invalid contract address or token ID"}), 400
             # Contract + Token ID provided
             subprocess.Popen([
                 "python3", str(downloader),
@@ -3208,7 +3326,7 @@ def update():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/reboot")
+@app.route("/api/reboot", methods=["POST"])
 def reboot():
     """Reboot the system.
 
@@ -3222,7 +3340,7 @@ def reboot():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/shutdown", methods=["GET", "POST"])
+@app.route("/api/shutdown", methods=["POST"])
 def shutdown():
     """Shutdown the system. Auth via PIN middleware — see `/api/reboot`."""
     try:
@@ -5008,77 +5126,164 @@ def display_output():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+# The gallery loads an HTML artwork's generator URL as a live page on the
+# kiosk, so only the two forms Vernis writes itself (save_generator) are
+# accepted. Anything else in a downloaded file shows as a static preview.
+_GENERATOR_URL_RES = (
+    re.compile(r"https://generator\.artblocks\.io/0x[0-9a-fA-F]{40}/\d{1,20}"),
+    re.compile(r"http://(?:127\.0\.0\.1|localhost)/lab\.html\?type=(?:gazer|pixelchain|punk|glyph|burner)"
+               r"&id=\d{1,20}&fullscreen=1(?:&mode=(?:pixel|svg|ascii|hex))?"),
+)
+
+def safe_generator_url(url):
+    url = (url or "").strip()
+    return url if any(r.fullmatch(url) for r in _GENERATOR_URL_RES) else None
+
+# Cache for the expensive nft-list-detailed file scan. Keyed on a cheap
+# directory SIGNATURE (entry count + dir mtime per storage dir) rather than a
+# wall-clock TTL: any add/delete changes the signature and busts the cache
+# automatically, so a freshly downloaded NFT shows up on the next poll while
+# repeated 30s gallery refreshes don't re-scan 4800 files over CIFS. The short
+# backstop only bounds worst-case staleness if a CIFS mount reports a stale
+# directory mtime.
+_nft_list_cache = {"sig": None, "ts": 0.0, "nfts": None}
+_nft_list_cache_lock = threading.Lock()
+_NFT_LIST_CACHE_BACKSTOP = 120  # seconds
+
+def _art_listing_dirs():
+    """[(dir, url_prefix), ...] for internal + AVAILABLE external storage.
+    Side-effect free — unlike get_active_nft_dir() it never mkdirs or mutates
+    globals, so it is safe to call from frequently-polled list endpoints."""
+    dirs = [(NFT_DIR, "/nfts/")]
+    try:
+        cfg = get_storage_config()
+        if cfg.get('use_external') and cfg.get('external_path'):
+            if external_storage_available(cfg['external_path']):
+                dirs.append((Path(cfg['external_path']) / "vernis-nfts", "/nfts-ext/"))
+    except Exception:
+        pass
+    return dirs
+
+def _nft_dir_signature(dirs):
+    """Cheap change-detector: (path, entry_count, dir_mtime) per dir. Catches
+    add/delete without a per-file stat() — over CIFS the per-file round trips
+    are the bottleneck, while one readdir + one dir-stat are cheap."""
+    sig = []
+    for d, _ in dirs:
+        try:
+            with os.scandir(d) as it:
+                count = sum(1 for _ in it)
+            mtime = int(d.stat().st_mtime)
+        except OSError:
+            count, mtime = -1, -1
+        sig.append((str(d), count, mtime))
+    return tuple(sig)
+
 @app.route("/api/nft-list-detailed")
 def nft_list_detailed():
-    """Return detailed list of NFTs with metadata"""
+    """Return detailed list of NFTs with metadata (internal + external storage)."""
+    global _nft_list_cache
     HIDDEN_NFTS_FILE = Path("/opt/vernis/hidden-nfts.json")
 
     try:
-        # Get hidden NFTs, then prune entries whose underlying files no
-        # longer exist on disk. Without this, a hidden-nfts.json that
-        # accumulated entries over time can shadow newly-downloaded
-        # files that happen to share a CID (deterministic IPFS hashing
-        # makes re-downloads very common). Symptom: View Art redirects
-        # to add.html even when the user has visible NFTs.
+        dirs = _art_listing_dirs()
+
+        # Get hidden NFTs, then prune entries whose underlying files no longer
+        # exist in ANY active storage dir. Without this, a hidden-nfts.json
+        # that accumulated entries over time can shadow newly-downloaded files
+        # that happen to share a CID (deterministic IPFS hashing makes
+        # re-downloads very common). Symptom: View Art redirects to add.html
+        # even when the user has visible NFTs. Read fresh every call (NOT
+        # cached) so hide/show changes reflect immediately.
         hidden = []
         if HIDDEN_NFTS_FILE.exists():
             with open(HIDDEN_NFTS_FILE, 'r') as f:
                 hidden = json.load(f)
             try:
-                present = {p.name for p in NFT_DIR.iterdir() if p.is_file()}
+                present = set()
+                for d, _ in dirs:
+                    with os.scandir(d) as it:
+                        present.update(e.name for e in it if e.is_file())
                 cleaned = [name for name in hidden if name in present]
                 if len(cleaned) != len(hidden):
                     with open(HIDDEN_NFTS_FILE, 'w') as f:
                         json.dump(cleaned, f)
                     hidden = cleaned
             except OSError:
-                pass  # NFT_DIR unreadable; fall back to original list
+                pass  # storage unreadable; fall back to original list
 
-        nfts = []
-        for ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'html']:
-            for file_path in NFT_DIR.glob(f"*.{ext}"):
-                # Skip non-art HTML files (IPFS directory listings etc)
-                # Only include HTML files that contain a generator-preview meta tag
-                gen_url = None
-                if ext == 'html':
-                    try:
-                        head = file_path.read_text(errors='ignore')[:2048]
-                        if 'generator-preview' not in head and 'canvas' not in head.lower():
+        # Serve the cached file-scan if nothing on disk changed.
+        sig = _nft_dir_signature(dirs)
+        cache = _nft_list_cache
+        if (cache["nfts"] is not None and cache["sig"] == sig
+                and time.time() - cache["ts"] < _NFT_LIST_CACHE_BACKSTOP):
+            return jsonify({"nfts": cache["nfts"], "hidden": hidden})
+
+        with _nft_list_cache_lock:
+            # Re-check inside the lock — another request may have just rebuilt
+            # it (single-flight: avoids two concurrent 14s CIFS scans).
+            cache = _nft_list_cache
+            if (cache["nfts"] is not None and cache["sig"] == sig
+                    and time.time() - cache["ts"] < _NFT_LIST_CACHE_BACKSTOP):
+                return jsonify({"nfts": cache["nfts"], "hidden": hidden})
+
+            nfts = []
+            seen = set()
+            for base_dir, url_prefix in dirs:
+                for ext in LIST_EXTS:
+                    for file_path in base_dir.glob(f"*.{ext}"):
+                        # Internal storage wins on a filename clash with external.
+                        if file_path.name in seen:
                             continue
-                        # Extract generator URL for direct iframe loading in gallery
-                        import re as _re
-                        m = _re.search(r'generator-url["\']?\s+content=["\']([^"\']+)', head)
-                        if m:
-                            gen_url = m.group(1)
+                        # Skip non-art HTML files (IPFS directory listings etc).
+                        # Only include HTML files with a generator-preview meta tag.
+                        gen_url = None
+                        if ext == 'html':
+                            try:
+                                head = file_path.read_text(errors='ignore')[:2048]
+                                if 'generator-preview' not in head and 'canvas' not in head.lower():
+                                    continue
+                                # Extract generator URL for direct iframe loading in gallery
+                                import re as _re
+                                m = _re.search(r'generator-url["\']?\s+content=["\']([^"\']+)', head)
+                                if m:
+                                    # The file came from the internet: only
+                                    # URLs Vernis itself writes may be loaded.
+                                    gen_url = safe_generator_url(m.group(1))
+                                else:
+                                    # Fallback: reconstruct from generator-type + generator-id (old format)
+                                    tm = _re.search(r'generator-type["\']?\s+content=["\']([^"\']+)', head)
+                                    im = _re.search(r'generator-id["\']?\s+content=["\']([^"\']+)', head)
+                                    if tm and im:
+                                        gt, gi = tm.group(1), im.group(1)
+                                        if gt == 'gazer':
+                                            gen_url = f"https://generator.artblocks.io/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/{215000000 + int(gi)}"
+                            except Exception:
+                                continue
+
+                        try:
+                            stat = file_path.stat()
+                        except OSError:
+                            continue
+                        size_bytes = stat.st_size
+                        if size_bytes < 1024**2:
+                            size = f"{size_bytes/1024:.1f} KB"
                         else:
-                            # Fallback: reconstruct from generator-type + generator-id (old format)
-                            tm = _re.search(r'generator-type["\']?\s+content=["\']([^"\']+)', head)
-                            im = _re.search(r'generator-id["\']?\s+content=["\']([^"\']+)', head)
-                            if tm and im:
-                                gt, gi = tm.group(1), im.group(1)
-                                if gt == 'gazer':
-                                    gen_url = f"https://generator.artblocks.io/0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270/{215000000 + int(gi)}"
-                    except Exception:
-                        continue
+                            size = f"{size_bytes/(1024**2):.1f} MB"
 
-                stat = file_path.stat()
-                size_bytes = stat.st_size
-                if size_bytes < 1024**2:
-                    size = f"{size_bytes/1024:.1f} KB"
-                else:
-                    size = f"{size_bytes/(1024**2):.1f} MB"
+                        nft_info = {
+                            "filename": file_path.name,
+                            "url": f"{url_prefix}{file_path.name}",
+                            "size": size,
+                            "mtime": int(stat.st_mtime)
+                        }
+                        if gen_url:
+                            nft_info["generator_url"] = gen_url
+                        seen.add(file_path.name)
+                        nfts.append(nft_info)
 
-                nft_info = {
-                    "filename": file_path.name,
-                    "url": f"/nfts/{file_path.name}",
-                    "size": size,
-                    "mtime": int(stat.st_mtime)
-                }
-                if gen_url:
-                    nft_info["generator_url"] = gen_url
-                nfts.append(nft_info)
-
-        return jsonify({"nfts": nfts, "hidden": hidden})
+            _nft_list_cache = {"sig": sig, "ts": time.time(), "nfts": nfts}
+            return jsonify({"nfts": nfts, "hidden": hidden})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -6096,6 +6301,17 @@ def nft_delete():
         data = request.json
         filenames = data.get('filenames', [])
 
+        # External storage now appears in the gallery/manage lists, so deletes
+        # must reach it too. Resolve the active external dir once (internal is
+        # always checked first).
+        external_dir = None
+        try:
+            ad = get_active_nft_dir()
+            if ad != NFT_DIR:
+                external_dir = ad
+        except Exception:
+            external_dir = None
+
         deleted = 0
         related_deleted = []
         for filename in filenames:
@@ -6103,22 +6319,29 @@ def nft_delete():
             if ".." in filename or "/" in filename or "\\" in filename:
                 continue
 
+            # Find the file in internal storage first, then external.
+            base_dir = NFT_DIR
             file_path = NFT_DIR / filename
+            if not file_path.exists() and external_dir is not None:
+                ext_candidate = external_dir / filename
+                if ext_candidate.exists():
+                    base_dir, file_path = external_dir, ext_candidate
             if file_path.exists():
                 file_path.unlink()
                 deleted += 1
 
                 # Auto-cleanup: if we deleted an image, check for related JSON
+                # in the SAME storage dir the file came from.
                 stem = file_path.stem
                 if file_path.suffix.lower() != '.json':
                     # 1. Same CID stem (e.g. QmXYZ.png → QmXYZ.json)
-                    json_path = NFT_DIR / f"{stem}.json"
+                    json_path = base_dir / f"{stem}.json"
                     if json_path.exists():
                         json_path.unlink()
                         related_deleted.append(json_path.name)
                     # 2. Scan JSON files that reference this CID
                     # Only delete if ALL referenced images are gone (Async Art has many layers)
-                    for jf in NFT_DIR.glob("*.json"):
+                    for jf in base_dir.glob("*.json"):
                         if jf.name == "download_progress.json" or jf.name in related_deleted:
                             continue
                         try:
@@ -6133,7 +6356,7 @@ def nft_delete():
                             has_remaining = False
                             for cid in all_cids:
                                 # Check if any file with this CID still exists
-                                for existing in NFT_DIR.glob(f"{cid}.*"):
+                                for existing in base_dir.glob(f"{cid}.*"):
                                     if existing.suffix.lower() != '.json':
                                         has_remaining = True
                                         break
@@ -6941,10 +7164,35 @@ def setup_status():
         # Check if password has been changed
         password_changed = Path("/opt/vernis/password-changed.marker").exists()
 
-        # Check for art
+        # Check for art across internal AND active external storage.
+        # Compute the external dir WITHOUT calling get_active_nft_dir(): that
+        # helper does a mkdir and mutates global state, which must not happen
+        # on this endpoint — index.html polls it every ~15s and the kiosk
+        # launcher hits it ~30x at boot, so a network mkdir on a flaky/late
+        # CIFS share would stall the whole status path.
+        ART_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'html', 'avif']
+        external_unavailable = False
+        art_dirs = [NFT_DIR]
+        try:
+            storage_cfg = get_storage_config()
+            if storage_cfg.get('use_external') and storage_cfg.get('external_path'):
+                if external_storage_available(storage_cfg['external_path']):
+                    art_dirs.append(Path(storage_cfg['external_path']) / "vernis-nfts")
+                else:
+                    # Configured but not mounted yet (late CIFS/NFS mount). Flag
+                    # it so the UI can say "drive mounting" rather than "no art".
+                    external_unavailable = True
+        except Exception:
+            pass
+
         local_files = 0
-        for ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'html']:
-            local_files += len(list(NFT_DIR.glob(f"*.{ext}")))
+        for art_dir in art_dirs:
+            try:
+                for ext in ART_EXTS:
+                    local_files += len(list(art_dir.glob(f"*.{ext}")))
+            except OSError:
+                # A stale CIFS handle must not 500 the whole status endpoint.
+                pass
         has_art = local_files > 0
 
         # Get hostname
@@ -6965,6 +7213,7 @@ def setup_status():
             "password_changed": password_changed,
             "has_art": has_art,
             "local_files": local_files,
+            "external_unavailable": external_unavailable,
             "hostname": hostname,
             "opensea_configured": opensea_configured
         })
@@ -8033,12 +8282,14 @@ def external_storage_status():
             "configured": config.get('use_external', False),
             "path": config.get('external_path'),
             "readonly_mode": config.get('readonly_mode', False),
+            "available": True,
             "internal_files": len(list(NFT_DIR.glob("*.*"))),
             "external_files": 0,
             "external_stats": None
         }
 
         if config.get('use_external') and config.get('external_path'):
+            result["available"] = external_storage_available(config['external_path'])
             external_nft_dir = Path(config['external_path']) / "vernis-nfts"
             if external_nft_dir.exists():
                 result["external_files"] = len(list(external_nft_dir.glob("*.*")))
@@ -8068,16 +8319,22 @@ def github_config():
                 if not config.get('owner') or not config.get('repo'):
                     return jsonify({"error": "Owner and repo are required when enabled"}), 400
 
+            # A blank token keeps the saved one (GET never returns it)
+            if not (config.get('token') or '').strip():
+                config['token'] = get_github_config().get('token', '')
+
             # Save configuration
             with open(GITHUB_CONFIG_FILE, 'w') as f:
                 json.dump(config, f, indent=2)
+            os.chmod(GITHUB_CONFIG_FILE, 0o600)
 
             return jsonify({"success": True, "message": "GitHub configuration saved"})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
     else:
         try:
-            config = get_github_config()
+            config = dict(get_github_config())
+            config['has_token'] = bool(config.pop('token', ''))
             return jsonify(config)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -8457,9 +8714,7 @@ def update_config():
 def system_update():
     """Trigger Vernis app update + system package update + reboot"""
     try:
-        config = get_update_config()
-        repo = (config.get("github_repo") or "").strip() or "AfroV/vernis"
-        branch = (config.get("github_branch") or "").strip() or "main"
+        repo, branch = update_source()
 
         script_path = SCRIPTS_DIR / "github-update.sh"
         if not script_path.exists():
@@ -8512,9 +8767,7 @@ def check_updates():
                 local_data = json.load(f)
             local_version = local_data.get("version", "unknown")
 
-        config = get_update_config()
-        repo = (config.get("github_repo") or "").strip() or "AfroV/vernis"
-        branch = (config.get("github_branch") or "").strip() or "main"
+        repo, branch = update_source()
 
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/version.json"
         resp = requests.get(raw_url, timeout=10)
@@ -8774,7 +9027,8 @@ def gallery_show_generator():
         rel_url = data.get('url', '')
         delay = min(max(int(data.get('delay', 15)), 5), 600)
 
-        if not rel_url or '..' in rel_url:
+        # Only Lab generators may take over the kiosk page
+        if not re.fullmatch(r"/lab\.html\?[A-Za-z0-9=&_.-]*", rel_url or ""):
             return jsonify({"error": "Invalid URL"}), 400
 
         full_url = f"http://127.0.0.1{rel_url}"
@@ -11308,6 +11562,149 @@ def ambient_light():
 THUMBNAIL_DIR = Path("/opt/vernis/thumbnails")
 THUMBNAIL_SIZE = (200, 200)
 
+def _thumbnail_is_current(thumbnail_path, original_path):
+    """Cache check that survives clock differences between the Pi and the
+    drive holding the originals (a NAS clock ahead of the Pi makes a
+    "thumbnail newer than original" ordering check fail forever). Thumbnails
+    are stamped with the source mtime at generation, so equality within
+    filesystem timestamp resolution means current."""
+    try:
+        return abs(thumbnail_path.stat().st_mtime - original_path.stat().st_mtime) < 2
+    except OSError:
+        return False
+
+def _stamp_thumbnail(thumbnail_path, original_path):
+    """Copy the source mtime onto the thumbnail for _thumbnail_is_current."""
+    try:
+        src_mtime = original_path.stat().st_mtime
+        os.utime(thumbnail_path, (src_mtime, src_mtime))
+    except OSError:
+        pass
+
+VIDEO_EXTS = ('.mp4', '.webm', '.mov')
+# ffmpeg/mpv use far more RAM than Pillow; one at a time keeps a 416MB Pi
+# alive when a gallery grid asks for dozens of video thumbnails at once.
+_external_decoder = threading.BoundedSemaphore(1)
+
+def _pil_to_thumbnail(img, thumbnail_path):
+    """Flatten transparency onto the dark UI background and save a JPEG."""
+    from PIL import Image
+    if img.mode in ('RGBA', 'LA', 'P'):
+        background = Image.new('RGB', img.size, (26, 26, 26))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+        img = background
+    elif img.mode != 'RGB':
+        img = img.convert('RGB')
+    img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+    img.save(thumbnail_path, 'JPEG', quality=70)
+
+def _extract_frame(src, out_jpg, is_video):
+    """Grab one frame of a video (or decode an AVIF Pillow can't read) to a
+    JPEG using ffmpeg, else mpv (installed on every Vernis). True on success."""
+    ffmpeg = shutil.which('ffmpeg')
+    if ffmpeg:
+        for seek in (['-ss', '1'] if is_video else []), []:
+            try:
+                subprocess.run(['nice', '-n', '10', ffmpeg, '-nostdin', '-v', 'error', *seek,
+                                '-i', str(src), '-frames:v', '1',
+                                '-vf', 'scale=400:400:force_original_aspect_ratio=decrease',
+                                '-y', str(out_jpg)],
+                               capture_output=True, timeout=60)
+            except (OSError, subprocess.TimeoutExpired):
+                break
+            if out_jpg.exists() and out_jpg.stat().st_size > 0:
+                return True
+            if not is_video:
+                break
+    mpv = shutil.which('mpv')
+    if mpv:
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=str(THUMBNAIL_DIR)) as tmp:
+            for start in (['--start=1'] if is_video else []), []:
+                try:
+                    subprocess.run(['nice', '-n', '10', mpv, '--no-config', '--really-quiet',
+                                    '--no-audio', '--vo=image', '--vo-image-format=jpg',
+                                    '--frames=1', *start, f'--vo-image-outdir={tmp}', str(src)],
+                                   capture_output=True, timeout=60)
+                except (OSError, subprocess.TimeoutExpired):
+                    break
+                frames = sorted(Path(tmp).glob('*.jpg'))
+                if frames:
+                    shutil.move(str(frames[0]), str(out_jpg))
+                    return True
+                if not is_video:
+                    break
+    return False
+
+def _make_thumbnail(original_path, thumbnail_path, wait=True):
+    """Write a 200px JPEG thumbnail for any image, AVIF or video file.
+    Returns False if it can't be made (no decoder, decoder busy and
+    wait=False, unreadable file) so the caller can fall back."""
+    from PIL import Image
+    name = original_path.name.lower()
+    is_video = name.endswith(VIDEO_EXTS)
+    if not is_video:
+        try:
+            with Image.open(original_path) as img:
+                _pil_to_thumbnail(img, thumbnail_path)
+            _stamp_thumbnail(thumbnail_path, original_path)
+            return True
+        except Exception:
+            if not name.endswith('.avif'):  # Pillow without AVIF support
+                return False
+    if not _external_decoder.acquire(blocking=wait):
+        return False
+    frame = thumbnail_path.with_name(thumbnail_path.name + '.frame.jpg')
+    try:
+        if not _extract_frame(original_path, frame, is_video):
+            return False
+        with Image.open(frame) as img:
+            _pil_to_thumbnail(img, thumbnail_path)
+        _stamp_thumbnail(thumbnail_path, original_path)
+        return True
+    except Exception:
+        return False
+    finally:
+        _external_decoder.release()
+        try:
+            frame.unlink()
+        except OSError:
+            pass
+
+def _find_nft_original(filename):
+    """Locate an NFT file in internal storage, then external storage."""
+    original_path = NFT_DIR / filename
+    if original_path.exists():
+        return original_path
+    active_dir = get_active_nft_dir()
+    if active_dir != NFT_DIR:
+        ext_path = active_dir / filename
+        if ext_path.exists():
+            return ext_path
+    return original_path
+
+@app.after_request
+def _thumbnail_cache_headers(resp):
+    """Let browsers cache generated thumbnails so they don't reload from
+    scratch on every gallery/manage visit. Caddy applies a global
+    no-cache/no-store to everything except /api/thumbnail/* (see Caddyfile),
+    so we set the policy here per-response: only successful raster thumbnails
+    (jpeg/avif) are cacheable; SVG/error/placeholder responses stay no-cache so
+    a thumbnail served during a transient CIFS hiccup is never frozen. Uses
+    must-revalidate (NOT immutable) + send_file's ETag/Last-Modified so a
+    replaced file still refreshes via a cheap 304."""
+    try:
+        if request.path.startswith('/api/thumbnail/'):
+            if resp.status_code == 200 and resp.mimetype in ('image/jpeg', 'image/avif'):
+                resp.headers['Cache-Control'] = 'public, max-age=300, must-revalidate'
+            else:
+                resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    except Exception:
+        pass
+    return resp
+
 @app.route("/api/thumbnail/<filename>")
 def get_thumbnail(filename):
     """Generate and serve a thumbnail for an NFT image"""
@@ -11317,12 +11714,20 @@ def get_thumbnail(filename):
 
         # Security: sanitize filename
         filename = Path(filename).name
-        original_path = NFT_DIR / filename
+        # NFTs may live on external storage (/nfts-ext/) — serve thumbnails
+        # for those too; a 404 here makes the frontend fall back to loading
+        # the full-size image, which is brutal over a network share.
+        original_path = _find_nft_original(filename)
         thumbnail_path = THUMBNAIL_DIR / f"thumb_{filename}"
 
-        # Handle video files - return a placeholder or first frame
-        if filename.lower().endswith(('.mp4', '.webm', '.mov')):
-            # Return video icon placeholder
+        # Video: a frame from the video, cached; a play icon until it exists
+        if filename.lower().endswith(VIDEO_EXTS):
+            if original_path.exists():
+                if _thumbnail_is_current(thumbnail_path, original_path):
+                    return send_file(thumbnail_path, mimetype='image/jpeg')
+                THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
+                if _make_thumbnail(original_path, thumbnail_path, wait=False):
+                    return send_file(thumbnail_path, mimetype='image/jpeg')
             svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
                 <rect width="200" height="200" fill="#1a1a1a"/>
                 <polygon points="75,60 75,140 140,100" fill="#666"/>
@@ -11341,7 +11746,10 @@ def get_thumbnail(filename):
                     header, b64data = data_uri.split(',', 1)
                     img_bytes = b64mod.b64decode(b64data)
                     mime = header.split(':')[1].split(';')[0] if ':' in header else 'image/jpeg'
-                    return Response(img_bytes, mimetype=mime)
+                    # Untrusted file: never echo e.g. text/html or SVG back
+                    if mime in ('image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'):
+                        return Response(img_bytes, mimetype=mime,
+                                        headers={'X-Content-Type-Options': 'nosniff'})
             except Exception:
                 pass
             svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
@@ -11350,9 +11758,9 @@ def get_thumbnail(filename):
             </svg>'''
             return Response(svg, mimetype='image/svg+xml')
 
-        # Check if thumbnail already exists and is newer than original
+        # Serve the cached thumbnail if it matches the original
         if thumbnail_path.exists() and original_path.exists():
-            if thumbnail_path.stat().st_mtime >= original_path.stat().st_mtime:
+            if _thumbnail_is_current(thumbnail_path, original_path):
                 return send_file(thumbnail_path, mimetype='image/jpeg')
 
         # Generate thumbnail
@@ -11364,35 +11772,15 @@ def get_thumbnail(filename):
 
         # Handle SVG files - return as-is (they scale well)
         if filename.lower().endswith('.svg'):
-            return send_file(original_path, mimetype='image/svg+xml')
+            return _sandbox_active_art(send_file(original_path, mimetype='image/svg+xml'), filename)
 
-        # Handle AVIF files - return as-is (browser handles scaling)
+        # Images incl. GIF (first frame) and AVIF (Pillow, else ffmpeg/mpv)
+        if _make_thumbnail(original_path, thumbnail_path, wait=False):
+            return send_file(thumbnail_path, mimetype='image/jpeg')
         if filename.lower().endswith('.avif'):
+            # No decoder free/available: the browser can still scale the original
             return send_file(original_path, mimetype='image/avif')
-
-        # Handle GIF - use first frame
-        if filename.lower().endswith('.gif'):
-            with Image.open(original_path) as img:
-                img = img.convert('RGB')
-                img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-                img.save(thumbnail_path, 'JPEG', quality=70)
-        else:
-            # Regular image (jpg, png, webp)
-            with Image.open(original_path) as img:
-                # Handle RGBA images
-                if img.mode in ('RGBA', 'LA', 'P'):
-                    background = Image.new('RGB', img.size, (26, 26, 26))
-                    if img.mode == 'P':
-                        img = img.convert('RGBA')
-                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                    img = background
-                elif img.mode != 'RGB':
-                    img = img.convert('RGB')
-
-                img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-                img.save(thumbnail_path, 'JPEG', quality=70)
-
-        return send_file(thumbnail_path, mimetype='image/jpeg')
+        raise ValueError("thumbnail failed")
 
     except Exception as e:
         # Return error placeholder
@@ -11411,32 +11799,27 @@ def generate_all_thumbnails():
         from PIL import Image
         THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
 
-        count = 0
-        for ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-            for file_path in NFT_DIR.glob(f"*.{ext}"):
-                try:
-                    thumbnail_path = THUMBNAIL_DIR / f"thumb_{file_path.name}"
+        # Cover external storage too, not just the internal NFT dir
+        nft_dirs = [NFT_DIR]
+        active_dir = get_active_nft_dir()
+        if active_dir != NFT_DIR:
+            nft_dirs.append(active_dir)
 
-                    # Skip if thumbnail exists and is current
-                    if thumbnail_path.exists():
-                        if thumbnail_path.stat().st_mtime >= file_path.stat().st_mtime:
+        count = 0
+        for ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'mp4', 'webm', 'mov']:
+            for nft_dir in nft_dirs:
+                for file_path in nft_dir.glob(f"*.{ext}"):
+                    try:
+                        thumbnail_path = THUMBNAIL_DIR / f"thumb_{file_path.name}"
+
+                        # Skip if thumbnail exists and is current
+                        if _thumbnail_is_current(thumbnail_path, file_path):
                             continue
 
-                    with Image.open(file_path) as img:
-                        if img.mode in ('RGBA', 'LA', 'P'):
-                            background = Image.new('RGB', img.size, (26, 26, 26))
-                            if img.mode == 'P':
-                                img = img.convert('RGBA')
-                            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                            img = background
-                        elif img.mode != 'RGB':
-                            img = img.convert('RGB')
-
-                        img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-                        img.save(thumbnail_path, 'JPEG', quality=70)
-                        count += 1
-                except Exception as e:
-                    pass  # Skip failed images
+                        if _make_thumbnail(file_path, thumbnail_path, wait=True):
+                            count += 1
+                    except Exception:
+                        pass  # Skip unreadable files
 
     thread = threading.Thread(target=generate_thumbnails)
     thread.start()
@@ -12958,6 +13341,368 @@ _fix_mislabeled_avif()
 LAB_CACHE_DIR = Path("/opt/vernis/lab-cache")
 _LAB_MEDIA_HOSTS = ("media.artblocks.io", "generator.artblocks.io")
 
+
+# =====================
+# Preview Mode — temporary artist previews
+# =====================
+# Art shown through this feature NEVER enters the library: nothing is written
+# to NFT_DIR, no metadata-cache entry, no IPFS pin, no thumbnail, no carousel.
+# Files live in a tmp dir under randomized names and are removed by three
+# independent mechanisms — explicit end, idle TTL sweep, and a wipe on startup
+# — so no single failure can leave an artist's work on the device.
+
+PREVIEW_DIR = Path("/tmp/vernis-preview")
+PREVIEW_CONFIG_FILE = Path("/opt/vernis/preview-config.json")
+
+PREVIEW_ALLOWED_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.mp4'}
+PREVIEW_MAX_FILES = 10
+PREVIEW_MAX_FILE_BYTES = 50 * 1024 * 1024
+# /tmp is tmpfs on most Pis, so a session is capped well below RAM. This is what
+# keeps the feature safe on the 416 MB devices instead of probing the mount type.
+PREVIEW_MAX_SESSION_BYTES = 100 * 1024 * 1024
+PREVIEW_DEFAULT_TTL = 1800  # 30 min without a heartbeat from the control page
+
+_preview_lock = threading.Lock()
+_preview_state = {
+    "files": [],        # [{"stored": "<hex><ext>", "name": "<original>", "size": int}]
+    "index": 0,
+    "last_seen": 0.0,   # heartbeat timestamp from preview.html
+    "return_url": None, # where the kiosk was before the preview took over
+    "showing": False,
+}
+_preview_sweeper_started = False
+
+# Slack for multipart boundaries/headers when checking the declared body size.
+_PREVIEW_FORM_OVERHEAD = 1024 * 1024
+
+
+def _preview_mb(n):
+    return n // (1024 * 1024)
+
+
+def _preview_save_capped(storage, dest, limit):
+    """Stream an upload to `dest`, aborting the moment it exceeds `limit`.
+    Returns bytes written, or None if the cap was hit (dest is removed).
+
+    Chunked rather than storage.save() because PREVIEW_DIR is on tmpfs: a
+    save-then-check would materialize the whole oversized file in RAM before
+    rejecting it, which a 416 MB Pi cannot absorb."""
+    written = 0
+    try:
+        with open(dest, 'wb') as out:
+            while True:
+                chunk = storage.stream.read(64 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > limit:
+                    dest.unlink(missing_ok=True)
+                    return None
+                out.write(chunk)
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise
+    return written
+
+
+def _preview_config_response(cfg):
+    """Config plus the limits, so preview.html can refuse an oversized file
+    up front instead of keeping its own copy that drifts out of sync."""
+    return {
+        **cfg,
+        "max_files": PREVIEW_MAX_FILES,
+        "max_file_bytes": PREVIEW_MAX_FILE_BYTES,
+        "max_session_bytes": PREVIEW_MAX_SESSION_BYTES,
+    }
+
+
+def load_preview_config():
+    cfg = {"enabled": False, "ttl_seconds": PREVIEW_DEFAULT_TTL}
+    try:
+        if PREVIEW_CONFIG_FILE.exists():
+            with open(PREVIEW_CONFIG_FILE, 'r') as f:
+                stored = json.load(f)
+            if isinstance(stored, dict):
+                cfg.update(stored)
+    except Exception:
+        pass
+    return cfg
+
+
+def save_preview_config(cfg):
+    with open(PREVIEW_CONFIG_FILE, 'w') as f:
+        json.dump(cfg, f, indent=2)
+
+
+def _preview_enabled():
+    return bool(load_preview_config().get("enabled"))
+
+
+def _preview_wipe_files():
+    """Delete every file in PREVIEW_DIR. Safe to call repeatedly."""
+    try:
+        if PREVIEW_DIR.exists():
+            for p in PREVIEW_DIR.iterdir():
+                try:
+                    if p.is_file():
+                        p.unlink()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def _preview_default_return_url():
+    return 'http://127.0.0.1/gallery.html' if get_gallery_state() else 'http://127.0.0.1/'
+
+
+def _preview_reset(restore_display=False):
+    """Wipe the session's files and state, optionally sending the kiosk back
+    to whatever it was showing before the preview took over."""
+    with _preview_lock:
+        was_showing = _preview_state["showing"]
+        return_url = _preview_state["return_url"]
+        _preview_state["files"] = []
+        _preview_state["index"] = 0
+        _preview_state["last_seen"] = 0.0
+        _preview_state["return_url"] = None
+        _preview_state["showing"] = False
+
+    _preview_wipe_files()
+
+    if restore_display and was_showing:
+        try:
+            navigate_browser_cdp(return_url or _preview_default_return_url())
+        except Exception as e:
+            print(f"[preview] could not restore display: {e}", flush=True)
+
+
+def _preview_sweeper():
+    """Background: end an abandoned session. This is the layer that actually
+    matters — an artist who closes their laptop and walks away must not leave
+    their work on the display or on disk."""
+    while True:
+        try:
+            time.sleep(20)
+            ttl = int(load_preview_config().get("ttl_seconds") or PREVIEW_DEFAULT_TTL)
+            with _preview_lock:
+                last = _preview_state["last_seen"]
+                active = bool(_preview_state["files"])
+            if active and last and (time.time() - last) > ttl:
+                print(f"[preview] session idle >{ttl}s — wiping", flush=True)
+                _preview_reset(restore_display=True)
+        except Exception as e:
+            print(f"[preview] sweeper error: {e}", flush=True)
+
+
+def _preview_ensure_sweeper():
+    """Start the sweeper on first use, so devices that never preview don't
+    carry an extra thread."""
+    global _preview_sweeper_started
+    with _preview_lock:
+        if _preview_sweeper_started:
+            return
+        _preview_sweeper_started = True
+    threading.Thread(target=_preview_sweeper, daemon=True).start()
+
+
+def _preview_files_locked():
+    return [{"stored": f["stored"], "name": f["name"], "size": f["size"]}
+            for f in _preview_state["files"]]
+
+
+# Startup wipe: a crash or power-pull mid-session can't strand files on disk.
+_preview_wipe_files()
+
+
+@app.route("/api/preview/config", methods=["GET", "POST"])
+def preview_config():
+    """Get or set Preview Mode. Off by default so a customer device isn't
+    quietly accepting uploads from anyone on the LAN."""
+    try:
+        if request.method == "POST":
+            data = request.json or {}
+            cfg = load_preview_config()
+            if "enabled" in data:
+                cfg["enabled"] = bool(data["enabled"])
+            if "ttl_seconds" in data:
+                cfg["ttl_seconds"] = max(60, min(int(data["ttl_seconds"]), 86400))
+            save_preview_config(cfg)
+            # Turning the feature off must also end anything already on screen.
+            if not cfg["enabled"]:
+                _preview_reset(restore_display=True)
+            return jsonify({"success": True, **_preview_config_response(cfg)})
+        return jsonify(_preview_config_response(load_preview_config()))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/preview/upload", methods=["POST"])
+def preview_upload():
+    """Accept one or more images into the temporary preview session."""
+    if not _preview_enabled():
+        return jsonify({"error": "Preview mode is disabled"}), 403
+
+    # Refuse on the DECLARED size before touching the body. Letting Werkzeug
+    # raise RequestEntityTooLarge from inside request.files instead means the
+    # server answers and closes while the browser is still streaming, which
+    # surfaces as an opaque "Failed to fetch" rather than a message the artist
+    # can act on.
+    declared = request.content_length or 0
+    if declared > PREVIEW_MAX_SESSION_BYTES + _PREVIEW_FORM_OVERHEAD:
+        return jsonify({
+            "error": f"That upload is too large — the limit is "
+                     f"{_preview_mb(PREVIEW_MAX_FILE_BYTES)} MB per file, "
+                     f"{_preview_mb(PREVIEW_MAX_SESSION_BYTES)} MB per session.",
+            "max_file_bytes": PREVIEW_MAX_FILE_BYTES,
+        }), 413
+
+    try:
+        try:
+            files = [f for f in request.files.getlist('file') if f and f.filename]
+        except RequestEntityTooLarge:
+            return jsonify({
+                "error": f"That upload is too large — each file must be under "
+                         f"{_preview_mb(PREVIEW_MAX_FILE_BYTES)} MB.",
+                "max_file_bytes": PREVIEW_MAX_FILE_BYTES,
+            }), 413
+        if not files:
+            return jsonify({"error": "No file provided"}), 400
+
+        PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(str(PREVIEW_DIR), 0o700)
+        except Exception:
+            pass
+
+        with _preview_lock:
+            count = len(_preview_state["files"])
+            used = sum(f["size"] for f in _preview_state["files"])
+
+        added = []
+        for f in files:
+            if count + len(added) >= PREVIEW_MAX_FILES:
+                return jsonify({"error": f"Maximum {PREVIEW_MAX_FILES} images per session"}), 400
+
+            ext = os.path.splitext(f.filename)[1].lower()
+            if ext not in PREVIEW_ALLOWED_EXTS:
+                return jsonify({"error": f"Unsupported file type: {ext or 'unknown'}"}), 400
+
+            # Randomized stored name — no caller-supplied string ever reaches
+            # the filesystem, so path traversal is impossible by construction
+            # rather than by sanitizing.
+            stored = _secrets.token_hex(8) + ext
+            dest = PREVIEW_DIR / stored
+
+            budget = min(PREVIEW_MAX_FILE_BYTES, PREVIEW_MAX_SESSION_BYTES - used)
+            size = _preview_save_capped(f, dest, budget)
+            if size is None:
+                fits_file = PREVIEW_MAX_FILE_BYTES <= (PREVIEW_MAX_SESSION_BYTES - used)
+                msg = (f"{f.filename} is over the {_preview_mb(PREVIEW_MAX_FILE_BYTES)} MB "
+                       f"per-file limit" if fits_file else
+                       f"{f.filename} does not fit in the remaining session limit")
+                return jsonify({"error": msg, "max_file_bytes": PREVIEW_MAX_FILE_BYTES}), 413
+
+            used += size
+            added.append({"stored": stored, "name": f.filename, "size": size})
+
+        with _preview_lock:
+            _preview_state["files"].extend(added)
+            _preview_state["last_seen"] = time.time()
+            result = _preview_files_locked()
+
+        _preview_ensure_sweeper()
+        return jsonify({"success": True, "files": result, "added": len(added)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/preview/show", methods=["POST"])
+def preview_show():
+    """Put a preview image on the device display."""
+    if not _preview_enabled():
+        return jsonify({"error": "Preview mode is disabled"}), 403
+    try:
+        data = request.json or {}
+        with _preview_lock:
+            total = len(_preview_state["files"])
+            if total == 0:
+                return jsonify({"error": "Nothing uploaded yet"}), 400
+            requested = data.get("index", _preview_state["index"])
+            idx = max(0, min(int(requested), total - 1))
+            _preview_state["index"] = idx
+            _preview_state["last_seen"] = time.time()
+            first_show = not _preview_state["showing"]
+            if first_show:
+                _preview_state["return_url"] = _preview_default_return_url()
+            _preview_state["showing"] = True
+
+        # Navigate only on the first show. Later prev/next are picked up by
+        # preview-display.html's own status poll, which swaps the <img> in
+        # place — no reload, no white flash between images.
+        if first_show:
+            ok, err = navigate_browser_cdp('http://127.0.0.1/preview-display.html')
+            if not ok:
+                with _preview_lock:
+                    _preview_state["showing"] = False
+                return jsonify({"error": err or "Could not reach the display"}), 502
+
+        return jsonify({"success": True, "index": idx})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/preview/end", methods=["POST"])
+def preview_end():
+    """End the session: wipe the files and send the display back. Deliberately
+    not gated on the enabled flag — ending must always work."""
+    try:
+        _preview_reset(restore_display=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/preview/status")
+def preview_status():
+    """Session state. Polled by preview.html (with heartbeat=1) and by
+    preview-display.html (without, so a forgotten display can't by itself
+    keep an abandoned session alive)."""
+    try:
+        cfg = load_preview_config()
+        ttl = int(cfg.get("ttl_seconds") or PREVIEW_DEFAULT_TTL)
+        beat = request.args.get('heartbeat') == '1'
+        with _preview_lock:
+            if beat and _preview_state["files"]:
+                _preview_state["last_seen"] = time.time()
+            last = _preview_state["last_seen"]
+            files = _preview_files_locked()
+            idx = _preview_state["index"]
+            showing = _preview_state["showing"]
+        expires_in = max(0, int(ttl - (time.time() - last))) if last else ttl
+        return jsonify({
+            "enabled": bool(cfg.get("enabled")),
+            "files": files,
+            "index": idx,
+            "showing": showing,
+            "expires_in": expires_in,
+            "ttl_seconds": ttl,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/preview/file/<name>")
+def preview_file(name):
+    """Serve a preview image. Only names this server generated are accepted."""
+    with _preview_lock:
+        known = {f["stored"] for f in _preview_state["files"]}
+    if name not in known:
+        return jsonify({"error": "Not found"}), 404
+    resp = send_from_directory(str(PREVIEW_DIR), name)
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
 @app.route("/api/lab-media")
 def lab_media():
     from urllib.parse import urlparse
@@ -13289,6 +14034,34 @@ def _start_scheduler():
 _start_scheduler()
 
 
+def _wait_for_external_storage(timeout=60):
+    """Network-mounted external storage (CIFS/NFS) can come up well after
+    this service starts at boot. Without this wait the library looks empty
+    and downloads silently land on the SD card, splitting the collection."""
+    try:
+        config = get_storage_config()
+        if not (config.get('use_external') and config.get('external_path')):
+            return
+        path = config['external_path']
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if external_storage_available(path):
+                return
+            print(f"Waiting for external storage at {path}...", flush=True)
+            time.sleep(2)
+        print(f"External storage at {path} still missing after {timeout}s — "
+              "starting with internal storage", flush=True)
+    except Exception:
+        pass
+
+# AI Curator (curator.py next to app.py). Optional: Vernis runs without it.
+try:
+    from curator import curator_bp
+    app.register_blueprint(curator_bp)
+except Exception as _curator_err:
+    print(f"[curator] disabled: {_curator_err}", flush=True)
+
 if __name__ == "__main__":
+    _wait_for_external_storage()
     # Bind to localhost only — Caddy reverse proxies /api/* from port 80
     app.run(host="127.0.0.1", port=5000, debug=False)

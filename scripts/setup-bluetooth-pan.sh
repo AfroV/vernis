@@ -134,7 +134,11 @@ EOF
 sudo tee /etc/dnsmasq.d/bt-pan.conf > /dev/null << EOF
 # Bluetooth PAN DHCP — only serves on bt0 bridge
 interface=bt0
-bind-interfaces
+# bind-dynamic (not bind-interfaces): bt0 only exists once a BT PAN client
+# connects. bind-interfaces would make dnsmasq fail to start ("unknown
+# interface bt0") at install/boot time; bind-dynamic lets it start now and
+# bind bt0 when it appears.
+bind-dynamic
 dhcp-range=${BT_DHCP_START},${BT_DHCP_END},255.255.255.0,24h
 dhcp-option=3,${BT_IP}
 dhcp-option=6,${BT_IP}
@@ -152,8 +156,10 @@ sudo ufw allow in on bt0 to any port 443 proto tcp comment "HTTPS over Bluetooth
 # Allow DHCP on bt0
 sudo ufw allow in on bt0 to any port 67 proto udp comment "DHCP for BT PAN"
 
-# Restart dnsmasq to pick up new config
-sudo systemctl restart dnsmasq 2>/dev/null || sudo systemctl start dnsmasq
+# Restart dnsmasq to pick up new config (non-fatal: bt0 DHCP is only needed
+# once a BT PAN client connects, and must never abort the rest of setup)
+sudo systemctl restart dnsmasq 2>/dev/null || sudo systemctl start dnsmasq 2>/dev/null || \
+    echo "WARN: dnsmasq did not start now (will serve bt0 once a BT PAN client connects)"
 
 # Enable and start services
 sudo systemctl daemon-reload

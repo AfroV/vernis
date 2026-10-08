@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Preview • Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <script src="vernis-pin-modal.js"></script>
+  <script src="vernis-lock-guard.js"></script>
+  <script src="vernis-notifications.js"></script>
+  <script>
+    // Load theme (same bootstrap as the other control pages)
+    (function () {
+      const theme = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      if (mode === 'auto') { var _h = new Date().getHours(); mode = (_h >= 20 || _h < 7) ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', `${theme}-${mode}`);
+    })();
+  </script>
+  <style>
+    body { min-height: 100vh; }
+
+    .main { padding: 40px 40px 80px; max-width: 780px; margin: 0 auto; }
+
+    /* The kiosk has no browser chrome, so a page reached from the device menu
+       needs its own way back or the user is stuck. */
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      min-height: 44px;
+      line-height: 44px;
+    }
+    .back-link:hover { color: var(--accent-primary); }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 42px;
+      font-weight: 900;
+      margin: 0 0 8px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .sub { color: var(--text-secondary); margin: 0 0 32px; line-height: 1.5; }
+    .sub strong { color: var(--text-primary); }
+
+    /* Drop zone */
+    #drop {
+      border: 2px dashed var(--border-medium);
+      border-radius: 16px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: var(--bg-secondary);
+    }
+    #drop:hover, #drop.over {
+      border-color: var(--accent-primary);
+      background: var(--bg-tertiary);
+    }
+    #drop .big { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+    #drop .small { color: var(--text-muted); font-size: 13px; }
+
+    /* Thumbnail strip */
+    #strip {
+      display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px;
+    }
+    .thumb {
+      position: relative; width: 116px; height: 116px; border-radius: 12px;
+      overflow: hidden; cursor: pointer; background: var(--bg-tertiary);
+      border: 3px solid transparent; transition: border-color .15s, transform .15s;
+    }
+    .thumb:hover { transform: translateY(-2px); }
+    .thumb.active { border-color: var(--accent-primary); }
+    .thumb img, .thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .thumb .num {
+      position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,.65);
+      color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 20px;
+    }
+
+    /* Controls */
+    #controls { margin-top: 32px; display: none; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+    button {
+      font-family: var(--font-body); font-size: 15px; font-weight: 600;
+      padding: 14px 24px; border-radius: 10px; border: 1px solid var(--border-medium);
+      background: var(--bg-secondary); color: var(--text-primary); cursor: pointer;
+      min-height: 48px; transition: background .15s, border-color .15s;
+    }
+    button:hover:not(:disabled) { background: var(--bg-tertiary); border-color: var(--border-dark); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.primary { background: var(--accent-primary); color: var(--bg-primary); border-color: var(--accent-primary); }
+    button.danger { border-color: var(--error); color: var(--error); }
+    button.danger:hover:not(:disabled) { background: rgba(var(--error-rgb), .08); }
+
+    #meta { margin-top: 18px; color: var(--text-muted); font-size: 13px; line-height: 1.7; }
+    #countdown { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+
+    .notice {
+      margin-top: 28px; padding: 16px 18px; border-radius: 12px;
+      background: rgba(var(--warning-rgb), .08);
+      border: 1px solid rgba(var(--warning-rgb), .3);
+      color: var(--text-secondary); font-size: 14px; line-height: 1.6;
+    }
+    #disabled-notice { display: none; }
+
+    .notice-bad {
+      background: rgba(var(--error-rgb), .08);
+      border-color: rgba(var(--error-rgb), .35);
+    }
+    #offline-notice { display: none; }
+  </style>
+</head>
+
+<body>
+  <div class="main">
+    <a href="index.html" class="back-link">&larr; Vernis</a>
+    <h1>Preview</h1>
+    <p class="sub">
+      Drop artwork here to see it on the device. Nothing is saved &mdash;
+      previews never enter the library, and everything is
+      <strong>wiped when you press End preview</strong> or after the session
+      goes idle.
+    </p>
+
+    <div id="offline-notice" class="notice notice-bad">
+      <strong>Not connected to this Vernis.</strong>
+      This page can't reach the device at <span id="offline-host"></span>.
+      Open it as <strong id="offline-url"></strong> from a computer on the same
+      network &mdash; uploads will fail until this clears.
+    </div>
+
+    <div id="disabled-notice" class="notice">
+      Preview Mode is turned off on this device. Enable it in
+      <strong>Settings &rsaquo; Preview Mode</strong> to use this page.
+    </div>
+
+    <div id="workspace">
+      <div id="drop">
+        <div class="big">Drop images here</div>
+        <div class="small" id="drop-hint">or click to choose &mdash; JPG, PNG, GIF, WebP, AVIF, MP4</div>
+      </div>
+      <input type="file" id="picker" multiple accept="image/*,video/mp4" style="display:none">
+
+      <div id="strip"></div>
+
+      <div id="controls">
+        <div class="row">
+          <button id="btn-prev" onclick="step(-1)">&#9664;&nbsp; Previous</button>
+          <button id="btn-next" onclick="step(1)">Next &nbsp;&#9654;</button>
+          <button id="btn-end" class="danger" onclick="endPreview()">End preview</button>
+        </div>
+        <div id="meta"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let files = [], index = 0, showing = false, enabled = true, connected = null;
+    // Overwritten by /api/preview/config; the server is the source of truth
+    // for the limits so this copy can't drift.
+    let limits = {
+      max_files: 10,
+      max_file_bytes: 50 * 1024 * 1024,
+      max_session_bytes: 100 * 1024 * 1024
+    };
+
+    const mb = b => Math.round(b / (1024 * 1024));
+
+    const $ = id => document.getElementById(id);
+    const drop = $('drop'), picker = $('picker');
+
+    // ---- upload ----
+    drop.onclick = () => picker.click();
+    picker.onchange = () => { if (picker.files.length) upload(picker.files); picker.value = ''; };
+
+    ['dragenter', 'dragover'].forEach(ev =>
+      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev =>
+      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
+    });
+
+    function upload(fileList) {
+      const picked = [...fileList];
+
+      // Refuse oversized files here rather than spending the whole transfer to
+      // be rejected at the far end — a large mp4 otherwise uploads for a long
+      // time and then fails with a network-level error that says nothing
+      // useful about why.
+      const tooBig = picked.filter(f => f.size > limits.max_file_bytes);
+      const ok = picked.filter(f => f.size <= limits.max_file_bytes);
+      if (tooBig.length) {
+        showError(
+          tooBig.map(f => f.name + ' (' + mb(f.size) + ' MB)').join(', ') +
+          ' — over the ' + mb(limits.max_file_bytes) + ' MB per-file limit'
+        );
+      }
+      if (!ok.length) return;
+
+      const usedBytes = files.reduce((a, f) => a + f.size, 0);
+      const addBytes = ok.reduce((a, f) => a + f.size, 0);
+      if (usedBytes + addBytes > limits.max_session_bytes) {
+        showError('That would exceed the ' + mb(limits.max_session_bytes) +
+                  ' MB session limit. Press End preview to clear, or send fewer files.');
+        return;
+      }
+      if (files.length + ok.length > limits.max_files) {
+        showError('Maximum ' + limits.max_files + ' files per session.');
+        return;
+      }
+
+      const fd = new FormData();
+      for (const f of ok) fd.append('file', f);
+      const done = showLoading('Sending to device...');
+      fetch('/api/preview/upload', { method: 'POST', body: fd })
+        .then(r => r.json().then(d => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+          if (done) done();
+          if (!ok || d.error) { showError(d.error || 'Upload failed'); return; }
+          files = d.files;
+          render();
+          // First upload of a session goes straight to the display, so the
+          // artist sees something without a second click.
+          show(showing ? index : files.length - d.added);
+        })
+        .catch(e => {
+          if (done) done();
+          // "Failed to fetch" is a TypeError from fetch itself — the request
+          // never completed, so it is a connectivity problem, not a server
+          // reply. Say that instead of surfacing the raw browser string.
+          showError(e instanceof TypeError
+            ? 'Could not reach the device. Check you are on the same network as Vernis, then try again.'
+            : 'Upload failed: ' + e.message);
+        });
+    }
+
+    // ---- display control ----
+    function show(i) {
+      if (!files.length) return;
+      index = Math.max(0, Math.min(i, files.length - 1));
+      render();
+      fetch('/api/preview/show', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index: index })
+      })
+        .then(r => r.json().then(d => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+          if (!ok || d.error) { showError(d.error || 'Could not reach the display'); return; }
+          showing = true;
+        })
+        .catch(e => showError('Could not reach the display: ' + e.message));
+    }
+
+    function step(dir) { show(index + dir); }
+
+    function endPreview() {
+      const done = showLoading('Ending preview...');
+      fetch('/api/preview/end', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+          if (done) done();
+          files = []; index = 0; showing = false;
+          render();
+          showSuccess('Preview ended — files wiped from the device');
+        })
+        .catch(e => { if (done) done(); showError('Failed to end preview: ' + e.message); });
+    }
+
+    // ---- rendering ----
+    function render() {
+      const strip = $('strip');
+      strip.innerHTML = '';
+      files.forEach((f, i) => {
+        const el = document.createElement('div');
+        el.className = 'thumb' + (i === index ? ' active' : '');
+        el.title = f.name;
+        el.onclick = () => show(i);
+        const isVideo = /\.mp4$/i.test(f.stored);
+        const media = document.createElement(isVideo ? 'video' : 'img');
+        media.src = '/api/preview/file/' + encodeURIComponent(f.stored);
+        if (isVideo) { media.muted = true; media.loop = true; media.autoplay = true; }
+        const num = document.createElement('div');
+        num.className = 'num';
+        num.textContent = i + 1;
+        el.appendChild(media);
+        el.appendChild(num);
+        strip.appendChild(el);
+      });
+
+      $('controls').style.display = files.length ? 'block' : 'none';
+      $('btn-prev').disabled = index <= 0;
+      $('btn-next').disabled = index >= files.length - 1;
+      if (files.length) {
+        $('meta').innerHTML = 'Showing <strong>' + escapeHtml(files[index].name) + '</strong> ('
+          + (index + 1) + ' of ' + files.length + ')<br><span id="countdown"></span>';
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function fmt(secs) {
+      const m = Math.floor(secs / 60), s = secs % 60;
+      return m + ':' + String(s).padStart(2, '0');
+    }
+
+    // ---- status poll (also the heartbeat that keeps the session alive) ----
+    function setConnected(ok) {
+      if (ok === connected) return;
+      connected = ok;
+      $('offline-notice').style.display = ok ? 'none' : 'block';
+      if (!ok) {
+        // A page that cannot reach the device used to look completely normal
+        // until an upload failed with an opaque network error. Say it up front.
+        $('offline-host').textContent = window.location.host || '(local file)';
+        $('offline-url').textContent = 'http://<device-ip>/preview.html';
+        $('workspace').style.display = 'none';
+      } else {
+        $('workspace').style.display = 'block';
+      }
+    }
+
+    function poll() {
+      fetch('/api/preview/status?heartbeat=1')
+        .then(r => r.json())
+        .then(d => {
+          setConnected(true);
+          enabled = d.enabled;
+          $('disabled-notice').style.display = enabled ? 'none' : 'block';
+          if (connected) $('workspace').style.display = enabled ? 'block' : 'none';
+
+          // The server can end a session on its own (idle sweep, or the
+          // toggle being switched off); reflect that instead of showing
+          // controls for files that no longer exist.
+          const serverCount = (d.files || []).length;
+          if (serverCount !== files.length || d.index !== index) {
+            files = d.files || [];
+            index = d.index || 0;
+            render();
+          }
+          showing = d.showing;
+
+          const cd = document.getElementById('countdown');
+          if (cd) {
+            cd.textContent = files.length
+              ? 'Auto-wipes in ' + fmt(d.expires_in) + ' if left idle'
+              : '';
+          }
+        })
+        .catch(() => setConnected(false));
+    }
+
+    // Limits come from the server so the two ends can never disagree.
+    fetch('/api/preview/config')
+      .then(r => r.json())
+      .then(c => {
+        if (c && c.max_file_bytes) limits = c;
+        $('drop-hint').textContent =
+          'or click to choose \u2014 JPG, PNG, GIF, WebP, AVIF, MP4 \u00b7 up to ' +
+          limits.max_files + ' files, ' + mb(limits.max_file_bytes) + ' MB each';
+      })
+      .catch(() => { });
+
+    poll();
+    setInterval(poll, 5000);
+  </script>
+</body>
+
+</html>
