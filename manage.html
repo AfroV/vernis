@@ -1972,8 +1972,12 @@
     loadSavedCarousels();
 
     // Auto-refresh when page becomes visible (after switching tabs/windows)
+    // Refresh when the tab comes back, at most once a minute: each refresh
+    // rescans the library, which is slow on a network drive.
+    var _lastVisibleRefresh = Date.now();
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && Date.now() - _lastVisibleRefresh > 60000) {
+        _lastVisibleRefresh = Date.now();
         loadNFTs().then(() => autoImportMetadata());
       }
     });

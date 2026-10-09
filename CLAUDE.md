@@ -58,6 +58,30 @@ cat file.html | sshpass -p "$VERNIS_PASS_afromini" ssh afromini@10.2.0.8 "cat > 
 cat file.html | ssh afro@10.2.0.14 "cat > /tmp/file.html && sudo mv /tmp/file.html /var/www/vernis/"
 ```
 
+## Releasing an update (AfroV/vernis)
+
+Owners update with Settings → Install update, which runs the updater **already on
+their device** (from the version they have now) against `AfroV/vernis` `main`.
+Testing new code with `update-deployed-pi.sh` does NOT test that path — 3.5.0
+shipped two bugs that way (updater overwrote itself mid-run; the 3.4 updater
+never copied the new curator.py). Before every release:
+
+1. Bump `version.json` (the button only offers an update when it increases).
+2. Push the release to a **`rc` branch** of AfroV/vernis, not `main`.
+3. On a test device running the **previous release** (restore it with
+   `sudo bash /opt/vernis/scripts/rollback-update.sh` if needed), run exactly what
+   the button runs, with the rc branch:
+   `sudo bash /opt/vernis/scripts/vernis-update.sh AfroV/vernis rc`
+   (devices on 3.5.0 and older: `github-update.sh` instead).
+4. After the reboot check: `/api/version` shows the new version, the updater
+   printed "all files verified", and `journalctl -u vernis-api -b | grep -i error`
+   is clean (a missing/broken curator.py logs `[curator] ERROR`).
+5. Only then merge `rc` into `main`.
+
+Never change `scripts/github-update.sh`: 3.5.0 devices copy it over themselves
+while it runs, which is only safe while its content is identical. Put updater
+changes in `scripts/vernis-update.sh`.
+
 ## Key Files
 
 - `backend/app.py` - Flask backend with all API endpoints

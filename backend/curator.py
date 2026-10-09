@@ -101,7 +101,9 @@ class ToolError(Exception):
 
 def claude_helper(payload, *args, timeout=120):
     if not os.path.exists(CLAUDE_PY):
-        raise ToolError("Claude support is not installed on this frame (missing /opt/vernis/curator-venv).")
+        raise ToolError("Claude support is not installed on this frame. Over SSH run: "
+                        "sudo python3 -m venv /opt/vernis/curator-venv && "
+                        "sudo /opt/vernis/curator-venv/bin/pip install anthropic")
     try:
         proc = subprocess.run([CLAUDE_PY, CLAUDE_HELPER, *args], input=json.dumps(payload),
                               capture_output=True, text=True, timeout=timeout)

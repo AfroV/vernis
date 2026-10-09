@@ -150,6 +150,25 @@ The update configuration is stored in `/opt/vernis/update-config.json`:
 - Requires GitHub repository to be configured
 - Good for deploying stable releases
 
+## 💾 Backups and rollback
+
+From 3.5.1, **Install Updates** (production mode) runs `scripts/vernis-update.sh`, which:
+
+1. Saves the current web UI, backend and scripts to `/opt/vernis/backups/vernis-<version>-<date>.tar.gz` before changing anything (the last 3 are kept). If the backup can't be written, the update stops without changing anything.
+2. Installs the update and restarts Vernis.
+3. Checks that Vernis answers again. If it doesn't within a minute, it restores the backup automatically.
+
+Art, settings and other data in `/opt/vernis` are never touched by updates and are not in these backups — use Settings → Backup for those.
+
+To go back to the previous version by hand:
+
+```bash
+sudo bash /opt/vernis/scripts/rollback-update.sh          # newest backup
+sudo bash /opt/vernis/scripts/rollback-update.sh --list   # list backups
+```
+
+Updates installed by 3.5.0 and older make no backup.
+
 ## 🐛 Troubleshooting
 
 ### "Cannot connect to dev server"
@@ -190,5 +209,7 @@ The update configuration is stored in `/opt/vernis/update-config.json`:
 - `dev-server.py` - Development file server
 - `start-dev.sh` - Convenient dev server starter
 - `scripts/dev-update.sh` - Dev mode update script
-- `scripts/github-update.sh` - Production mode update script
+- `scripts/vernis-update.sh` - Production mode update script (backup + automatic rollback)
+- `scripts/rollback-update.sh` - Restore the version before the last update
+- `scripts/github-update.sh` - Updater used by 3.5.0 and older (kept unchanged on purpose)
 - `update-config.json` - Configuration file

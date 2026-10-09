@@ -192,7 +192,22 @@ This creates: `vernis-update-YYYYMMDD-HHMMSS.tar.gz`
 3. On Vernis: Click "Check for Updates" in Settings page
 4. System downloads, applies update, and reboots
 
-**Backup:** Each update creates backup at `/opt/vernis/backup-YYYYMMDD-HHMMSS/`
+**Backup:** Updates installed from Settings (from 3.5.1) save the previous web UI, backend and scripts to `/opt/vernis/backups/` first (last 3 kept) and roll back automatically if Vernis doesn't start afterwards. To go back by hand: `sudo bash /opt/vernis/scripts/rollback-update.sh`. Your art and settings are not part of these backups — use Settings → Backup for those.
+
+---
+
+## AI Curator
+
+Settings → AI Curator lets you talk to the frame through Grok, OpenAI, Claude or a local model (Ollama / LM Studio). Grok, OpenAI and local models work out of the box.
+
+**Claude needs a one-time setup.** The Anthropic SDK needs newer Python packages than Raspberry Pi OS ships, so it runs in its own virtual environment. Over SSH:
+
+```bash
+sudo python3 -m venv /opt/vernis/curator-venv
+sudo /opt/vernis/curator-venv/bin/pip install anthropic
+```
+
+If the Curator itself is unavailable, `journalctl -u vernis-api | grep curator` shows why; installing the latest update restores missing Curator files.
 
 ---
 

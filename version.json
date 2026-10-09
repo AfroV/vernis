@@ -1,8 +1,12 @@
 {
-  "version": "3.5.0",
-  "build_date": "2026-10-08",
+  "version": "3.5.1",
+  "build_date": "2026-10-09",
   "codename": "Sentinel",
   "changelog": [
+    "Updates now back up the previous version first and roll back automatically if something goes wrong",
+    "Fix: an update could stop halfway and need a manual reboot",
+    "Fix: WiFi showed as not connected on non-English systems",
+    "Manage page no longer reloads the whole library on every tab switch",
     "AI Curator: talk to your frame with Grok, Claude, OpenAI or a local model",
     "Preview Mode: temporary artist previews that never enter your library",
     "Fully on-chain artworks: correct titles, no duplicate copies",

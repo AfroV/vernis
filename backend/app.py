@@ -18,6 +18,7 @@ import io
 import threading
 import socket
 import platform
+import sys
 from urllib.parse import urlparse
 
 # Force a locale-independent environment for everything we spawn — the
@@ -48,6 +49,10 @@ FILES_METADATA_FILE = Path("/opt/vernis/files-metadata.json")
 CONFIG_FILE = Path("/opt/vernis/device-config.json")
 GITHUB_CONFIG_FILE = Path("/opt/vernis/github-config.json")
 UPDATE_CONFIG_FILE = Path("/opt/vernis/update-config.json")
+# nmcli translates its output ("ja:" instead of "yes:" on German Pi OS).
+# Parse it in the C locale everywhere; SSIDs are still returned as UTF-8.
+NMCLI_ENV = {**{k: v for k, v in os.environ.items() if k != "LANGUAGE"},
+             "LC_ALL": "C.UTF-8", "PAGER": "cat", "TERM": "dumb"}
 CARDS_CONFIG_FILE = Path("/opt/vernis/cards-config.json")
 CARDS_CACHE_FILE = Path("/opt/vernis/cards-cache.json")
 STORAGE_CONFIG_FILE = Path("/opt/vernis/storage-config.json")
@@ -2539,7 +2544,7 @@ def diagnostics():
         net["ip_addresses"] = r.stdout.strip().split()
     except: pass
     try:
-        r = subprocess.run(["nmcli", "-t", "-f", "active,ssid,signal,freq", "dev", "wifi"],
+        r = subprocess.run(["nmcli", "-t", "-f", "active,ssid,signal,freq", "dev", "wifi"], env=NMCLI_ENV,
                            capture_output=True, text=True, timeout=5)
         for line in r.stdout.splitlines():
             if line.startswith("yes:"):
@@ -2665,7 +2670,7 @@ def status():
         # Get connected Wi-Fi
         try:
             ssid_result = subprocess.run(
-                ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"],
+                ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"], env=NMCLI_ENV,
                 capture_output=True, text=True, timeout=5
             )
             ssid = "Not connected"
@@ -3177,14 +3182,14 @@ def wifi_scan():
     """Scan for available Wi-Fi networks using nmcli"""
     try:
         # Trigger a fresh scan first (needs sudo for full channel scan)
-        subprocess.run(["sudo", "nmcli", "device", "wifi", "rescan"],
+        subprocess.run(["sudo", "nmcli", "device", "wifi", "rescan"], env=NMCLI_ENV,
                       capture_output=True, timeout=10)
         import time
         time.sleep(2)  # Give scan time to complete
 
         # Get list of available networks
         result = subprocess.run(
-            ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,IN-USE", "device", "wifi", "list"],
+            ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY,IN-USE", "device", "wifi", "list"], env=NMCLI_ENV,
             capture_output=True, text=True, timeout=10
         )
 
@@ -3249,7 +3254,7 @@ def change_wifi():
         con_name = f"Vernis-{safe_ssid}"
 
         # Prevent nmcli pager from blocking subprocess
-        nmcli_env = {**os.environ, "PAGER": "cat", "TERM": "dumb"}
+        nmcli_env = NMCLI_ENV
 
         # Delete ALL existing connections with this name (duplicates cause failures)
         for _attempt in range(5):
@@ -7150,7 +7155,7 @@ def setup_status():
         wifi_ssid = ""
         try:
             result = subprocess.run(
-                ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"],
+                ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"], env=NMCLI_ENV,
                 capture_output=True, text=True, timeout=5
             )
             for line in result.stdout.split('\n'):
@@ -8716,11 +8721,14 @@ def system_update():
     try:
         repo, branch = update_source()
 
-        script_path = SCRIPTS_DIR / "github-update.sh"
+        # vernis-update.sh: backup, install, check the API restarts (else roll
+        # back), apt upgrade, reboot. github-update.sh is the pre-3.5.1 updater.
+        script_path = SCRIPTS_DIR / "vernis-update.sh"
+        if not script_path.exists():
+            script_path = SCRIPTS_DIR / "github-update.sh"
         if not script_path.exists():
             return jsonify({"error": "Update script not found"}), 500
 
-        # github-update.sh does: clone repo, copy files, apt upgrade, restart, reboot
         subprocess.Popen(["sudo", "bash", str(script_path), repo, branch])
 
         return jsonify({
@@ -14054,12 +14062,20 @@ def _wait_for_external_storage(timeout=60):
     except Exception:
         pass
 
-# AI Curator (curator.py next to app.py). Optional: Vernis runs without it.
+# AI Curator (curator.py next to app.py). Vernis runs without it, but a
+# missing or broken curator.py is reported loudly at startup and by its API,
+# not first discovered as "could not load models" in Settings.
 try:
     from curator import curator_bp
     app.register_blueprint(curator_bp)
 except Exception as _curator_err:
-    print(f"[curator] disabled: {_curator_err}", flush=True)
+    _CURATOR_ERROR = (f"AI Curator unavailable: {type(_curator_err).__name__}: {_curator_err}. "
+                      "Install the latest update (Settings > Updates) to restore curator.py.")
+    print(f"[curator] ERROR {_CURATOR_ERROR}", file=sys.stderr, flush=True)
+
+    @app.route("/api/curator/<path:_rest>", methods=["GET", "POST", "DELETE"])
+    def curator_unavailable(_rest):
+        return jsonify({"error": _CURATOR_ERROR}), 503
 
 if __name__ == "__main__":
     _wait_for_external_storage()
