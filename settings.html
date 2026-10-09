@@ -7987,7 +7987,7 @@
         show("Starting the update...");
 
         // The boot id changes when the frame restarts: that is how we know it finished
-        var bootId = null, started = 0, polls = 0;
+        var bootId = null, started = 0, polls = 0, lastState = "", lastText = "";
         try { bootId = (await (await fetch("/api/system/update-status")).json()).boot_id || null; } catch (e) {}
         try {
           var r = await fetch("/api/system/update", { method: "POST", headers: { "Content-Type": "application/json" } });
@@ -8016,9 +8016,12 @@
                 clearInterval(poll);
                 show(st.message, "error");
               } else if (st.state === "rebooting") {
+                lastState = "rebooting";
                 show("Restarting the frame - this page reconnects by itself in a minute or two.");
               } else if (st.state === "running" && st.step > 0) {
-                show("Updating - step " + st.step + " of " + st.total + ": " + st.message);
+                lastState = "running";
+                lastText = "Updating - step " + st.step + " of " + st.total + ": " + st.message;
+                show(lastText);
               } else if (polls > 40) {
                 // No progress after 2 minutes: an older updater that reports nothing
                 clearInterval(poll);
@@ -8026,7 +8029,14 @@
               }
             })
             .catch(function () {
-              show("Restarting the frame - this page reconnects by itself in a minute or two.");
+              // No answer: the frame is restarting, or just busy (Vernis restarts
+              // in step 4; system updates load the Pi). Only say "restarting"
+              // once the updater has said so.
+              if (lastState === "rebooting") {
+                show("Restarting the frame - this page reconnects by itself in a minute or two.");
+              } else if (lastText) {
+                show(lastText + " (waiting for the frame to answer...)");
+              }
             });
         }, 3000);
       }
