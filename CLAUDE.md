@@ -69,13 +69,21 @@ never copied the new curator.py). Before every release:
 1. Bump `version.json` (the button only offers an update when it increases).
 2. Push the release to a **`rc` branch** of AfroV/vernis, not `main`.
 3. On a test device running the **previous release** (restore it with
-   `sudo bash /opt/vernis/scripts/rollback-update.sh` if needed), run exactly what
-   the button runs, with the rc branch:
-   `sudo bash /opt/vernis/scripts/vernis-update.sh AfroV/vernis rc`
-   (devices on 3.5.0 and older: `github-update.sh` instead).
-4. After the reboot check: `/api/version` shows the new version, the updater
-   printed "all files verified", and `journalctl -u vernis-api -b | grep -i error`
-   is clean (a missing/broken curator.py logs `[curator] ERROR`).
+   `sudo bash /opt/vernis/scripts/rollback-update.sh` if needed), trigger the
+   update **the way the button does — through the API, not over SSH** (a script
+   started over SSH runs outside vernis-api.service and hides bugs, e.g. the
+   service restart killing the updater):
+   ```bash
+   curl -X POST -H 'Content-Type: application/json' \
+     -d '{"mode":"production","dev_server":"","github_repo":"","github_branch":"rc"}' \
+     http://<device>/api/update-config
+   curl -X POST http://<device>/api/system/update
+   ```
+4. Check: `/api/version` shows the new version, every file matches the rc commit,
+   the device **rebooted** by itself, the updater log reached its last step
+   (`journalctl -u 'vernis-update-*'`; for 3.5.0 and older `journalctl -u vernis-api`),
+   and `journalctl -u vernis-api -b | grep -i error` is clean (a missing/broken
+   curator.py logs `[curator] ERROR`). Then set `github_branch` back to `main`.
 5. Only then merge `rc` into `main`.
 
 Never change `scripts/github-update.sh`: 3.5.0 devices copy it over themselves

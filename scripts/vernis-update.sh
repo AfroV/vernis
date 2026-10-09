@@ -31,6 +31,15 @@ fi
 if [ "${VERNIS_UPDATE_STAGED:-}" != "1" ]; then
     SELF_COPY=$(mktemp /tmp/vernis-update-run.XXXXXX)
     cp "$0" "$SELF_COPY"
+    # Started by Settings > Install update, i.e. inside vernis-api.service?
+    # Restarting that service (step 4) would kill this script with it, so
+    # run as a systemd unit of its own. Output: journalctl -u 'vernis-update-*'
+    if grep -q "vernis-api.service" /proc/self/cgroup 2>/dev/null && command -v systemd-run > /dev/null; then
+        systemd-run --quiet --collect --unit "vernis-update-$(date +%s)" \
+            --setenv=VERNIS_UPDATE_STAGED=1 bash "$SELF_COPY" "$@"
+        echo "Update running as its own service: journalctl -u 'vernis-update-*' -f"
+        exit 0
+    fi
     VERNIS_UPDATE_STAGED=1 exec bash "$SELF_COPY" "$@"
 fi
 trap 'rm -f "$0"' EXIT

@@ -23,7 +23,8 @@ echo ""
 
 # Step 1: Update and install dependencies
 echo "[1/17] Installing dependencies..."
-sudo apt update
+# A broken third-party repo (e.g. Caddy's returning 402) must not stop the install
+sudo apt update || echo "⚠ apt update reported errors - continuing with the repositories that work"
 sudo apt install -y python3-pip python3-flask xinput xdotool unclutter \
     curl libssl-dev gcc wayvnc ufw fail2ban wtype mpv wlrctl log2ram \
     librsvg2-bin imagemagick swaybg ffmpeg \
@@ -48,10 +49,28 @@ echo "rpcbind disabled"
 if ! command -v caddy >/dev/null 2>&1; then
     sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
     # --yes so gpg overwrites the keyring on a re-run instead of failing under set -e
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-    sudo apt update
-    sudo apt install -y caddy
+    if curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null \
+       && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null \
+       && sudo apt update && sudo apt install -y caddy; then
+        echo "Caddy installed from the Caddy repository"
+    else
+        # Caddy's repository is unavailable (it returned 402 in Oct 2026). Use the
+        # official release .deb instead - Debian's own caddy (2.6) is too old for
+        # the {client_ip} placeholder in our Caddyfile. Checksums pinned here.
+        echo "Caddy repository unavailable - installing the official Caddy release instead"
+        sudo rm -f /etc/apt/sources.list.d/caddy-stable.list
+        CADDY_VER=2.10.2
+        case "$(dpkg --print-architecture)" in
+            arm64) CADDY_ARCH=arm64; CADDY_SHA512=77a5531291aba6eadc4081f3df399d55039cc18b11ba83feedc05de7e650de978022b2a2d86f09927869e9768822d0704098a25f30172a8322e0f0f597833896 ;;
+            armhf) CADDY_ARCH=armv7; CADDY_SHA512=00d87901961083d5fedada9d8cf3d4b8e16eeb6fb16cfd445649b303ab09ab05af5b8b2f29074304f4c34ba5e80714c7fc10374cda58fae69cc5d275896be388 ;;
+            *) echo "❌ No Caddy fallback for $(dpkg --print-architecture)"; exit 1 ;;
+        esac
+        CADDY_DEB=$(mktemp --suffix=.deb)
+        curl -fsSL -o "$CADDY_DEB" "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VER}/caddy_${CADDY_VER}_linux_${CADDY_ARCH}.deb"
+        echo "$CADDY_SHA512  $CADDY_DEB" | sha512sum -c - || { echo "❌ Caddy download checksum mismatch"; exit 1; }
+        sudo apt install -y "$CADDY_DEB"
+        rm -f "$CADDY_DEB"
+    fi
 else
     echo "Caddy already installed: $(caddy version 2>/dev/null | head -1)"
 fi
