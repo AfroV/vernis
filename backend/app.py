@@ -1142,6 +1142,24 @@ def get_update_config():
 OFFICIAL_UPDATE_REPO = "AfroV/vernis"
 EXTRA_UPDATE_REPOS_FILE = Path("/etc/vernis/allowed-update-repos")
 
+UPDATE_STATUS_FILE = Path("/opt/vernis/update-status.json")
+# Files every install must have. Updaters from 3.4 and older only copied
+# app.py, so a frame they updated can be left without these: Check for
+# Updates then offers Install again to finish the job.
+REQUIRED_APP_FILES = ("curator.py", "curator_claude.py", "scripts/vernis-update.sh")
+
+def missing_app_files():
+    app_dir = Path(__file__).resolve().parent
+    return [f for f in REQUIRED_APP_FILES if not (app_dir / f).exists()]
+
+def _write_update_status(**status):
+    try:
+        tmp = UPDATE_STATUS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(status))
+        tmp.replace(UPDATE_STATUS_FILE)
+    except OSError:
+        pass
+
 def update_source():
     """(repo, branch) the updater may use, from update-config.json."""
     config = get_update_config()
@@ -8729,10 +8747,13 @@ def system_update():
         if not script_path.exists():
             return jsonify({"error": "Update script not found"}), 500
 
+        started = int(time.time())
+        _write_update_status(state="running", step=0, total=7, message="Starting update", started=started)
         subprocess.Popen(["sudo", "bash", str(script_path), repo, branch])
 
         return jsonify({
             "success": True,
+            "started": started,
             "message": "Update started. Device will reboot when complete."
         })
     except Exception as e:
@@ -8801,11 +8822,34 @@ def check_updates():
     except Exception:
         result["vernis"]["message"] = "Could not check for Vernis updates"
 
+    missing = missing_app_files()
+    if missing:
+        result["vernis"]["incomplete"] = missing
+        result["vernis"]["update_available"] = True
+
     # Backward compatibility
     result["updates_available"] = result["system"]["updates_available"] or result["vernis"]["update_available"]
     result["message"] = "Updates available" if result["updates_available"] else "Everything is up to date"
 
     return jsonify(result)
+
+@app.route("/api/system/update-status")
+def update_status():
+    """Progress of the running/last update (written by vernis-update.sh), plus
+    the boot id so the Settings page can tell when the frame has restarted."""
+    try:
+        status = json.loads(UPDATE_STATUS_FILE.read_text())
+    except (OSError, ValueError):
+        status = {}
+    try:
+        status["boot_id"] = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        status["boot_id"] = ""
+    try:
+        status["version"] = json.loads(Path("/var/www/vernis/version.json").read_text()).get("version", "")
+    except (OSError, ValueError):
+        status["version"] = ""
+    return jsonify(status)
 
 # Remote control state file
 REMOTE_CONTROL_FILE = Path("/opt/vernis/remote-control.json")

@@ -1,8 +1,10 @@
 {
-  "version": "3.5.1",
+  "version": "3.5.2",
   "build_date": "2026-10-09",
   "codename": "Sentinel",
   "changelog": [
+    "Settings shows live progress while an update installs, and tells you when it is finished",
+    "Check for Updates now finishes an update that an older version left incomplete",
     "Updates now back up the previous version first and roll back automatically if something goes wrong",
     "Fix: an update could stop halfway and need a manual reboot",
     "Fix: WiFi showed as not connected on non-English systems",

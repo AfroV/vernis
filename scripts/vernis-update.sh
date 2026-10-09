@@ -42,7 +42,8 @@ if [ "${VERNIS_UPDATE_STAGED:-}" != "1" ]; then
     fi
     VERNIS_UPDATE_STAGED=1 exec bash "$SELF_COPY" "$@"
 fi
-trap 'rm -f "$0"' EXIT
+# On any unexpected stop, tell the Settings page instead of leaving it waiting
+trap 'rc=$?; [ $rc -ne 0 ] && [ -z "${STATUS_FINAL:-}" ] && type status > /dev/null 2>&1 && status failed 0 "Update stopped unexpectedly (code $rc). Nothing is lost - try again, or see journalctl -u vernis-update-*"; rm -f "$0"' EXIT
 
 GITHUB_REPO="$1"
 GITHUB_BRANCH="$2"
@@ -63,6 +64,16 @@ esac
 WEB_DIR="/var/www/vernis"
 APP_DIR="/opt/vernis"
 BACKUP_DIR="$APP_DIR/backups"
+STATUS_FILE="$APP_DIR/update-status.json"
+
+# Progress for Settings > System (GET /api/system/update-status).
+# "started" is set by the API when Install is pressed; keep it.
+UPDATE_STARTED=$(python3 -c "import json; print(int(json.load(open('$STATUS_FILE')).get('started', 0)))" 2>/dev/null || echo 0)
+status() {  # state step message
+    python3 -c 'import json, sys; print(json.dumps({"state": sys.argv[1], "step": int(sys.argv[2]), "total": 7, "message": sys.argv[3], "started": int(sys.argv[4])}))' \
+        "$1" "$2" "$3" "$UPDATE_STARTED" > "$STATUS_FILE.tmp" 2>/dev/null \
+        && chmod 644 "$STATUS_FILE.tmp" && mv -f "$STATUS_FILE.tmp" "$STATUS_FILE" || true
+}
 TEMP_DIR=$(mktemp -d /tmp/vernis-github-update.XXXXXX)
 
 echo "=========================================="
@@ -75,18 +86,22 @@ echo ""
 cd "$TEMP_DIR"
 
 echo "[1/7] Downloading update..."
+status running 1 "Downloading the update"
 git clone --depth 1 --branch "$GITHUB_BRANCH" "https://github.com/$GITHUB_REPO.git" vernis || {
     echo "❌ Failed to download update"
+    status failed 1 "Could not download the update. Check the internet connection and try again. Nothing was changed."; STATUS_FINAL=1
     exit 1
 }
 cd vernis
 if [ ! -f "backend/app.py" ]; then
     echo "❌ Invalid repository structure - backend/app.py not found"
+    status failed 1 "The downloaded update looks incomplete. Nothing was changed."; STATUS_FINAL=1
     exit 1
 fi
 echo "✅ Downloaded"
 
 echo "[2/7] Backing up current version..."
+status running 2 "Saving a backup of the current version"
 OLD_VERSION=$(python3 -c "import json; print(json.load(open('$WEB_DIR/version.json'))['version'])" 2>/dev/null || echo unknown)
 mkdir -p "$BACKUP_DIR"
 BACKUP="$BACKUP_DIR/vernis-$OLD_VERSION-$(date +%Y%m%d-%H%M%S).tar.gz"
@@ -98,6 +113,7 @@ tar czf "$BACKUP" -C / \
     "${APP_DIR#/}/scripts" || {
     rm -f "$BACKUP"
     echo "❌ Backup failed - nothing was changed"
+    status failed 2 "Could not save a backup (is the storage full?). Nothing was changed."; STATUS_FINAL=1
     exit 1
 }
 ls -1t "$BACKUP_DIR"/vernis-*.tar.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
@@ -124,6 +140,7 @@ restore_backup() {
 }
 
 echo "[3/7] Installing update..."
+status running 3 "Installing the new version"
 cp *.html "$WEB_DIR/"
 cp *.css "$WEB_DIR/" 2>/dev/null || true
 cp *.js "$WEB_DIR/" 2>/dev/null || true
@@ -160,27 +177,32 @@ done
 if [ -n "$missing" ]; then
     echo "❌ Some files were not installed:$missing"
     restore_backup
+    status rolled_back 3 "Some files could not be installed, so the previous version ($OLD_VERSION) was restored. Try again later."; STATUS_FINAL=1
     rm -rf "$TEMP_DIR"
     exit 1
 fi
 echo "✅ Installed (all files verified)"
 
 echo "[4/7] Restarting services..."
+status running 4 "Restarting Vernis"
 systemctl restart vernis-api.service
 systemctl restart caddy
 echo "✅ Restarted"
 
 echo "[5/7] Checking the new version starts..."
+status running 5 "Checking the new version works"
 if ! wait_for_api; then
     echo "❌ The updated Vernis did not start - rolling back to $OLD_VERSION"
     journalctl -u vernis-api -n 20 --no-pager 2>/dev/null || true
     restore_backup
+    status rolled_back 5 "The new version did not start, so the previous version ($OLD_VERSION) was restored. Your frame works as before."; STATUS_FINAL=1
     rm -rf "$TEMP_DIR"
     exit 1
 fi
 echo "✅ Vernis is running"
 
 echo "[6/7] Running system updates..."
+status running 6 "Installing system updates - this can take 5 to 20 minutes. Keep the frame plugged in."
 apt-get update || true
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" || \
     echo "⚠ System package upgrade failed - Vernis itself is updated"
@@ -192,6 +214,7 @@ fi
 echo "✅ System updated"
 
 echo "[7/7] Cleaning up..."
+status running 7 "Finishing"
 cd /
 rm -rf "$TEMP_DIR"
 echo "✅ Done"
@@ -202,5 +225,6 @@ echo "✅ Update complete ($OLD_VERSION -> $(python3 -c "import json; print(json
 echo "=========================================="
 echo "Previous version saved in $BACKUP"
 echo "System will reboot in 10 seconds..."
+status rebooting 7 "Restarting the frame"; STATUS_FINAL=1
 sleep 10
 reboot

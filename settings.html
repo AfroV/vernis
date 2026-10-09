@@ -7903,7 +7903,14 @@
             if (data.vernis) {
               var vDiv = document.createElement('div');
               vDiv.style.marginBottom = '12px';
-              if (data.vernis.update_available) {
+              if (data.vernis.incomplete && data.vernis.remote_version === data.vernis.current_version) {
+                // An older updater left files out: Install finishes the job
+                hasUpdates = true;
+                var warn = document.createElement('strong');
+                warn.textContent = 'Vernis v' + data.vernis.current_version + ' is not fully installed.';
+                vDiv.appendChild(warn);
+                vDiv.appendChild(document.createTextNode(' Press Install Updates & Reboot to finish the update.'));
+              } else if (data.vernis.update_available) {
                 hasUpdates = true;
                 var title = document.createElement('strong');
                 title.textContent = 'Vernis v' + data.vernis.remote_version;
@@ -7968,40 +7975,60 @@
       }
 
       async function performUpdate() {
-        if (!(await vernisConfirm("Install all updates (Vernis + system) and reboot? The device will restart when complete."))) return;
+        if (!(await vernisConfirm("Install the update? The frame restarts by itself when it is done. This can take up to 20 minutes - keep it plugged in."))) return;
         var statusEl = document.getElementById("update-check-status");
-        statusEl.style.display = "block";
-        statusEl.textContent = "Installing updates... Device will reboot when done.";
-        statusEl.style.background = "var(--bg-tertiary)";
-        statusEl.style.color = "var(--text-primary)";
+        function show(text, kind) {
+          statusEl.style.display = "block";
+          statusEl.textContent = text;
+          statusEl.style.background = kind === "ok" ? "rgba(var(--success-rgb), 0.15)" : kind === "error" ? "#f8d7da" : "var(--bg-tertiary)";
+          statusEl.style.color = kind === "ok" ? "var(--success)" : kind === "error" ? "#721c24" : "var(--text-primary)";
+        }
         document.getElementById("update-info").style.display = "none";
-        fetch("/api/system/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
-        // Wait for reboot then try to reconnect
-        setTimeout(function() {
-          statusEl.textContent = "Device is rebooting...";
-          var attempts = 0;
-          var poll = setInterval(function() {
-            attempts++;
-            fetch("/api/version", { signal: AbortSignal.timeout(3000) })
-              .then(function(r) { return r.json(); })
-              .then(function() {
+        show("Starting the update...");
+
+        // The boot id changes when the frame restarts: that is how we know it finished
+        var bootId = null, started = 0, polls = 0;
+        try { bootId = (await (await fetch("/api/system/update-status")).json()).boot_id || null; } catch (e) {}
+        try {
+          var r = await fetch("/api/system/update", { method: "POST", headers: { "Content-Type": "application/json" } });
+          var d = await r.json();
+          if (!r.ok || !d.success) { show("Could not start the update: " + (d.error || r.status), "error"); return; }
+          started = d.started || 0;
+        } catch (e) { show("Could not start the update. Check the connection and try again.", "error"); return; }
+
+        var poll = setInterval(function () {
+          polls++;
+          if (polls > 600) {  // 30 minutes
+            clearInterval(poll);
+            show("The update is taking unusually long. If the art is showing on the frame, open Settings again; otherwise unplug the frame, wait 10 seconds and plug it back in.", "error");
+            return;
+          }
+          fetch("/api/system/update-status", { signal: AbortSignal.timeout(4000) })
+            .then(function (r) { return r.json(); })
+            .then(function (st) {
+              if (bootId && st.boot_id && st.boot_id !== bootId) {
                 clearInterval(poll);
-                statusEl.textContent = "Update complete! Reloading...";
-                statusEl.style.background = "rgba(var(--success-rgb), 0.15)";
-                statusEl.style.color = "var(--success)";
-                setTimeout(function() { location.reload(); }, 1500);
-              })
-              .catch(function() {
-                if (attempts >= 60) {
-                  clearInterval(poll);
-                  statusEl.textContent = "Device may still be rebooting. Refresh the page manually.";
-                }
-              });
-          }, 5000);
-        }, 15000);
+                show("Update complete - your frame now runs Vernis v" + st.version + ".", "ok");
+                setTimeout(function () { location.reload(); }, 4000);
+              } else if (started && st.started && st.started !== started) {
+                // status from an earlier update: wait for this one
+              } else if (st.state === "failed" || st.state === "rolled_back") {
+                clearInterval(poll);
+                show(st.message, "error");
+              } else if (st.state === "rebooting") {
+                show("Restarting the frame - this page reconnects by itself in a minute or two.");
+              } else if (st.state === "running" && st.step > 0) {
+                show("Updating - step " + st.step + " of " + st.total + ": " + st.message);
+              } else if (polls > 40) {
+                // No progress after 2 minutes: an older updater that reports nothing
+                clearInterval(poll);
+                show("The update was installed. To finish, press Reboot under System Control below and wait until the art shows again.", "ok");
+              }
+            })
+            .catch(function () {
+              show("Restarting the frame - this page reconnects by itself in a minute or two.");
+            });
+        }, 3000);
       }
 
       // Load auto-update status
