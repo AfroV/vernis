@@ -187,7 +187,7 @@ class AdvancedNFTDownloader:
     def _check_auto_pin(self):
         """Check if auto-pin is enabled in IPFS settings"""
         try:
-            settings_file = Path("/opt/vernis/ipfs_settings.json")
+            settings_file = Path("/opt/vernis/ipfs-settings.json")
             if settings_file.exists():
                 with open(settings_file) as f:
                     settings = json.load(f)

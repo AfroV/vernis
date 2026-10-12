@@ -1236,6 +1236,29 @@
       background_color: ''
     };
     let hiddenFiles = [];
+    let _playlist = []; // Visible artworks in library order; `files` is this, shuffled when shuffle is on
+
+    // Fisher–Yates: unbiased, unlike sort(() => Math.random() - 0.5)
+    function shuffled(list) {
+      const a = list.slice();
+      for (let k = a.length - 1; k > 0; k--) {
+        const j = Math.floor(Math.random() * (k + 1));
+        [a[k], a[j]] = [a[j], a[k]];
+      }
+      return a;
+    }
+
+    function applyPlaylistOrder() {
+      files = config.shuffle ? shuffled(_playlist) : _playlist.slice();
+    }
+
+    // The 30 s refresh usually returns the same list: keep the current order so
+    // the slideshow neither repeats nor skips artworks, and only reorder on change.
+    function setPlaylist(list) {
+      if (list.length === _playlist.length && list.every((u, k) => u === _playlist[k])) return;
+      _playlist = list;
+      applyPlaylistOrder();
+    }
     var generatorUrls = {}; // url -> direct generator URL for live iframe loading
     var _pixelShiftInterval = null;
     var _pixelShiftIdx = 0;
@@ -1369,8 +1392,7 @@
         try {
           const selected = JSON.parse(localStorage.getItem('vernis-gallery-preview') || '[]');
           if (selected.length > 0) {
-            files = selected.map(f => '/nfts/' + f);
-            if (config.shuffle) files = files.sort(() => Math.random() - 0.5);
+            setPlaylist(selected.map(f => '/nfts/' + f));
             updateSplashStatus(`Previewing ${files.length} artwork${files.length !== 1 ? 's' : ''}...`);
             if (i === 0) next();
             return;
@@ -1390,17 +1412,10 @@
           if (nft.generator_url && SAFE_GENERATOR_URL.test(nft.generator_url)) generatorUrls[nft.url] = nft.generator_url;
         });
 
-        // Filter out hidden NFTs
-        const allFiles = nfts.map(nft => nft.url);
-        files = allFiles.filter(url => {
-          const filename = url.split('/').pop();
-          return !hiddenFiles.includes(filename);
-        });
-
-        // Shuffle if enabled
-        if (config.shuffle && files.length > 0) {
-          files = files.sort(() => Math.random() - 0.5);
-        }
+        // Filter out hidden NFTs. A Set keeps this O(files): with thousands
+        // hidden, Array.includes froze the page for over a second on a Pi.
+        const hiddenSet = new Set(hiddenFiles);
+        setPlaylist(nfts.map(nft => nft.url).filter(url => !hiddenSet.has(url.split('/').pop())));
 
         if (files.length > 0) {
           updateSplashStatus(`Curating ${files.length} masterpiece${files.length !== 1 ? 's' : ''}...`);
@@ -1732,12 +1747,11 @@
         // Check if config changed
         if (JSON.stringify(config) !== JSON.stringify(newConfig)) {
           console.log('Display config changed, applying new settings:', newConfig);
+          const shuffleChanged = !!config.shuffle !== !!newConfig.shuffle;
           config = newConfig;
 
-          // If shuffle changed and we have files, reshuffle
-          if (config.shuffle && files.length > 0) {
-            files = files.sort(() => Math.random() - 0.5);
-          }
+          // Reorder only when shuffle itself was toggled
+          if (shuffleChanged && _playlist.length > 0) applyPlaylistOrder();
 
           // Update frosted background visibility (both buffers + dither)
           var bgA = document.getElementById('frosted-bg-a');
@@ -2480,7 +2494,7 @@
       if (key === 'shuffle') {
         document.getElementById('qs-shuffle-track').style.background = value ? '#6366f1' : 'rgba(255,255,255,0.2)';
         document.getElementById('qs-shuffle-thumb').style.left = value ? '20px' : '2px';
-        if (value && files.length > 0) files = files.sort(function() { return Math.random() - 0.5; });
+        if (_playlist.length > 0) applyPlaylistOrder();
       }
       if (key === 'frosted_background') {
         document.getElementById('qs-frosted-track').style.background = value ? '#6366f1' : 'rgba(255,255,255,0.2)';

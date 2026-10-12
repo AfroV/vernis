@@ -9866,7 +9866,13 @@
           });
       }
 
+      // Only send the storage limit once the owner moves the slider: the slider
+      // is capped at the recommended max, so echoing it back on every save
+      // shrank larger IPFS limits set elsewhere.
+      let storageLimitTouched = false;
+
       function updateStorageSlider() {
+        storageLimitTouched = true;
         const value = document.getElementById("storage-limit").value;
         document.getElementById("storage-limit-value").textContent = value;
       }
@@ -9942,9 +9948,6 @@
           auto_pin: document
             .getElementById("toggle-ipfs-auto-pin")
             .classList.contains("active"),
-          storage_limit_gb: parseInt(
-            document.getElementById("storage-limit").value,
-          ),
           smart_pin_enabled: document
             .getElementById("toggle-smart-pin-enabled")
             .classList.contains("active"),
@@ -9961,6 +9964,10 @@
             document.getElementById("download-retries").value,
           ),
         };
+        if (storageLimitTouched)
+          settings.storage_limit_gb = parseInt(
+            document.getElementById("storage-limit").value,
+          );
 
         fetch("/api/ipfs/settings", {
           method: "POST",

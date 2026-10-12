@@ -1,8 +1,13 @@
 {
-  "version": "3.5.2",
-  "build_date": "2026-10-09",
+  "version": "3.5.3",
+  "build_date": "2026-10-12",
   "codename": "Sentinel",
   "changelog": [
+    "Shuffle plays every artwork once per round instead of repeating and skipping",
+    "Saving IPFS settings no longer shrinks a larger storage limit",
+    "Download speed setting is now used when installing a library",
+    "Temperature still shows when the Pi's firmware tool is unavailable",
+    "Uploading several files at once no longer loses some of them",
     "Settings shows live progress while an update installs, and tells you when it is finished",
     "Check for Updates now finishes an update that an older version left incomplete",
     "Updates now back up the previous version first and roll back automatically if something goes wrong",

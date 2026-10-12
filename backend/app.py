@@ -3034,6 +3034,7 @@ def get_ipfs_settings():
         "smart_pin_timeout": 10,   # Seconds to wait for provider check
         "download_timeout": 60,    # Seconds to wait for IPFS downloads
         "download_retries": 3,     # Number of retry attempts
+        "download_workers": 2,     # Parallel downloads when installing a library
         "cid_verification": True   # Verify content matches CID (with directory fallback)
     }
     if IPFS_SETTINGS_FILE.exists():
@@ -3045,6 +3046,41 @@ def get_ipfs_settings():
         except:
             pass
     return defaults
+
+
+def _ipfs_storage_max_gb():
+    """IPFS Datastore.StorageMax in whole GB, or None if unreadable."""
+    try:
+        r = subprocess.run(["ipfs", "config", "Datastore.StorageMax"],
+                           env=IPFS_ENV, capture_output=True, text=True, timeout=10)
+        m = re.fullmatch(r'\s*(\d+(?:\.\d+)?)\s*(KB|KiB|MB|MiB|GB|GiB|TB|TiB)\s*', r.stdout) if r.returncode == 0 else None
+        if not m:
+            return None
+        scale = {"K": 1e-6, "M": 1e-3, "G": 1, "T": 1e3}[m.group(2)[0]]
+        return max(1, round(float(m.group(1)) * scale))
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _ipfs_download_workers():
+    """download_workers from IPFS settings, clamped to what the downloader accepts."""
+    lo, hi = _IPFS_SETTING_BOUNDS["download_workers"]
+    try:
+        return max(lo, min(int(get_ipfs_settings().get("download_workers", 2)), hi))
+    except (TypeError, ValueError):
+        return 2
+
+
+# Bounds for POST /api/ipfs/settings. The endpoint takes client input, so every
+# number is clamped: e.g. huge download_workers would stall the Pi.
+_IPFS_SETTING_BOUNDS = {
+    "storage_limit_gb": (1, 4096),
+    "smart_pin_threshold": (1, 100),
+    "smart_pin_timeout": (1, 120),
+    "download_timeout": (5, 600),
+    "download_retries": (0, 10),
+    "download_workers": (1, 8),   # nft_downloader_advanced.py rejects anything outside 1-8
+}
 
 
 def get_provider_count(cid, timeout=10):
@@ -3134,34 +3170,45 @@ def storage_recommendations():
 def ipfs_settings():
     """Get or update IPFS storage settings"""
     if request.method == "GET":
-        return jsonify(get_ipfs_settings())
+        settings = get_ipfs_settings()
+        # Show the limit IPFS actually enforces, not a saved default
+        actual_gb = _ipfs_storage_max_gb()
+        if actual_gb is not None:
+            settings["storage_limit_gb"] = actual_gb
+        return jsonify(settings)
 
     try:
-        data = request.json
-        current_settings = get_ipfs_settings()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Expected a JSON object"}), 400
 
-        settings = {
-            "auto_pin": data.get('auto_pin', current_settings.get('auto_pin', True)),
-            "storage_limit_gb": int(data.get('storage_limit_gb', current_settings.get('storage_limit_gb', 2))),
-            "smart_pin_enabled": data.get('smart_pin_enabled', current_settings.get('smart_pin_enabled', False)),
-            "smart_pin_threshold": int(data.get('smart_pin_threshold', current_settings.get('smart_pin_threshold', 5))),
-            "smart_pin_timeout": int(data.get('smart_pin_timeout', current_settings.get('smart_pin_timeout', 10))),
-            "download_timeout": int(data.get('download_timeout', current_settings.get('download_timeout', 60))),
-            "download_retries": int(data.get('download_retries', current_settings.get('download_retries', 3))),
-            "cid_verification": True  # Always on — verify content matches IPFS CID
-        }
+        # Merge into the saved settings so keys this request doesn't send
+        # (e.g. download_workers) are kept, not reset to defaults.
+        settings = get_ipfs_settings()
+        for key in ("auto_pin", "smart_pin_enabled"):
+            if key in data:
+                settings[key] = bool(data[key])
+        for key, (lo, hi) in _IPFS_SETTING_BOUNDS.items():
+            if key in data:
+                try:
+                    settings[key] = max(lo, min(int(data[key]), hi))
+                except (TypeError, ValueError):
+                    return jsonify({"error": f"{key} must be a number"}), 400
+        settings["cid_verification"] = True  # Always on — verify content matches IPFS CID
 
         # Save settings
         with open(IPFS_SETTINGS_FILE, 'w') as f:
             json.dump(settings, f)
 
-        # Update IPFS storage limit
-        limit_str = f'"{settings["storage_limit_gb"]}GB"'
-        subprocess.run(
-            ["ipfs", "config", "--json", "Datastore.StorageMax", limit_str],
-            env=IPFS_ENV,
-            capture_output=True, timeout=10
-        )
+        # Update the IPFS storage limit only when the request sets a different
+        # one: saving an unrelated toggle used to shrink a 50 GB repo to 2 GB.
+        if "storage_limit_gb" in data and settings["storage_limit_gb"] != _ipfs_storage_max_gb():
+            limit_str = f'"{settings["storage_limit_gb"]}GB"'
+            subprocess.run(
+                ["ipfs", "config", "--json", "Datastore.StorageMax", limit_str],
+                env=IPFS_ENV,
+                capture_output=True, timeout=10
+            )
 
         return jsonify({"success": True})
     except Exception as e:
@@ -4017,15 +4064,7 @@ def install_csv_collection():
         shutil.copy2(csv_path, dest_path)
 
         # Get workers from settings (default: 2)
-        workers = 2
-        try:
-            settings_file = Path("/opt/vernis/ipfs_settings.json")
-            if settings_file.exists():
-                with open(settings_file) as f:
-                    settings = json.load(f)
-                    workers = settings.get("download_workers", 2)
-        except:
-            pass
+        workers = _ipfs_download_workers()
 
         # Kill any existing downloader processes for this CSV to prevent stuck processes
         try:
@@ -7836,14 +7875,7 @@ def setup_quick_import():
 
         # Start downloader in background
         active_nft_dir = get_active_nft_dir(for_writing=True)
-        workers = 2
-        try:
-            settings_file = Path("/opt/vernis/ipfs_settings.json")
-            if settings_file.exists():
-                with open(settings_file) as f:
-                    workers = json.load(f).get("download_workers", 2)
-        except Exception:
-            pass
+        workers = _ipfs_download_workers()
 
         active_nft_dir.mkdir(parents=True, exist_ok=True)
 
@@ -9203,7 +9235,10 @@ def get_thermal_status():
             temp = float(temp_str.replace("temp=", "").replace("'C", ""))
             result["temperature"] = temp
     except:
-        # Fallback to sys file
+        pass
+    if result["temperature"] is None:
+        # Fallback to sys file. vcgencmd can also fail by exiting non-zero
+        # (e.g. no /dev/vcio access after an OS upgrade), not only by raising.
         try:
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 temp = int(f.read().strip()) / 1000.0
@@ -9213,14 +9248,30 @@ def get_thermal_status():
 
     # Get throttling status
     try:
-        throttle_result = subprocess.run(
-            ["vcgencmd", "get_throttled"],
-            capture_output=True, text=True, timeout=5
-        )
-        if throttle_result.returncode == 0:
-            # Output: throttled=0x0
-            throttle_str = throttle_result.stdout.strip()
-            throttle_hex = throttle_str.replace("throttled=", "")
+        throttle_hex = None
+        try:
+            throttle_result = subprocess.run(
+                ["vcgencmd", "get_throttled"],
+                capture_output=True, text=True, timeout=5
+            )
+            if throttle_result.returncode == 0:
+                # Output: throttled=0x0
+                throttle_hex = throttle_result.stdout.strip().replace("throttled=", "")
+        except (OSError, subprocess.SubprocessError):
+            pass
+        if throttle_hex is None:
+            # Without vcgencmd the kernel only exposes current under-voltage,
+            # via the rpi_volt hwmon alarm. Report that much.
+            for hwmon in Path("/sys/class/hwmon").glob("hwmon*"):
+                try:
+                    if (hwmon / "name").read_text().strip() == "rpi_volt":
+                        if (hwmon / "in0_lcrit_alarm").read_text().strip() == "1":
+                            result["under_voltage"] = True
+                            result["throttle_flags"] = ["Under-voltage detected"]
+                        break
+                except OSError:
+                    pass
+        else:
             throttle_val = int(throttle_hex, 16)
 
             # Decode throttle flags
@@ -13237,9 +13288,25 @@ def load_files_metadata():
             pass
     return {}
 
+# Held around every load -> modify -> save of files-metadata.json. Without it,
+# parallel uploads each saved their own stale copy and dropped the others' entries.
+_files_meta_lock = threading.Lock()
+
 def save_files_metadata(meta):
-    with open(FILES_METADATA_FILE, 'w') as f:
-        json.dump(meta, f, indent=2)
+    """Atomic write: readers never see a half-written file."""
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=str(FILES_METADATA_FILE.parent), prefix=".files-metadata.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(meta, f, indent=2)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, FILES_METADATA_FILE)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 @app.route("/api/files/upload", methods=["POST"])
 def upload_file():
@@ -13253,17 +13320,22 @@ def upload_file():
         FILES_DIR.mkdir(parents=True, exist_ok=True)
 
         safe_name = re.sub(r'[^\w\-\.]', '_', f.filename)
-        # Avoid overwriting: append number if exists
-        dest = FILES_DIR / safe_name
-        if dest.exists():
-            base, ext = os.path.splitext(safe_name)
-            i = 1
-            while (FILES_DIR / f"{base}_{i}{ext}").exists():
+        # Avoid overwriting: append number if exists. O_EXCL claims the name
+        # atomically, so parallel uploads of the same name can't clobber each
+        # other, and it never follows a symlink planted at that name.
+        base, ext = os.path.splitext(safe_name)
+        i = 0
+        while True:
+            candidate = safe_name if i == 0 else f"{base}_{i}{ext}"
+            try:
+                fd = os.open(str(FILES_DIR / candidate), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+                break
+            except FileExistsError:
                 i += 1
-            safe_name = f"{base}_{i}{ext}"
-            dest = FILES_DIR / safe_name
-
-        f.save(str(dest))
+        safe_name = candidate
+        dest = FILES_DIR / safe_name
+        with os.fdopen(fd, 'wb') as out:
+            f.save(out)
 
         import mimetypes
         mime = mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
@@ -13280,18 +13352,19 @@ def upload_file():
         except Exception:
             pass  # IPFS not available, continue without CID
 
-        meta = load_files_metadata()
         collection = request.form.get('collection', '').strip()
         display_name = request.form.get('name', '').strip()
-        meta[safe_name] = {
-            "name": display_name if display_name else f.filename,
-            "collection": collection if collection else "",
-            "uploadDate": datetime.now().isoformat(),
-            "size": dest.stat().st_size,
-            "mimeType": mime,
-            "ipfs_cid": ipfs_cid
-        }
-        save_files_metadata(meta)
+        with _files_meta_lock:
+            meta = load_files_metadata()
+            meta[safe_name] = {
+                "name": display_name if display_name else f.filename,
+                "collection": collection if collection else "",
+                "uploadDate": datetime.now().isoformat(),
+                "size": dest.stat().st_size,
+                "mimeType": mime,
+                "ipfs_cid": ipfs_cid
+            }
+            save_files_metadata(meta)
 
         return jsonify({"success": True, "filename": safe_name, "ipfs_cid": ipfs_cid, "message": f"Uploaded {f.filename}"})
     except Exception as e:
@@ -13318,16 +13391,17 @@ def delete_files():
         if not filenames:
             return jsonify({"error": "No filenames provided"}), 400
 
-        meta = load_files_metadata()
         deleted = []
-        for fname in filenames:
-            safe = re.sub(r'[^\w\-\.]', '_', fname)
-            fpath = FILES_DIR / safe
-            if fpath.exists():
-                fpath.unlink()
-                deleted.append(safe)
-            meta.pop(safe, None)
-        save_files_metadata(meta)
+        with _files_meta_lock:
+            meta = load_files_metadata()
+            for fname in filenames:
+                safe = re.sub(r'[^\w\-\.]', '_', fname)
+                fpath = FILES_DIR / safe
+                if fpath.is_file():  # not "." / ".." (directories)
+                    fpath.unlink()
+                    deleted.append(safe)
+                meta.pop(safe, None)
+            save_files_metadata(meta)
 
         return jsonify({"success": True, "deleted": deleted})
     except Exception as e:
@@ -13337,14 +13411,14 @@ def delete_files():
 def update_file_metadata(filename):
     try:
         safe = re.sub(r'[^\w\-\.]', '_', filename)
-        meta = load_files_metadata()
-        if safe not in meta:
-            return jsonify({"error": "File not found in metadata"}), 404
-
         data = request.get_json()
-        if "collection" in data:
-            meta[safe]["collection"] = data["collection"]
-        save_files_metadata(meta)
+        with _files_meta_lock:
+            meta = load_files_metadata()
+            if safe not in meta:
+                return jsonify({"error": "File not found in metadata"}), 404
+            if "collection" in data:
+                meta[safe]["collection"] = data["collection"]
+            save_files_metadata(meta)
 
         return jsonify({"success": True})
     except Exception as e:
