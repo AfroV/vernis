@@ -212,6 +212,10 @@ if ! command -v ffmpeg > /dev/null 2>&1; then
         echo "⚠ ffmpeg not installed - video/AVIF thumbnails use a fallback"
 fi
 echo "✅ System updated"
+# Root helper for the device password (3.6+); optional, never fails the update
+bash "$APP_DIR/scripts/install-password-helper.sh" || true
+# USB automount + IPFS store move (3.6+); optional, never fails the update
+bash "$APP_DIR/scripts/install-storage-helper.sh" || true
 
 echo "[7/7] Cleaning up..."
 status running 7 "Finishing"

@@ -45,6 +45,7 @@ SCRIPTS_DIR = Path("/opt/vernis/scripts")
 CSV_LIBRARY_DIR = Path("/opt/vernis/csv-library")
 FILES_DIR = Path("/opt/vernis/files")
 TMP_DIR = Path("/opt/vernis/tmp")  # tmpfs RAM disk (setup-tmpfs.sh), fallback to /tmp
+BACKUP_DIR = Path("/opt/vernis/backup")
 FILES_METADATA_FILE = Path("/opt/vernis/files-metadata.json")
 CONFIG_FILE = Path("/opt/vernis/device-config.json")
 GITHUB_CONFIG_FILE = Path("/opt/vernis/github-config.json")
@@ -58,6 +59,8 @@ CARDS_CACHE_FILE = Path("/opt/vernis/cards-cache.json")
 STORAGE_CONFIG_FILE = Path("/opt/vernis/storage-config.json")
 ETH_RPC_CONFIG_FILE = Path("/opt/vernis/eth-rpc-config.json")
 SETUP_COMPLETE_FILE = Path("/opt/vernis/setup-complete.json")
+# Written once the owner has set the device password (setup wizard or Settings)
+PASSWORD_MARKER_FILE = Path("/opt/vernis/password-changed.marker")
 THEME_FILE = Path("/opt/vernis/theme.json")
 
 # Art file extensions surfaced in the gallery/manage listings (incl. avif).
@@ -665,6 +668,10 @@ def _enforce_security():
     # AI Curator: /api/mcp checks its own bearer token; a phone paired by QR code
     # may use the curator's chat and voice (only those) without a PIN session.
     if request.path == "/api/mcp":
+        return None
+    # Work Mode: the owner's Mac pushes quota numbers with its own token,
+    # checked in workmode_usage(), so it works in Mode C without a PIN session.
+    if request.path == WORKMODE_PUSH_PATH and request.method == "POST":
         return None
     if request.path.startswith("/api/curator/"):
         try:
@@ -1586,7 +1593,12 @@ def download_progress():
         retry_pass = data.get('retry_pass', 0)
         retry_timeout = data.get('retry_timeout', 0)
 
+        # The downloader records whether it found the local IPFS node; check
+        # again on failures, the node may have died since.
+        ipfs_down = data.get('local_ipfs') is False or (failed_count > 0 and not _ipfs_node_online())
+
         return jsonify({
+            "ipfs_warning": IPFS_NODE_DOWN_HELP if ipfs_down else None,
             "active": active,
             "completed": completed,
             "total": total,
@@ -1647,10 +1659,8 @@ def download_report():
         output.write(f"# Generated: {datetime.now().isoformat()}\n")
         output.write(f"#\n")
         output.write(f"# Collectors can try these CIDs on alternative IPFS gateways:\n")
-        output.write(f"#   https://ipfs.io/ipfs/CID\n")
-        output.write(f"#   https://cloudflare-ipfs.com/ipfs/CID\n")
-        output.write(f"#   https://dweb.link/ipfs/CID\n")
-        output.write(f"#   https://w3s.link/ipfs/CID\n")
+        for gw in PUBLIC_IPFS_GATEWAYS:
+            output.write(f"#   {gw}/ipfs/CID\n")
         output.write(f"#\n")
 
         writer = csv_mod.writer(output)
@@ -1659,7 +1669,7 @@ def download_report():
         for cid, error in sorted(failed_data.items()):
             # Clean up CID for URL (remove nested suffixes like _13)
             base_cid = cid.split('_')[0] if '_' in cid and not cid.startswith('0x') else cid
-            ipfs_url = f"https://ipfs.io/ipfs/{base_cid}" if (base_cid.startswith('Qm') or base_cid.startswith('bafy')) else ""
+            ipfs_url = f"{PUBLIC_IPFS_GATEWAYS[0]}/ipfs/{base_cid}" if (base_cid.startswith('Qm') or base_cid.startswith('bafy')) else ""
             writer.writerow([cid, error, ipfs_url])
 
         response = app.response_class(
@@ -2754,12 +2764,7 @@ def status():
 @app.route("/api/health-check")
 def health_check():
     """Quick diagnostic: IPFS running + internet reachable"""
-    ipfs_ok = False
-    try:
-        r = subprocess.run(["ipfs", "id"], env=IPFS_ENV, capture_output=True, timeout=5)
-        ipfs_ok = r.returncode == 0
-    except:
-        pass
+    ipfs_ok = _ipfs_node_online()
     internet_ok = False
     try:
         import urllib.request
@@ -2773,14 +2778,69 @@ def health_check():
 # Auto-detect IPFS_PATH: check common locations
 def _find_ipfs_path():
     import glob
+    # vernis-api runs as the user that owns the ipfs service (install-vernis.sh)
+    own = os.path.expanduser("~/.ipfs")
+    if os.path.isdir(own):
+        return own
     for path in glob.glob("/home/*/.ipfs"):
         if os.path.isdir(path):
             return path
     if os.path.isdir("/root/.ipfs"):
         return "/root/.ipfs"
-    return "/home/afrol/.ipfs"  # fallback
+    return own
 
 IPFS_ENV = {**os.environ, "IPFS_PATH": _find_ipfs_path()}
+
+# The Pi's own IPFS node (gateway port set by install-vernis.sh). ipfs.io and
+# dweb.link stopped serving content in 2026 (HTTP 429 "switching to a service
+# worker gateway"), so the local node is the primary source and these two
+# public gateways are the only fallbacks that still answered when tested.
+LOCAL_IPFS_GATEWAY = "http://127.0.0.1:8080"
+PUBLIC_IPFS_GATEWAYS = ["https://gateway.pinata.cloud", "https://ipfs.filebase.io"]
+
+IPFS_NODE_DOWN_HELP = (
+    "The IPFS node on this Vernis is not running, so artwork comes from slower public "
+    "gateways that can fail or rate-limit. Fix: Settings > IPFS > Restart Node "
+    "(or over SSH: sudo systemctl restart ipfs), then retry any failed downloads."
+)
+
+
+def _ipfs_node_online(timeout=2):
+    """True when the local IPFS daemon answers on its gateway port.
+
+    `ipfs id` is not a liveness check: it succeeds offline, straight from the
+    repo, even when the daemon is stopped. The gateway only answers while the
+    daemon runs. bafkqaaa is the empty identity CID, served without network."""
+    try:
+        requests.get(f"{LOCAL_IPFS_GATEWAY}/ipfs/bafkqaaa", timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def _ipfs_path_of(uri):
+    """'<cid>[/path]' for ipfs:// URIs and any gateway URL (ipfs.io, SuperRare's
+    ipfs.pixura.io, ...), else None. Lets us fetch from gateways that work."""
+    if not uri:
+        return None
+    if uri.startswith('ipfs://'):
+        path = uri[7:]
+        return path[5:] if path.startswith('ipfs/') else path
+    m = re.match(r'https?://[^/]+/ipfs/(.+)', uri)
+    return m.group(1) if m else None
+
+
+def _ipfs_fetch_urls(uri):
+    """URLs to try, in order, for an ipfs://, gateway, ar:// or plain URL."""
+    path = _ipfs_path_of(uri)
+    if path:
+        urls = [f"{gw}/ipfs/{path}" for gw in [LOCAL_IPFS_GATEWAY] + PUBLIC_IPFS_GATEWAYS]
+        if uri.startswith('http') and uri not in urls:
+            urls.append(uri)  # the original gateway, last
+        return urls
+    if uri.startswith('ar://'):
+        return ['https://arweave.net/' + uri[5:]]
+    return [uri]
 
 @app.route("/api/ipfs/pin-all", methods=["POST"])
 def ipfs_pin_all():
@@ -2886,7 +2946,10 @@ def ipfs_status():
 
         status["installed"] = True
 
-        # Check if IPFS is running
+        # Check if IPFS is running (`ipfs id` alone also succeeds while stopped)
+        status["running"] = _ipfs_node_online()
+        if not status["running"]:
+            status["help"] = IPFS_NODE_DOWN_HELP
         try:
             id_result = subprocess.run(
                 ["ipfs", "id", "-f", "<id>"],
@@ -2894,7 +2957,6 @@ def ipfs_status():
                 capture_output=True, text=True, timeout=5
             )
             if id_result.returncode == 0:
-                status["running"] = True
                 status["peer_id"] = id_result.stdout.strip()
         except:
             return jsonify(status)
@@ -2935,7 +2997,19 @@ def ipfs_status():
                     if 'RepoSize' in line:
                         size_bytes = int(line.split(':')[1].strip())
                         status["repo_size"] = f"{size_bytes / (1024**2):.1f} MB"
+                        status["repo_size_bytes"] = size_bytes
         except:
+            pass
+
+        # What the settings page needs to warn before storage runs out: the
+        # IPFS limit, and free space on the drive the repo lives on.
+        status["storage_max_gb"] = _ipfs_storage_max_gb()
+        status["storage_limit_ceiling_gb"] = _ipfs_limit_ceiling_gb()
+        try:
+            du = shutil.disk_usage(IPFS_ENV["IPFS_PATH"])
+            status["disk_total_bytes"] = du.total
+            status["disk_free_bytes"] = du.free
+        except OSError:
             pass
 
         return jsonify(status)
@@ -2976,23 +3050,17 @@ def ipfs_restart():
         )
 
         if result.returncode == 0:
-            # Wait a moment for IPFS to start
-            import time
-            time.sleep(2)
-
-            # Check if it's now running
-            check = subprocess.run(
-                ["ipfs", "id"],
-                env=IPFS_ENV,
-                capture_output=True, text=True, timeout=10
-            )
-
-            if check.returncode == 0:
-                return jsonify({"success": True, "message": "IPFS node restarted successfully"})
-            else:
-                return jsonify({"success": False, "error": "IPFS restarted but not responding yet. Try refreshing in a few seconds."})
+            # The daemon takes a few seconds on a Pi before its gateway answers
+            for _ in range(10):
+                time.sleep(1)
+                if _ipfs_node_online():
+                    return jsonify({"success": True, "message": "IPFS node restarted successfully"})
+            return jsonify({"success": False, "error": "IPFS restarted but is not responding yet. Wait a minute and check again; if it stays offline, reboot the device."})
+        elif "password is required" in result.stderr:
+            return jsonify({"success": False, "error": "Vernis is not allowed to restart the IPFS service "
+                            "(its sudo rule is missing). Over SSH run: sudo systemctl restart ipfs"})
         else:
-            return jsonify({"success": False, "error": f"Failed to restart: {result.stderr[:200]}"})
+            return jsonify({"success": False, "error": f"Failed to restart: {result.stderr[:200]}. Over SSH, check: sudo systemctl status ipfs"})
 
     except subprocess.TimeoutExpired:
         return jsonify({"success": False, "error": "Restart command timed out"})
@@ -3074,7 +3142,9 @@ def _ipfs_download_workers():
 # Bounds for POST /api/ipfs/settings. The endpoint takes client input, so every
 # number is clamped: e.g. huge download_workers would stall the Pi.
 _IPFS_SETTING_BOUNDS = {
-    "storage_limit_gb": (1, 4096),
+    # Only a sanity bound on client input (1 PB). The real ceiling is the
+    # drive the IPFS store is on: see _ipfs_limit_ceiling_gb().
+    "storage_limit_gb": (1, 1_000_000),
     "smart_pin_threshold": (1, 100),
     "smart_pin_timeout": (1, 120),
     "download_timeout": (5, 600),
@@ -3126,6 +3196,20 @@ def should_pin_cid(cid, settings=None):
 
     return True, f"pinning_low_providers ({provider_count} < {threshold})", provider_count
 
+def _ipfs_limit_ceiling_gb():
+    """Highest IPFS storage limit the settings slider offers: the drive the
+    IPFS store is on (the SD card, or an external drive it was moved to),
+    minus a 15% wear-leveling reserve and, on the system drive, the OS."""
+    repo = os.path.realpath(IPFS_ENV["IPFS_PATH"])
+    try:
+        total_gb = shutil.disk_usage(repo).total / (1024**3)
+        on_system = os.stat(repo).st_dev == os.stat("/").st_dev
+    except OSError:
+        total_gb, on_system = shutil.disk_usage("/").total / (1024**3), True
+    usable = total_gb * 0.85 - (4.0 if on_system else 0)
+    return max(1, min(int(usable), _IPFS_SETTING_BOUNDS["storage_limit_gb"][1]))
+
+
 @app.route("/api/storage/recommendations")
 def storage_recommendations():
     """Get smart storage recommendations based on device capacity"""
@@ -3161,7 +3245,8 @@ def storage_recommendations():
             "available_for_nfts_gb": round(available_for_nfts, 1),
             "max_recommended_gb": round(max_recommended_gb, 1),
             "safe_limit_gb": safe_limit_gb,
-            "slider_max": min(int(max_recommended_gb), 64)  # Cap at 64GB for UI
+            # Same ceiling as the IPFS warning uses; no 64 GB cap for big SSDs
+            "slider_max": _ipfs_limit_ceiling_gb()
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -3213,6 +3298,49 @@ def ipfs_settings():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+IPFS_MOVE_STATUS_FILE = Path("/run/vernis-storage/ipfs-move-status.json")  # written by the root helper
+
+
+@app.route("/api/ipfs/location", methods=["GET", "POST"])
+def ipfs_location():
+    """Where the IPFS store lives (SD card or an external drive), and moving
+    it. The move runs as root in the storage helper: it stops the node,
+    copies and checks the store, restarts the node from the new place, and
+    only then removes the old copy (any failure puts everything back)."""
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        target = str(data.get("target", ""))
+        if target != "internal":
+            drive = next((d for d in detect_external_drives() if d["path"] == target), None)
+            if not drive:
+                return jsonify({"error": "Drive not found"}), 404
+            if not drive["can_hold_ipfs"]:
+                return jsonify({"error": f"This drive is formatted as {drive['fstype']}. The IPFS store "
+                                         "needs ext4 (or btrfs/xfs/f2fs); art files work on any format."}), 400
+        ok = _storage_helper("ipfs-move", target)
+        if ok is None:
+            return jsonify({"error": "This Vernis needs the latest update to move the IPFS store"}), 501
+        if not ok:
+            return jsonify({"error": "Could not start the move"}), 500
+        return jsonify({"success": True})
+
+    repo = os.path.realpath(IPFS_ENV["IPFS_PATH"])
+    drive = next((mp for _, mp, _ in _drive_mounts()
+                  if repo == mp or repo.startswith(mp.rstrip("/") + "/")), None)
+    status = {}
+    try:
+        status = json.loads(IPFS_MOVE_STATUS_FILE.read_text())
+    except (OSError, ValueError):
+        pass
+    return jsonify({
+        "path": repo,
+        "external": drive is not None,
+        "drive": drive,
+        "move": status,
+        "helper_installed": os.path.exists(STORAGE_HELPER),
+    })
+
 
 @app.route("/api/ipfs/gc", methods=["POST"])
 def ipfs_garbage_collection():
@@ -5712,13 +5840,7 @@ def fetch_ipfs_metadata(cid):
     """Fetch metadata JSON from IPFS"""
     import urllib.request
 
-    gateways = [
-        f"https://ipfs.io/ipfs/{cid}",
-        f"https://cloudflare-ipfs.com/ipfs/{cid}",
-        f"https://gateway.pinata.cloud/ipfs/{cid}",
-    ]
-
-    for gateway in gateways:
+    for gateway in _ipfs_fetch_urls(f"ipfs://{cid}"):
         try:
             req = urllib.request.Request(gateway, headers={"User-Agent": "Vernis/1.0"})
             with urllib.request.urlopen(req, timeout=10) as response:
@@ -6451,12 +6573,18 @@ def download_status():
         return jsonify({"error": str(e)}), 500
 
 OPENSEA_KEY_FILE = Path("/opt/vernis/opensea-key.json")
-_OPENSEA_DEFAULT_KEY = "8639ad6fa0d04b2e8ddc5e8d522d8616"
 _WALLET_CHAINS = {"ethereum", "base", "optimism", "polygon", "arbitrum", "zora", "shape"}
+
+# No built-in key: one shared key in a public repo gets revoked or exhausted
+# for everyone. Each owner brings their own free key.
+OPENSEA_KEY_HELP = ("Importing an Ethereum-family wallet needs a free OpenSea API key. "
+                    "Get one at opensea.io/settings/developer and paste it here.")
+OPENSEA_KEY_REJECTED_HELP = ("OpenSea rejected the API key (it is invalid or has expired). "
+                             "Get a new free key at opensea.io/settings/developer and paste it here.")
 
 
 def _get_opensea_key():
-    """Get OpenSea API key: user-configured > env var > built-in default."""
+    """Get OpenSea API key: user-configured > env var. Empty if neither."""
     if OPENSEA_KEY_FILE.exists():
         try:
             key = json.loads(OPENSEA_KEY_FILE.read_text()).get('key', '')
@@ -6464,8 +6592,17 @@ def _get_opensea_key():
                 return key
         except Exception:
             pass
-    env_key = os.getenv("OPENSEA_API_KEY", "")
-    return env_key if env_key else _OPENSEA_DEFAULT_KEY
+    return os.getenv("OPENSEA_API_KEY", "")
+
+
+def _opensea_key_error(rejected=False):
+    """JSON body + status for a missing or rejected key. The UI shows a key
+    field when it sees needs_opensea_key."""
+    if rejected:
+        _write_key_status(OPENSEA_KEY_REJECTED_HELP)
+    return jsonify({"success": False,
+                    "error": OPENSEA_KEY_REJECTED_HELP if rejected else OPENSEA_KEY_HELP,
+                    "needs_opensea_key": True}), 401 if rejected else 400
 
 
 OPENSEA_KEY_STATUS_FILE = Path("/opt/vernis/opensea-key-status.json")
@@ -6523,73 +6660,119 @@ _IPFS_CID_RE = re.compile(
 )
 
 
-def _resolve_nft_metadata(nfts, max_workers=6, timeout=12):
-    """Resolve IPFS metadata for NFTs to get original image/animation URLs.
+_VIDEO_EXTS = ('.mp4', '.webm', '.mov', '.m4v')
+_NOT_SHOWABLE_EXTS = ('.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.glb', '.gltf', '.usdz')
 
-    For each NFT with a metadata_url, fetches the JSON metadata and
-    extracts the original image field (preferring ipfs:// over HTTP CDN).
-    Modifies nfts in-place. Safe to call with HTTP or missing metadata_urls.
+
+def _uri_ext(uri):
+    return os.path.splitext(urlparse(uri).path)[1].lower()
+
+
+def _pick_artwork_uri(metadata):
+    """The URI of the full artwork in token metadata.
+
+    `image` is often only a still: SuperRare puts a frame grab there and the
+    original file in its own `media.uri`; video NFTs put the video in
+    `animation_url`. A non-video animation_url (HTML, often a folder CID) is
+    only used when the image isn't on IPFS, as before. Keep in sync with
+    pick_artwork_uri() in scripts/nft_downloader_advanced.py."""
+    def bare_cid(*keys):
+        # Nifty Gateway stores bare CIDs in image_hash / animation_hash
+        for k in keys:
+            v = metadata.get(k)
+            if isinstance(v, str) and _IPFS_CID_RE.fullmatch(v):
+                return 'ipfs://' + v
+        return ''
+
+    image = (bare_cid('image_hash', 'imageHash') or metadata.get('image')
+             or metadata.get('image_url') or metadata.get('image_data') or '')
+    anim = bare_cid('animation_hash', 'animationHash') or metadata.get('animation_url') or ''
+    if not isinstance(image, str):
+        image = ''
+    if not isinstance(anim, str):
+        anim = ''
+
+    media = metadata.get('media')
+    if isinstance(media, dict) and isinstance(media.get('uri'), str) and media['uri']:
+        mime = str(media.get('mimeType') or '')
+        if not mime.startswith(('audio/', 'model/')) and _uri_ext(media['uri']) not in _NOT_SHOWABLE_EXTS:
+            return media['uri']
+
+    if anim:
+        details = metadata.get('animation_details')
+        fmt = str(details.get('format') or '') if isinstance(details, dict) else ''
+        if _uri_ext(anim) in _VIDEO_EXTS or fmt.upper() in ('MP4', 'WEBM', 'MOV', 'M4V'):
+            return anim
+
+    if _ipfs_path_of(image):
+        return image
+    if _ipfs_path_of(anim) and _uri_ext(anim) not in _NOT_SHOWABLE_EXTS:
+        return anim
+    return image
+
+
+def _resolve_nft_metadata(nfts, max_workers=8, timeout=10):
+    """Resolve token metadata for NFTs to get the original artwork URL.
+
+    For each NFT with a metadata_url, fetches the JSON metadata (local IPFS
+    node first, then public gateways) and replaces the OpenSea CDN preview
+    with the original artwork. Modifies nfts in-place. Safe to call with
+    HTTP or missing metadata_urls.
     """
-    import requests as _req
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    def _to_gateway(uri):
-        if uri.startswith('ipfs://'):
-            return 'https://ipfs.io/ipfs/' + uri[7:]
-        if uri.startswith('ar://'):
-            return 'https://arweave.net/' + uri[5:]
-        return uri
+    # Gateways that refuse connections or rate-limit are skipped for the rest
+    # of the batch instead of costing a timeout per NFT.
+    dead_hosts = set()
 
-    def _is_ipfs(uri):
-        return bool(uri and (uri.startswith('ipfs://') or '/ipfs/' in uri))
+    def fetch_metadata(meta_url):
+        for url in _ipfs_fetch_urls(meta_url):
+            host = urlparse(url).netloc
+            if host in dead_hosts:
+                continue
+            try:
+                resp = requests.get(url, timeout=timeout,
+                                    headers={"Accept": "application/json"})
+            except requests.exceptions.ConnectionError:
+                dead_hosts.add(host)
+                continue
+            except Exception:
+                continue
+            if resp.status_code == 429:
+                dead_hosts.add(host)
+                continue
+            if resp.status_code != 200:
+                continue
+            try:
+                return resp.json()
+            except ValueError:
+                continue
+        return None
 
     def resolve_one(nft):
         meta_url = nft.get('metadata_url', '')
         if not meta_url:
             return
-
-        fetch_url = _to_gateway(meta_url)
         try:
-            resp = _req.get(fetch_url, timeout=timeout,
-                            headers={"Accept": "application/json"})
-            if resp.status_code != 200:
+            metadata = fetch_metadata(meta_url)
+            if not isinstance(metadata, dict):
                 return
-            metadata = resp.json()
 
-            # Extract original image — check standard and non-standard fields
-            orig_img = (metadata.get('image') or metadata.get('image_url')
-                        or metadata.get('image_data') or '')
-            orig_anim = metadata.get('animation_url') or ''
+            art = _pick_artwork_uri(metadata)
+            # Keep the OpenSea URL for on-chain (data:) art: the downloader
+            # resolves those itself, but only for rows with an http image_url.
+            if art and not art.startswith('data:') \
+                    and 'seadn.io' not in art and 'opensea' not in art:
+                nft['image_url'] = art
 
-            # Nifty Gateway uses "image_hash" for bare IPFS CID
-            img_hash = metadata.get('image_hash') or metadata.get('imageHash') or ''
-            anim_hash = metadata.get('animation_hash') or metadata.get('animationHash') or ''
-
-            # Convert bare CID hashes to ipfs:// URIs
-            if img_hash and _IPFS_CID_RE.match(img_hash):
-                orig_img = 'ipfs://' + img_hash
-            if anim_hash and _IPFS_CID_RE.match(anim_hash):
-                orig_anim = 'ipfs://' + anim_hash
-
-            # Priority: IPFS image > IPFS animation > non-CDN original
-            if _is_ipfs(orig_img):
-                nft['image_url'] = orig_img
-            elif _is_ipfs(orig_anim):
-                # Some NFTs store the actual artwork in animation_url (videos, HTML)
-                nft['image_url'] = orig_anim
-            elif orig_img and 'seadn.io' not in orig_img and 'opensea' not in orig_img:
-                # Non-CDN original — still better than OpenSea resize
-                nft['image_url'] = orig_img
-
-            # Save animation_url separately if IPFS
-            if orig_anim and _is_ipfs(orig_anim) and orig_anim != nft['image_url']:
-                nft['animation_url'] = orig_anim
+            anim = metadata.get('animation_url') or ''
+            if isinstance(anim, str) and _ipfs_path_of(anim) and anim != nft['image_url']:
+                nft['animation_url'] = anim
 
             # Extract CID from resolved image for downloader
             m = _IPFS_CID_RE.search(nft['image_url'])
             if m:
                 nft['cid'] = m.group(1)
-
         except Exception:
             pass
 
@@ -6671,7 +6854,7 @@ def opensea_key():
                         "last_error": status.get("last_error", ""),
                     })
             return jsonify({
-                "configured": False,
+                "configured": bool(os.getenv("OPENSEA_API_KEY")),
                 "exhausted": exhausted,
                 "exhausted_at": status.get("exhausted_at", ""),
                 "last_error": status.get("last_error", ""),
@@ -6721,10 +6904,10 @@ def fetch_wallet_nfts():
             chains = ['ethereum']
 
         api_key = _get_opensea_key()
+        if not api_key:
+            return _opensea_key_error()
 
-        headers = {"Accept": "application/json"}
-        if api_key:
-            headers["X-API-KEY"] = api_key
+        headers = {"Accept": "application/json", "X-API-KEY": api_key}
 
         # Collections to skip (not displayable art)
         _skip_collections = {'ens', 'unstoppable-domains', 'lens-protocol-profiles',
@@ -6749,6 +6932,8 @@ def fetch_wallet_nfts():
 
                 resp = _req.get(url, headers=headers, params=params, timeout=30)
 
+                if resp.status_code == 401:
+                    return _opensea_key_error(rejected=True)
                 if resp.status_code == 429:
                     throttled = True
                     chain_counts[chain] = {"error": "Rate limited"}
@@ -6986,43 +7171,74 @@ def run_disk_scan():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+def _library_dirs():
+    """Every folder holding library files: the active one (an external drive
+    when configured) plus internal storage, which still takes new downloads
+    while the external drive is in read-only mode."""
+    dirs = [get_active_nft_dir()]
+    if NFT_DIR not in dirs:
+        dirs.append(NFT_DIR)
+    return [d for d in dirs if d.is_dir()]
+
+
+def _backup_entries():
+    """{archive name: source path} for everything a backup holds."""
+    entries = {}
+    for d in _library_dirs():
+        for p in d.glob("*"):
+            if p.is_file():
+                entries.setdefault(f"nfts/{p.name}", p)  # first folder wins
+    for folder, src in (("csv-library", CSV_LIBRARY_DIR), ("uploads", UPLOAD_DIR)):
+        if src.exists():
+            for p in src.glob("*.csv"):
+                if p.is_file():
+                    entries[f"{folder}/{p.name}"] = p
+    return entries
+
+
+# Free space kept on top of what a backup or restore needs, so the OS,
+# logs and IPFS can still write while it runs.
+_BACKUP_SPACE_MARGIN = 512 * 1024 * 1024
+
+
+def _gb(n):
+    return f"{n / (1024**3):.1f} GB"
+
+
 @app.route("/api/backup/create", methods=["POST"])
 def create_backup():
     """Create a backup archive of all NFTs and CSV files"""
+    part_path = None
     try:
-        # Create backup directory if it doesn't exist
-        backup_dir = Path("/opt/vernis/backup")
+        backup_dir = BACKUP_DIR
         backup_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate timestamp for filename
+        entries = _backup_entries()
+
+        # The zip is written to this device's own storage first. Media barely
+        # compresses, so it needs about as much free space as the library.
+        needed = sum(p.stat().st_size for p in entries.values()) + _BACKUP_SPACE_MARGIN
+        free = shutil.disk_usage(backup_dir).free
+        if needed > free:
+            return jsonify({
+                "error": f"Not enough free space for a backup: it needs about {_gb(needed)} "
+                         f"and the device has {_gb(free)} free. Delete old backups or free up space."
+            }), 507
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_filename = f"vernis_backup_{timestamp}.zip"
         backup_path = backup_dir / backup_filename
+        # Write under a temporary name so a failed backup never shows up
+        # in the list as if it were complete.
+        part_path = backup_dir / f".{backup_filename}.part"
 
-        # Create zip file
-        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Add all NFT files
-            if NFT_DIR.exists():
-                for file_path in NFT_DIR.glob("*"):
-                    if file_path.is_file():
-                        zipf.write(file_path, f"nfts/{file_path.name}")
+        with zipfile.ZipFile(part_path, 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zipf:
+            for arcname, src in entries.items():
+                zipf.write(src, arcname)
+        os.replace(part_path, backup_path)
+        part_path = None
 
-            # Add all CSV library files
-            if CSV_LIBRARY_DIR.exists():
-                for file_path in CSV_LIBRARY_DIR.glob("*.csv"):
-                    if file_path.is_file():
-                        zipf.write(file_path, f"csv-library/{file_path.name}")
-
-            # Add all uploaded CSV files
-            if UPLOAD_DIR.exists():
-                for file_path in UPLOAD_DIR.glob("*.csv"):
-                    if file_path.is_file():
-                        zipf.write(file_path, f"uploads/{file_path.name}")
-
-        # Get file size
-        size_bytes = backup_path.stat().st_size
-        size_mb = size_bytes / (1024 * 1024)
-
+        size_mb = backup_path.stat().st_size / (1024 * 1024)
         return jsonify({
             "success": True,
             "filename": backup_filename,
@@ -7031,12 +7247,15 @@ def create_backup():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if part_path is not None:
+            Path(part_path).unlink(missing_ok=True)
 
 @app.route("/api/backup/download/<filename>")
 def download_backup(filename):
     """Download a backup file"""
     try:
-        backup_dir = Path("/opt/vernis/backup")
+        backup_dir = BACKUP_DIR
 
         # Security: prevent directory traversal
         if ".." in filename or "/" in filename or "\\" in filename:
@@ -7055,7 +7274,7 @@ def download_backup(filename):
 def list_backups():
     """List all available backup files"""
     try:
-        backup_dir = Path("/opt/vernis/backup")
+        backup_dir = BACKUP_DIR
         backups = []
 
         if backup_dir.exists():
@@ -7087,7 +7306,7 @@ def delete_backup():
         if not filename or ".." in filename or "/" in filename or "\\" in filename:
             return jsonify({"error": "Invalid filename"}), 400
 
-        backup_dir = Path("/opt/vernis/backup")
+        backup_dir = BACKUP_DIR
         backup_path = backup_dir / filename
 
         if not backup_path.exists():
@@ -7104,91 +7323,621 @@ def delete_backup():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/backup/import", methods=["POST"])
-def import_backup():
-    """Import a backup file (tar.gz) and restore its contents"""
-    try:
-        if 'file' not in request.files:
-            return jsonify({"error": "No file provided"}), 400
+# ---- Streamed backup ----------------------------------------------------
+# GET /api/backup/stream sends the library as a plain .tar built on the fly,
+# so nothing is written to the device while it runs. The layout is fixed by
+# the file list (sorted names, sizes, mtimes), so the exact size is known up
+# front and any byte range can be rebuilt: the browser shows real progress
+# and can resume an interrupted download (Range + If-Range on the ETag).
+# Art is already compressed media, so the tar is not compressed.
 
-        file = request.files['file']
-        if not file.filename:
-            return jsonify({"error": "No file selected"}), 400
+_TAR_END = b"\0" * 1024  # end-of-archive marker: two empty 512-byte blocks
+# Written as the last member of a streamed backup. Restore looks for it to
+# tell a complete download from one that stopped part-way.
+_BACKUP_MANIFEST = "vernis-backup.json"
 
-        # Validate file extension
-        if not (file.filename.endswith('.tar.gz') or file.filename.endswith('.tgz') or file.filename.endswith('.zip')):
-            return jsonify({"error": "Invalid file type. Please upload a .tar.gz or .zip backup file"}), 400
 
-        backup_dir = Path("/opt/vernis/backup")
-        backup_dir.mkdir(parents=True, exist_ok=True)
+def _backup_tar_plan():
+    """(segments, total_bytes, etag, summary) for the streamed backup.
 
-        # Save the uploaded file temporarily
-        import tempfile
-        import tarfile
-        import zipfile
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix, dir=str(TMP_DIR)) as tmp:
-            file.save(tmp.name)
-            tmp_path = tmp.name
-
+    Each segment is (bytes, None) or (path, size)."""
+    import hashlib
+    import tarfile
+    entries = _backup_entries()
+    segments, total = [], 0
+    digest = hashlib.sha256()
+    art = csv = 0
+    for arcname in sorted(entries):
+        path = entries[arcname]
         try:
-            extracted_count = 0
+            st = path.stat()
+        except OSError:
+            continue
+        info = tarfile.TarInfo(arcname)
+        info.size, info.mtime, info.mode = st.st_size, int(st.st_mtime), 0o644
+        header = info.tobuf(tarfile.PAX_FORMAT, "utf-8", "surrogateescape")
+        pad = (-st.st_size) % 512
+        segments += [(header, None), (path, st.st_size), (b"\0" * pad, None)]
+        total += len(header) + st.st_size + pad
+        digest.update(f"{arcname}\0{st.st_size}\0{info.mtime}\n".encode("utf-8", "surrogateescape"))
+        if arcname.startswith("nfts/"):
+            art += 1
+        else:
+            csv += 1
+    manifest = json.dumps({"format": "vernis-backup", "version": 1,
+                           "artworks": art, "collection_files": csv}).encode()
+    info = tarfile.TarInfo(_BACKUP_MANIFEST)
+    info.size, info.mode = len(manifest), 0o644
+    header = info.tobuf(tarfile.PAX_FORMAT, "utf-8", "surrogateescape")
+    tail = header + manifest + b"\0" * ((-len(manifest)) % 512) + _TAR_END
+    segments.append((tail, None))
+    total += len(tail)
+    summary = {"artworks": art, "collection_files": csv, "bytes": total}
+    return segments, total, digest.hexdigest()[:32], summary
 
-            if file.filename.endswith('.zip'):
-                # Handle zip files
-                with zipfile.ZipFile(tmp_path, 'r') as zf:
-                    # Extract NFT files
-                    for name in zf.namelist():
-                        if name.startswith('nfts/') and not name.endswith('/'):
-                            # Extract to NFT directory
-                            basename = Path(name).name
-                            if not basename or basename.startswith('.'):
-                                continue
-                            dest = NFT_DIR / basename
-                            with zf.open(name) as src, open(dest, 'wb') as dst:
-                                dst.write(src.read())
-                            extracted_count += 1
-                        elif name.startswith('csv/') and not name.endswith('/'):
-                            # Extract to CSV library
-                            basename = Path(name).name
-                            if not basename or basename.startswith('.'):
-                                continue
-                            dest = CSV_LIBRARY_DIR / basename
-                            with zf.open(name) as src, open(dest, 'wb') as dst:
-                                dst.write(src.read())
-            else:
-                # Handle tar.gz files
-                with tarfile.open(tmp_path, 'r:gz') as tf:
-                    for member in tf.getmembers():
-                        if member.isfile():
-                            if member.name.startswith('nfts/'):
-                                basename = Path(member.name).name
-                                if not basename or basename.startswith('.'):
-                                    continue
-                                dest = NFT_DIR / basename
-                                with tf.extractfile(member) as src:
-                                    with open(dest, 'wb') as dst:
-                                        dst.write(src.read())
-                                extracted_count += 1
-                            elif member.name.startswith('csv/'):
-                                basename = Path(member.name).name
-                                if not basename or basename.startswith('.'):
-                                    continue
-                                dest = CSV_LIBRARY_DIR / basename
-                                with tf.extractfile(member) as src:
-                                    with open(dest, 'wb') as dst:
-                                        dst.write(src.read())
 
-            return jsonify({
-                "success": True,
-                "message": f"Restored {extracted_count} files from backup"
-            })
-        finally:
-            # Clean up temp file
-            Path(tmp_path).unlink(missing_ok=True)
+def _stream_tar_range(segments, start, stop):
+    """Yield bytes [start, stop) of the archive described by `segments`."""
+    pos = 0
+    for data, size in segments:
+        seg_len = len(data) if size is None else size
+        seg_start, seg_end = pos, pos + seg_len
+        pos = seg_end
+        if seg_end <= start:
+            continue
+        if seg_start >= stop:
+            break
+        lo, hi = max(start, seg_start) - seg_start, min(stop, seg_end) - seg_start
+        if size is None:
+            yield data[lo:hi]
+            continue
+        # A file that changed since the plan was made is cut or zero-padded
+        # to its planned size, so the archive around it stays valid.
+        remaining = hi - lo
+        try:
+            with open(data, "rb") as f:
+                f.seek(lo)
+                while remaining > 0:
+                    chunk = f.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+        except OSError:
+            pass
+        while remaining > 0:
+            n = min(1024 * 1024, remaining)
+            remaining -= n
+            yield b"\0" * n
 
+
+@app.route("/api/backup/stream/info")
+def backup_stream_info():
+    """What a streamed backup will hold, for the settings page to show first."""
+    try:
+        _, _, _, summary = _backup_tar_plan()
+        return jsonify(summary)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/backup/stream")
+def backup_stream():
+    """Download the whole library as one .tar, with Range/resume support."""
+    segments, total, etag, _ = _backup_tar_plan()
+    start, stop, status = 0, total, 200
+    rng = request.range
+    if rng is not None:
+        if_range = request.if_range
+        # Resume only if the library is unchanged; otherwise send it all again.
+        if if_range.date is None and (if_range.etag is None or if_range.etag == etag):
+            span = rng.range_for_length(total)
+            if span is None:
+                return Response(status=416, headers={"Content-Range": f"bytes */{total}"})
+            start, stop = span
+            status = 206
+    host = re.sub(r"[^A-Za-z0-9-]", "", socket.gethostname()) or "vernis"
+    name = f"vernis-backup-{host}-{datetime.now().strftime('%Y-%m-%d')}.tar"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{name}"',
+        "Content-Length": str(stop - start),
+        "Accept-Ranges": "bytes",
+        "ETag": f'"{etag}"',
+        "Cache-Control": "private, no-transform",
+    }
+    if status == 206:
+        headers["Content-Range"] = f"bytes {start}-{stop - 1}/{total}"
+    return Response(_stream_tar_range(segments, start, stop), status=status,
+                    headers=headers, mimetype="application/x-tar",
+                    direct_passthrough=True)
+
+
+# ---- Restore -------------------------------------------------------------
+
+# Archive folder -> where its files are restored. "csv/" is what older
+# releases looked for; Vernis backups have always written "csv-library/".
+_RESTORE_FOLDERS = {"nfts": None, "csv-library": "csv", "csv": "csv", "uploads": "uploads"}
+_BACKUP_TYPES = (".tar", ".zip", ".tar.gz", ".tgz")
+
+
+def _restore_target(name, nft_dir):
+    """Destination path for one archive member, or None to skip it."""
+    parts = [p for p in name.replace("\\", "/").split("/") if p]
+    if len(parts) < 2 or parts[0] not in _RESTORE_FOLDERS:
+        return None
+    base = parts[-1]
+    if base.startswith("."):
+        return None
+    kind = _RESTORE_FOLDERS[parts[0]]
+    if kind is None:
+        return nft_dir / base
+    if not base.lower().endswith(".csv"):
+        return None
+    return (CSV_LIBRARY_DIR if kind == "csv" else UPLOAD_DIR) / base
+
+
+def _restore_file(src, dest, size):
+    """Stream one file into place (never whole-file in RAM: a video can be
+    larger than a small Pi's memory). Returns False when an identical-size
+    copy is already there, so re-running an interrupted restore is quick."""
+    try:
+        if dest.stat().st_size == size:
+            return False
+    except OSError:
+        pass
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(f".{dest.name}.restore")
+    try:
+        with open(tmp, "wb") as out:
+            shutil.copyfileobj(src, out, 1024 * 1024)
+            written = out.tell()
+        if written != size:
+            raise ValueError(_INCOMPLETE_BACKUP)
+        os.replace(tmp, dest)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return True
+
+
+_INCOMPLETE_BACKUP = ("This backup file is incomplete: the download probably stopped before "
+                      "the end. Resume it in your browser's downloads, then restore again. "
+                      "Files restored so far are kept.")
+
+
+def _restore_space_error(size, filename, nft_dir, uploaded=True):
+    """Error text when the library drive can't take this restore, else None.
+    A .tar is unpacked while it uploads; other uploads are saved first."""
+    factor = 2 if uploaded and not filename.lower().endswith(".tar") else 1
+    needed = factor * size + _BACKUP_SPACE_MARGIN
+    free = shutil.disk_usage(nft_dir).free
+    if needed > free:
+        return (f"Not enough free space to restore this backup: it needs about {_gb(needed)} "
+                f"and the library drive has {_gb(free)} free. Add an external drive in "
+                f"Settings → Storage, or restore onto a bigger SD card or SSD.")
+    return None
+
+
+class _BodyReader(io.RawIOBase):
+    """Exactly `length` bytes of the request body, read in place.
+
+    Reading wsgi.input directly skips MAX_CONTENT_LENGTH (a library backup is
+    many GB) and multipart parsing (which would spool it all to /tmp)."""
+
+    def __init__(self, stream, length):
+        self._stream, self._left = stream, length
+
+    def readable(self):
+        return True
+
+    def readinto(self, buf):
+        if self._left <= 0:
+            return 0
+        data = self._stream.read(min(len(buf), self._left))
+        if not data:
+            raise ValueError("Upload was interrupted. Please try again.")
+        n = len(data)
+        buf[:n] = data
+        self._left -= n
+        return n
+
+
+@app.route("/api/backup/import/check")
+def backup_import_check():
+    """Space check before an upload starts, so a refusal can be shown
+    instead of failing part-way through a multi-GB upload."""
+    try:
+        size = int(request.args.get("size", "0"))
+    except ValueError:
+        return jsonify({"error": "size must be a number"}), 400
+    name = request.args.get("name", "")
+    if not name.lower().endswith(_BACKUP_TYPES):
+        return jsonify({"ok": False, "error": "Choose a Vernis backup file (.tar, .zip or .tar.gz)"})
+    nft_dir = get_active_nft_dir(for_writing=True)
+    nft_dir.mkdir(parents=True, exist_ok=True)
+    err = _restore_space_error(size, name, nft_dir)
+    return jsonify({"ok": err is None, "error": err})
+
+
+class _RestoreError(Exception):
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.status = status
+
+
+class _CountingReader(io.RawIOBase):
+    """Wraps a file to count bytes read (restore progress)."""
+
+    def __init__(self, f, on_read):
+        self._f, self._on_read = f, on_read
+
+    def readable(self):
+        return True
+
+    def readinto(self, buf):
+        data = self._f.read(len(buf))
+        n = len(data)
+        buf[:n] = data
+        if n:
+            self._on_read(n)
+        return n
+
+
+def _restore_archive(body, filename, nft_dir, counts, path=None):
+    """Restore one backup into the library, filling `counts`
+    ({"art", "csv", "unchanged", "art_files": [...]}).
+
+    `body` is the archive as a stream; `path`, when given, is the same
+    archive on disk (a backup on a USB drive), so a .zip is read in place
+    instead of being copied first. Raises _RestoreError."""
+    import tarfile
+    lower = filename.lower()
+
+    def restore(src, name, member_size):
+        dest = _restore_target(name, nft_dir)
+        if dest is None:
+            return
+        if not _restore_file(src, dest, member_size):
+            counts["unchanged"] += 1
+        elif dest.parent == nft_dir:
+            counts["art"] += 1
+            counts["art_files"].append(dest.name)
+        else:
+            counts["csv"] += 1
+
+    # A .zip needs random access; an upload is saved first, on the library's
+    # own drive (not the RAM-backed TMP_DIR).
+    tmp_path = nft_dir.parent / f".vernis-restore-{os.getpid()}-{threading.get_ident()}.part"
+    try:
+        if lower.endswith(".tar"):
+            complete = seen = False
+            try:
+                with tarfile.open(fileobj=body, mode="r|") as tf:
+                    for member in tf:
+                        seen = True
+                        if member.name == _BACKUP_MANIFEST:
+                            complete = True
+                        elif member.isfile():
+                            restore(tf.extractfile(member), member.name, member.size)
+            except (tarfile.TarError, EOFError):
+                if not seen:
+                    raise
+            if not complete:
+                raise _RestoreError(_INCOMPLETE_BACKUP)
+        else:
+            if path is None:
+                with open(tmp_path, "wb") as out:
+                    shutil.copyfileobj(body, out, 1024 * 1024)
+                path = tmp_path
+            if lower.endswith(".zip"):
+                with zipfile.ZipFile(path) as zf:
+                    for info in zf.infolist():
+                        if not info.is_dir():
+                            with zf.open(info) as src:
+                                restore(src, info.filename, info.file_size)
+            else:
+                with tarfile.open(path, "r:gz") as tf:
+                    for member in tf:
+                        if member.isfile():
+                            restore(tf.extractfile(member), member.name, member.size)
+        if not (counts["art"] or counts["csv"] or counts["unchanged"]):
+            raise _RestoreError("No Vernis files found in this backup")
+    except _RestoreError:
+        raise
+    except ValueError as e:
+        raise _RestoreError(str(e))
+    except (zipfile.BadZipFile, tarfile.TarError, EOFError):
+        raise _RestoreError("This file is not a readable Vernis backup")
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+def _new_restore_counts():
+    return {"art": 0, "csv": 0, "unchanged": 0, "art_files": []}
+
+
+def _restore_message(counts):
+    msg = f"Restored {counts['art']} artworks and {counts['csv']} collection files"
+    if counts["unchanged"]:
+        msg += f" ({counts['unchanged']} were already here)"
+    return msg
+
+
+# ---- Re-pin after restore --------------------------------------------------
+# The backup holds the art files, not the IPFS store. Files named by their CID
+# are added back to the local node; when `ipfs add` reproduces the original
+# CID (most single-file art does) this works offline. Otherwise the CID is
+# pinned from the network, which needs internet.
+_CID_NAME_RE = re.compile(r"^(Qm[1-9A-HJ-NP-Za-km-z]{44}|baf[a-z2-7]{50,})")
+_repin_state = {"running": False, "total": 0, "done": 0, "pinned": 0, "failed": 0}
+_repin_lock = threading.Lock()
+
+
+def _repin_file(path):
+    """Pin one restored art file under its original CID. True when pinned."""
+    m = _CID_NAME_RE.match(path.name)
+    if not m:
+        return False
+    cid = m.group(1)
+    for opts in (["--cid-version=0"], ["--cid-version=1"]):
+        try:
+            r = subprocess.run(["ipfs", "add", "-Q", "--only-hash", *opts, str(path)],
+                               env=IPFS_ENV, capture_output=True, text=True, timeout=300)
+            if r.returncode == 0 and r.stdout.strip() == cid:
+                r = subprocess.run(["ipfs", "add", "-Q", "--pin", *opts, str(path)],
+                                   env=IPFS_ENV, capture_output=True, text=True, timeout=600)
+                return r.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            return False
+    try:  # different chunking than the original upload: fetch by CID
+        r = subprocess.run(["ipfs", "pin", "add", cid], env=IPFS_ENV,
+                           capture_output=True, text=True, timeout=120)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _start_repin(nft_dir, names):
+    """Pin restored art in the background, if auto-pin is on and the node runs."""
+    names = [n for n in names if _CID_NAME_RE.match(n)]
+    if not names or get_ipfs_settings().get("auto_pin") is False or not _ipfs_node_online():
+        return False
+    with _repin_lock:
+        if _repin_state["running"]:
+            return False
+        _repin_state.update(running=True, total=len(names), done=0, pinned=0, failed=0)
+
+    def run():
+        try:
+            for name in names:
+                ok = _repin_file(nft_dir / name)
+                with _repin_lock:
+                    _repin_state["done"] += 1
+                    _repin_state["pinned" if ok else "failed"] += 1
+        finally:
+            with _repin_lock:
+                _repin_state["running"] = False
+    threading.Thread(target=run, daemon=True).start()
+    return True
+
+
+# ---- Backups on USB drives -------------------------------------------------
+_BACKUP_NAME_RE = re.compile(r"^vernis[-_]backup.*\.(tar|zip|tar\.gz|tgz)$", re.I)
+_restore_job = {"state": "idle"}
+_restore_job_lock = threading.Lock()
+
+
+def _local_backups():
+    """Vernis backups on mounted drives: top level or one folder deep."""
+    found = []
+    for _, mp, _ in _drive_mounts():
+        base = Path(mp)
+        try:
+            candidates = list(base.iterdir())
+            for d in candidates:
+                if d.is_dir() and not d.name.startswith(".") and d.name != "vernis-nfts":
+                    try:
+                        candidates += list(d.iterdir())
+                    except OSError:
+                        pass
+        except OSError:
+            continue
+        for p in candidates:
+            try:
+                if p.is_file() and _BACKUP_NAME_RE.match(p.name):
+                    st = p.stat()
+                    found.append({"path": str(p), "name": p.name, "drive": base.name,
+                                  "bytes": st.st_size,
+                                  "modified": datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M")})
+            except OSError:
+                pass
+    found.sort(key=lambda b: b["modified"], reverse=True)
+    return found
+
+
+# ---- Backup onto a USB drive -----------------------------------------------
+# Same archive as the streamed download, written by the Vernis itself onto a
+# drive plugged into it: no phone or computer has to stay connected, and no
+# internet is involved.
+_drive_backup_job = {"state": "idle"}
+_drive_backup_lock = threading.Lock()
+_FAT32_MAX_FILE = 4 * 1024**3 - 1
+
+
+def _write_drive_backup(segments, total, dest_dir, name):
+    """Write the archive to dest_dir/name via a .part file, synced to disk
+    before it gets its final name, so a half-written backup never looks done."""
+    part = dest_dir / f".{name}.part"
+    try:
+        with open(part, "wb") as out:
+            for chunk in _stream_tar_range(segments, 0, total):
+                out.write(chunk)
+                _drive_backup_job["written"] += len(chunk)
+            out.flush()
+            os.fsync(out.fileno())
+        if part.stat().st_size != total:
+            raise OSError("the file on the drive is not the expected size")
+        final = dest_dir / name
+        os.replace(part, final)
+        fd = os.open(dest_dir, os.O_RDONLY)  # make the rename itself durable
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        return final
+    finally:
+        part.unlink(missing_ok=True)
+
+
+@app.route("/api/backup/drive", methods=["POST"])
+def backup_to_drive():
+    """Save the full backup onto a USB drive plugged into this Vernis."""
+    data = request.get_json(silent=True) or {}
+    drive = next((d for d in detect_external_drives() if d["path"] == str(data.get("path", ""))), None)
+    if not drive:
+        return jsonify({"error": "Drive not found. Plug it into the Vernis and try again."}), 404
+    segments, total, _, summary = _backup_tar_plan()
+    if drive["fstype"] == "vfat" and total > _FAT32_MAX_FILE:
+        return jsonify({"error": f"This drive is formatted as FAT32, which can't hold a file over "
+                                 f"4 GB, and this backup is {_gb(total)}. Use a drive formatted "
+                                 f"as exFAT, NTFS or ext4."}), 400
+    free = shutil.disk_usage(drive["path"]).free
+    if total + _BACKUP_SPACE_MARGIN > free:
+        return jsonify({"error": f"Not enough space on {drive['name']}: the backup is {_gb(total)} "
+                                 f"and the drive has {_gb(free)} free."}), 507
+    dest_dir = Path(drive["path"]) / "vernis-backups"
+    try:
+        dest_dir.mkdir(exist_ok=True)
+    except OSError:
+        _storage_helper("prepare-backups", drive["path"])  # root-owned ext4 drive
+    if not (dest_dir.is_dir() and os.access(dest_dir, os.W_OK)):
+        return jsonify({"error": f"Vernis can't write to {drive['name']}"}), 400
+
+    with _drive_backup_lock:
+        if _drive_backup_job.get("state") == "running":
+            return jsonify({"error": "A backup is already being saved"}), 409
+        _drive_backup_job.clear()
+        _drive_backup_job.update(state="running", drive=drive["name"], bytes=total, written=0)
+    host = re.sub(r"[^A-Za-z0-9-]", "", socket.gethostname()) or "vernis"
+    name = f"vernis-backup-{host}-{datetime.now().strftime('%Y-%m-%d-%H%M')}.tar"
+
+    def run():
+        try:
+            final = _write_drive_backup(segments, total, dest_dir, name)
+            _drive_backup_job.update(state="done", file=str(final), name=name, **summary)
+        except Exception as e:
+            _drive_backup_job.update(state="error", error=f"Saving the backup failed: {e}")
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({"success": True, "name": name, "bytes": total})
+
+
+@app.route("/api/backup/drive/status")
+def backup_to_drive_status():
+    return jsonify(dict(_drive_backup_job))
+
+
+@app.route("/api/backup/local")
+def backup_local_list():
+    """Backups found on USB drives plugged into this Vernis."""
+    return jsonify({"backups": _local_backups()})
+
+
+@app.route("/api/backup/local/restore", methods=["POST"])
+def backup_local_restore():
+    """Restore a backup straight from a USB drive, in the background. Nothing
+    is uploaded, so it works without a network and at disk speed."""
+    data = request.get_json(silent=True) or {}
+    wanted = str(data.get("path", ""))
+    # Only a file the listing offered: the path comes from the client.
+    match = next((b for b in _local_backups() if b["path"] == wanted), None)
+    if not match:
+        return jsonify({"error": "Backup not found on a connected drive"}), 404
+    nft_dir = get_active_nft_dir(for_writing=True)
+    nft_dir.mkdir(parents=True, exist_ok=True)
+    err = _restore_space_error(match["bytes"], match["name"], nft_dir, uploaded=False)
+    if err:
+        return jsonify({"error": err}), 507
+    with _restore_job_lock:
+        if _restore_job.get("state") == "running":
+            return jsonify({"error": "A restore is already running"}), 409
+        _restore_job.clear()
+        _restore_job.update(state="running", name=match["name"], bytes=match["bytes"], read=0)
+
+    def progress(n):
+        _restore_job["read"] += n
+
+    def run():
+        counts = _new_restore_counts()
+        try:
+            with open(match["path"], "rb") as f:
+                body = _CountingReader(f, progress)
+                _restore_archive(body, match["name"], nft_dir, counts,
+                                 path=None if match["name"].lower().endswith(".tar") else match["path"])
+            repin = _start_repin(nft_dir, counts["art_files"])
+            _restore_job.update(state="done", message=_restore_message(counts),
+                                restored_art=counts["art"], restored_csv=counts["csv"],
+                                unchanged=counts["unchanged"], repinning=repin)
+        except _RestoreError as e:
+            _restore_job.update(state="error", error=str(e), restored_art=counts["art"])
+        except Exception as e:
+            _restore_job.update(state="error", error=str(e))
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({"success": True})
+
+
+@app.route("/api/backup/restore-status")
+def backup_restore_status():
+    """Progress of a USB-drive restore and of re-pinning restored art."""
+    with _repin_lock:
+        repin = dict(_repin_state)
+    return jsonify({**_restore_job, "repin": repin})
+
+
+@app.route("/api/backup/import", methods=["POST"])
+def import_backup():
+    """Restore an uploaded Vernis backup (.tar, .zip, or .tar.gz).
+
+    The settings page sends the file as the raw request body; a .tar is
+    unpacked as it arrives, so it needs no extra space for the archive.
+    Multipart uploads still work for small files."""
+    from urllib.parse import unquote
+    nft_dir = get_active_nft_dir(for_writing=True)
+    nft_dir.mkdir(parents=True, exist_ok=True)
+
+    if request.mimetype == "multipart/form-data":
+        file = request.files.get("file")
+        if not file or not file.filename:
+            return jsonify({"error": "No file provided"}), 400
+        filename, body, size = file.filename, file.stream, None
+    else:
+        filename = unquote(request.headers.get("X-Backup-Filename", ""))
+        size = request.content_length
+        if not size:
+            return jsonify({"error": "No file provided"}), 400
+        body = _BodyReader(request.environ["wsgi.input"], size)
+
+    if not filename.lower().endswith(_BACKUP_TYPES):
+        return jsonify({"error": "Invalid file type. Please upload a .tar, .zip or .tar.gz backup file"}), 400
+    if size:
+        err = _restore_space_error(size, filename, nft_dir)
+        if err:
+            return jsonify({"error": err}), 507
+
+    counts = _new_restore_counts()
+    try:
+        _restore_archive(body, filename, nft_dir, counts)
+    except _RestoreError as e:
+        return jsonify({"error": str(e), "restored_art": counts["art"]}), e.status
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    repin = _start_repin(nft_dir, counts["art_files"])
+    return jsonify({
+        "success": True,
+        "restored_art": counts["art"],
+        "restored_csv": counts["csv"],
+        "unchanged": counts["unchanged"],
+        "repinning": repin,
+        "message": _restore_message(counts),
+    })
 
 
 # ========================================
@@ -7224,7 +7973,7 @@ def setup_status():
             pass
 
         # Check if password has been changed
-        password_changed = Path("/opt/vernis/password-changed.marker").exists()
+        password_changed = PASSWORD_MARKER_FILE.exists()
 
         # Check for art across internal AND active external storage.
         # Compute the external dir WITHOUT calling get_active_nft_dir(): that
@@ -7283,9 +8032,180 @@ def setup_status():
         return jsonify({"error": str(e)}), 500
 
 
+# --- Setup pairing --------------------------------------------------------
+# The first device password may be set without knowing the old one (a new
+# owner never chose it). Without a check, anyone on the same Wi-Fi could claim
+# the frame that way. Pairing proves the person can see the frame: its own
+# screen shows a QR code (one-time link) and a 6-digit code; the phone sends
+# either back and gets a short-lived setup session.
+PAIR_CODE_TTL = 600         # code + link rotate every 10 minutes
+PAIR_SESSION_TTL = 1800     # a paired phone has 30 minutes to finish
+PAIR_REQUEST_TTL = 600      # the gallery shows the code while a phone asks
+PAIR_ROTATE_AFTER_FAILS = 3  # any 3 wrong codes (from anyone) → new code
+_pair_lock = threading.Lock()
+_pair = {"code": None, "token": None, "expires": 0, "requested": 0, "fails": 0}
+_pair_sessions = {}         # session token -> expiry
+
+
+def _is_kiosk_request():
+    return request.remote_addr in ("127.0.0.1", "::1")
+
+
+def _rotate_pairing_locked():
+    _pair.update(code=f"{_secrets.randbelow(10**6):06d}", token=_secrets.token_urlsafe(12),  # short: a less dense QR
+                 expires=time.time() + PAIR_CODE_TTL, fails=0)
+
+
+def _current_pairing():
+    with _pair_lock:
+        if not _pair["code"] or time.time() >= _pair["expires"]:
+            _rotate_pairing_locked()
+        return dict(_pair)
+
+
+def _setup_session_valid():
+    sid = request.headers.get("X-Vernis-Setup-Session", "")
+    with _pair_lock:
+        exp = _pair_sessions.get(sid)
+        return bool(sid) and exp is not None and exp > time.time()
+
+
+@app.route("/api/setup/pairing")
+def setup_pairing():
+    """Code + link for the frame's own screen. Kiosk only: a phone must never
+    be able to read it, or pairing would prove nothing."""
+    if not _is_kiosk_request():
+        return jsonify({"error": "Only the frame's own screen can show the setup code"}), 403
+    if SETUP_COMPLETE_FILE.exists():
+        return jsonify({"active": False})
+    p = _current_pairing()
+    ip = get_primary_ip()
+    base = f"http://{ip}" if ip else f"http://{platform.node()}.local"
+    return jsonify({
+        "active": True,
+        "code": p["code"],
+        "url": f"{base}/welcome.html?pair={p['token']}",
+        "address": base.replace("http://", ""),
+        "requested": time.time() - p["requested"] < PAIR_REQUEST_TTL,
+    })
+
+
+@app.route("/api/setup/pairing/qr")
+def setup_pairing_qr():
+    """Plain QR of the one-time setup link, for the frame's own screen. Plain
+    square modules, no logo: this one must scan on the first try."""
+    if not _is_kiosk_request():
+        return jsonify({"error": "Only the frame's own screen can show the setup code"}), 403
+    if SETUP_COMPLETE_FILE.exists():
+        return jsonify({"error": "Setup is finished"}), 404
+    import qrcode
+    p = _current_pairing()
+    ip = get_primary_ip()
+    base = f"http://{ip}" if ip else f"http://{platform.node()}.local"
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
+    qr.add_data(f"{base}/welcome.html?pair={p['token']}")
+    qr.make(fit=True)
+    buf = io.BytesIO()
+    qr.make_image(fill_color="black", back_color="white").save(buf, format="PNG")
+    buf.seek(0)
+    resp = send_file(buf, mimetype="image/png")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.route("/api/setup/pairing/request", methods=["POST"])
+def setup_pairing_request():
+    """A phone opened the wizard: ask the frame to show its code, also when
+    it is showing the gallery rather than the home screen."""
+    with _pair_lock:
+        _pair["requested"] = time.time()
+    return jsonify({"success": True})
+
+
+@app.route("/api/setup/pair", methods=["POST"])
+def setup_pair():
+    """Exchange the code (or the QR link's token) for a setup session."""
+    ip = request.remote_addr or "?"
+    wait = cooldown_remaining(ip)
+    if wait > 0:
+        return jsonify({"error": f"Too many wrong codes. Try again in {wait} seconds.",
+                        "retry_after": wait}), 429
+    data = request.json or {}
+    code = re.sub(r"\D", "", str(data.get("code", "")))
+    token = str(data.get("token", ""))
+    p = _current_pairing()
+    ok = (code and _secrets.compare_digest(code, p["code"])) or \
+         (token and _secrets.compare_digest(token, p["token"]))
+    if not ok:
+        record_failure(ip)
+        with _pair_lock:
+            _pair["fails"] += 1
+            if _pair["fails"] >= PAIR_ROTATE_AFTER_FAILS:
+                _rotate_pairing_locked()
+        append_audit("setup_pair", result="fail", ip=ip)
+        return jsonify({"error": "That code doesn't match. Check the numbers on your frame's screen."}), 403
+    clear_failures(ip)
+    sid = _secrets.token_urlsafe(24)
+    with _pair_lock:
+        now = time.time()
+        for k in [k for k, exp in _pair_sessions.items() if exp <= now]:
+            del _pair_sessions[k]
+        _pair_sessions[sid] = now + PAIR_SESSION_TTL
+        _pair["requested"] = 0
+        _rotate_pairing_locked()  # each code and link works once
+    append_audit("setup_pair", result="ok", ip=ip)
+    return jsonify({"success": True, "session": sid})
+
+
+# vernis-api runs as the owner's own (non-root) account, which can neither read
+# /etc/shadow nor run chpasswd. This root helper, allowed by one sudo rule,
+# does both - only ever for that account (scripts/vernis-device-password.py).
+DEVICE_PASSWORD_HELPER = "/usr/local/sbin/vernis-device-password"
+
+
+def _device_password(action, password):
+    """'check' or 'set' the owner's Linux password. True/False, or None when
+    this device cannot do it (helper not installed yet and not running as root)."""
+    if os.path.exists(DEVICE_PASSWORD_HELPER):
+        cmd, env = ["sudo", "-n", DEVICE_PASSWORD_HELPER, action], None
+    elif os.geteuid() == 0:
+        # Older installs run vernis-api as root: run the helper directly
+        cmd = [sys.executable, str(SCRIPTS_DIR / "vernis-device-password.py"), action]
+        env = {**os.environ, "SUDO_USER": _login_username()}
+    else:
+        return None
+    try:
+        r = subprocess.run(cmd, input=password + "\n", capture_output=True, text=True,
+                           timeout=15, env=env)
+    except Exception as e:
+        print(f"[setup] password helper error: {e}", flush=True)
+        return None
+    if r.returncode in (0, 1):
+        return r.returncode == 0
+    print(f"[setup] password helper failed ({r.returncode}): {r.stderr.strip()[:200]}", flush=True)
+    return None
+
+
+def _login_username():
+    """The owner's login account (the one vernis-api runs as, or for an old
+    root install the first regular user)."""
+    import pwd
+    name = pwd.getpwuid(os.getuid()).pw_name
+    if name != "root":
+        return name
+    for u in pwd.getpwall():
+        if 1000 <= u.pw_uid < 65534 and u.pw_shell not in ("/usr/sbin/nologin", "/bin/false"):
+            return u.pw_name
+    return ""
+
+
 @app.route("/api/setup/change-password", methods=["POST"])
 def setup_change_password():
-    """Change the Linux user password."""
+    """Change the owner's Linux password.
+
+    Needs the current password - except the very first time (no marker yet),
+    when a phone paired with the frame's screen, or the frame itself, may set
+    one without it."""
     try:
         data = request.json or {}
         new_password = data.get('password', '')
@@ -7293,56 +8213,36 @@ def setup_change_password():
 
         if not new_password or len(new_password) < 8:
             return jsonify({"error": "Password must be at least 8 characters"}), 400
-        if len(new_password) > 128:
+        if len(new_password) > 128 or "\n" in new_password:
             return jsonify({"error": "Password too long"}), 400
 
-        # Get the actual login user (not root, which runs the service)
-        try:
-            username = os.getlogin()
-        except OSError:
-            username = os.environ.get("SUDO_USER", "")
-        if not username or username == "root":
-            # Read from hostname-based convention or /etc/hostname
-            import pwd
-            for u in pwd.getpwall():
-                if u.pw_uid >= 1000 and u.pw_uid < 65534 and u.pw_shell not in ("/usr/sbin/nologin", "/bin/false"):
-                    username = u.pw_name
-                    break
+        marker = PASSWORD_MARKER_FILE
+        first_time = not marker.exists()
+        ip = request.remote_addr or "?"
 
-        # If password was already changed before, require current password
-        marker = Path("/opt/vernis/password-changed.marker")
-        if marker.exists():
-            if not current_password:
-                return jsonify({"error": "Current password required", "needs_current": True}), 400
-            # Verify current password via /etc/shadow + libc crypt (runs as root)
-            _pw_ok = False
-            try:
-                import ctypes, ctypes.util
-                _libcrypt = ctypes.CDLL(ctypes.util.find_library("crypt") or "libcrypt.so.1")
-                _libcrypt.crypt.restype = ctypes.c_char_p
-                stored_hash = None
-                with open("/etc/shadow") as sf:
-                    for line in sf:
-                        parts = line.strip().split(":")
-                        if parts[0] == username and len(parts) > 1:
-                            stored_hash = parts[1]
-                            break
-                if not stored_hash or stored_hash in ("*", "!", "!!", "x"):
-                    _pw_ok = True  # No password set
-                else:
-                    computed = _libcrypt.crypt(current_password.encode(), stored_hash.encode())
-                    _pw_ok = computed is not None and computed.decode() == stored_hash
-            except Exception as e:
-                print(f"[setup] Password verify error: {e}", flush=True)
-            if not _pw_ok:
+        if current_password:
+            wait = cooldown_remaining(ip)
+            if wait > 0:
+                return jsonify({"error": f"Too many attempts. Try again in {wait} seconds.",
+                                "retry_after": wait}), 429
+            owner_hash = load_security_config().get("owner_pwd_hash") if SECURITY_CONFIG_FILE.exists() else None
+            if not (verify_owner_password(current_password, owner_hash)
+                    or _device_password("check", current_password)):
+                record_failure(ip)
                 return jsonify({"error": "Wrong password"}), 403
+            clear_failures(ip)
+        elif not (first_time and (_setup_session_valid() or _is_kiosk_request())):
+            if first_time:
+                return jsonify({"error": "Enter the 6-digit code shown on your Vernis screen, "
+                                         "or your current device password.",
+                                "needs_pairing": True, "needs_current": True}), 400
+            return jsonify({"error": "Current password required", "needs_current": True}), 400
 
-        process = subprocess.run(
-            ["chpasswd"],
-            input=f"{username}:{new_password}",
-            capture_output=True, text=True, timeout=10
-        )
-        if process.returncode != 0:
+        changed = _device_password("set", new_password)
+        if changed is None:
+            return jsonify({"error": "This Vernis can't change its password from here yet. "
+                                     "Install the latest update, or over SSH run: passwd"}), 500
+        if not changed:
             return jsonify({"error": "Failed to change password"}), 500
 
         # Keep recovery hash in sync with the new device password.
@@ -7351,6 +8251,10 @@ def setup_change_password():
         # Write marker
         marker.touch()
         os.chmod(str(marker), 0o600)
+
+        sid = request.headers.get("X-Vernis-Setup-Session", "")
+        with _pair_lock:
+            _pair_sessions.pop(sid, None)
 
         return jsonify({"success": True})
     except Exception as e:
@@ -7397,7 +8301,8 @@ def _fetch_opensea_wallet_nfts(wallet, chains, api_key):
                 break
             if resp.status_code in (429, 401, 403):
                 throttled = True
-                err = f"HTTP {resp.status_code} from OpenSea"
+                err = (OPENSEA_KEY_REJECTED_HELP if resp.status_code == 401
+                       else f"HTTP {resp.status_code} from OpenSea")
                 break
             if resp.status_code != 200:
                 err = f"HTTP {resp.status_code} from OpenSea"
@@ -7468,6 +8373,8 @@ def _refresh_wallet_collection(filename):
                 "opensea_key_exhausted": True}
 
     api_key = _get_opensea_key()
+    if not api_key:
+        return {"ok": False, "error": OPENSEA_KEY_HELP, "opensea_key_exhausted": True}
     nfts, throttled, err = _fetch_opensea_wallet_nfts(wallet, evm_chains, api_key)
 
     if throttled:
@@ -7726,6 +8633,8 @@ def setup_quick_import():
         opensea_chains = [c for c in chains if c in _WALLET_CHAINS]
 
         api_key = _get_opensea_key()
+        if is_eth and opensea_chains and not api_key:
+            return _opensea_key_error()
 
         all_nfts = []
         skipped = 0
@@ -7735,9 +8644,7 @@ def setup_quick_import():
 
         # Fetch from OpenSea (EVM chains)
         if is_eth and opensea_chains:
-            headers = {"Accept": "application/json"}
-            if api_key:
-                headers["X-API-KEY"] = api_key
+            headers = {"Accept": "application/json", "X-API-KEY": api_key}
 
             for chain in opensea_chains:
                 if throttled:
@@ -7753,6 +8660,8 @@ def setup_quick_import():
                         resp = _req.get(url, headers=headers, params=params, timeout=30)
                     except Exception:
                         break
+                    if resp.status_code == 401:
+                        return _opensea_key_error(rejected=True)
                     if resp.status_code in (429, 403):
                         throttled = True
                         break
@@ -7910,7 +8819,8 @@ def setup_quick_import():
             "skipped": skipped,
             "throttled": throttled,
             "wallet": wallet,
-            "message": msg
+            "message": msg,
+            "ipfs_warning": None if _ipfs_node_online() else IPFS_NODE_DOWN_HELP,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -7922,7 +8832,7 @@ def setup_complete():
     try:
         data = {
             "completed_at": datetime.utcnow().isoformat() + "Z",
-            "password_changed": Path("/opt/vernis/password-changed.marker").exists()
+            "password_changed": PASSWORD_MARKER_FILE.exists()
         }
         SETUP_COMPLETE_FILE.write_text(json.dumps(data, indent=2))
         os.chmod(str(SETUP_COMPLETE_FILE), 0o644)
@@ -8161,55 +9071,72 @@ def get_storage_config():
             pass
     return defaults
 
-def detect_external_drives():
-    """Detect mounted external USB drives"""
-    drives = []
-    mount_points = ['/media/pi', '/media', '/mnt']
+STORAGE_HELPER = "/usr/local/sbin/vernis-storage"
+MOUNTS_FILE = "/proc/self/mounts"
+_PSEUDO_FS = {"tmpfs", "devtmpfs", "proc", "sysfs", "overlay", "squashfs", "autofs",
+              "cgroup", "cgroup2", "devpts", "mqueue", "debugfs", "tracefs", "fusectl"}
 
-    for mount_base in mount_points:
-        if not os.path.exists(mount_base):
+
+def _drive_mounts():
+    """[(device, mountpoint, fstype)] for drives mounted under /media or /mnt
+    (USB drives mounted by the storage helper or a desktop, network shares)."""
+    found = []
+    try:
+        with open(MOUNTS_FILE) as f:
+            lines = f.readlines()
+    except OSError:
+        return found
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 3:
             continue
+        dev, mp, fs = parts[0], parts[1].replace("\\040", " "), parts[2]
+        if fs in _PSEUDO_FS or not re.match(r"^/(media|mnt)/.", mp):
+            continue
+        found.append((dev, mp, fs))
+    return found
+
+
+def _storage_helper(*args, timeout=30):
+    """Run the root storage helper through its sudo rule. True on success,
+    None when it isn't installed (older install)."""
+    if not os.path.exists(STORAGE_HELPER):
+        return None
+    try:
+        r = subprocess.run(["sudo", "-n", STORAGE_HELPER, *args],
+                           capture_output=True, text=True, timeout=timeout)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def detect_external_drives():
+    """Drives mounted under /media or /mnt, from the kernel's mount table.
+    (Listing folders instead reported the SD card itself for any empty
+    folder there, and missed drives one level deeper, e.g. /media/<user>/X.)"""
+    drives = []
+    for dev, mp, fs in _drive_mounts():
         try:
-            for entry in os.listdir(mount_base):
-                drive_path = os.path.join(mount_base, entry)
-                if not os.path.isdir(drive_path):
-                    continue
-
-                # Skip system directories
-                if entry in ['cdrom', 'floppy', 'usb']:
-                    continue
-
-                try:
-                    # Check if it's a mount point and writable
-                    stat = os.statvfs(drive_path)
-                    total_gb = (stat.f_blocks * stat.f_frsize) / (1024**3)
-                    free_gb = (stat.f_bavail * stat.f_frsize) / (1024**3)
-                    used_gb = total_gb - free_gb
-
-                    # Only include drives with >1GB capacity (skip small USB sticks that might be boot drives)
-                    if total_gb > 1:
-                        # Check if writable
-                        test_file = Path(drive_path) / ".vernis_test"
-                        try:
-                            test_file.touch()
-                            test_file.unlink()
-                            writable = True
-                        except:
-                            writable = False
-
-                        drives.append({
-                            "name": entry,
-                            "path": drive_path,
-                            "total_gb": round(total_gb, 1),
-                            "free_gb": round(free_gb, 1),
-                            "used_gb": round(used_gb, 1),
-                            "writable": writable
-                        })
-                except:
-                    pass
-        except:
-            pass
-
+            st = os.statvfs(mp)
+        except OSError:
+            continue
+        total_gb = st.f_blocks * st.f_frsize / (1024**3)
+        if total_gb <= 1:  # tiny sticks are usually installers, not libraries
+            continue
+        free_gb = st.f_bavail * st.f_frsize / (1024**3)
+        nft_dir = Path(mp) / "vernis-nfts"
+        writable = os.access(mp, os.W_OK) or (nft_dir.is_dir() and os.access(nft_dir, os.W_OK))
+        drives.append({
+            "name": os.path.basename(mp),
+            "path": mp,
+            "fstype": fs,
+            "total_gb": round(total_gb, 1),
+            "free_gb": round(free_gb, 1),
+            "used_gb": round(total_gb - free_gb, 1),
+            # A root-owned ext4 drive can still be made usable by the helper
+            "writable": writable or os.path.exists(STORAGE_HELPER),
+            "can_hold_ipfs": fs in ("ext4", "ext3", "ext2", "btrfs", "xfs", "f2fs"),
+        })
     return drives
 
 @app.route("/api/storage/external/detect")
@@ -8260,16 +9187,18 @@ def configure_external_storage():
             if not os.path.isdir(external_path):
                 return jsonify({"error": "Path does not exist"}), 400
 
-            test_file = Path(external_path) / ".vernis_test"
+            nft_path = Path(external_path) / "vernis-nfts"
+            try:
+                nft_path.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                # e.g. an ext4 drive whose top folder belongs to root
+                _storage_helper("prepare", str(Path(external_path).resolve()))
+            test_file = nft_path / ".vernis_test"
             try:
                 test_file.touch()
                 test_file.unlink()
-            except:
-                return jsonify({"error": "Path is not writable"}), 400
-
-            # Create vernis-nfts directory on external drive
-            nft_path = Path(external_path) / "vernis-nfts"
-            nft_path.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                return jsonify({"error": "Vernis can't write to this drive"}), 400
 
         # Save configuration (preserve readonly_mode if set)
         config = {
@@ -8457,25 +9386,25 @@ def screen_rotation():
             if rotation not in [0, 90, 180, 270]:
                 return jsonify({"error": "Invalid rotation value. Must be 0, 90, 180, or 270"}), 400
 
-            # Detect if running Wayland or X11
-            # Check for wayland socket in common user runtime dirs
+            # Detect if running Wayland or X11. vernis-api runs as the desktop
+            # user, so its own runtime dir comes first; then any other user's.
             wayland_socket = None
-            for uid in [1000, 1001, 0]:
-                socket_path = f'/run/user/{uid}/wayland-0'
-                if os.path.exists(socket_path):
-                    wayland_socket = socket_path
+            run_dirs = [Path(f'/run/user/{os.getuid()}')]
+            try:
+                run_dirs += sorted(Path('/run/user').iterdir())
+            except OSError:
+                pass
+            for run_dir in run_dirs:
+                if (run_dir / 'wayland-0').exists():
+                    wayland_socket = str(run_dir / 'wayland-0')
                     break
 
             wayland_display = os.environ.get('WAYLAND_DISPLAY') or wayland_socket
 
-            # Set up Wayland environment - use the user's runtime dir where wayland socket exists
-            wayland_uid = 1000  # Default to typical user UID
-            if wayland_socket:
-                wayland_uid = int(wayland_socket.split('/')[3])
-
             wayland_env = {
                 **os.environ,
-                'XDG_RUNTIME_DIR': f'/run/user/{wayland_uid}',
+                'XDG_RUNTIME_DIR': os.path.dirname(wayland_socket) if wayland_socket
+                                   else f'/run/user/{os.getuid()}',
                 'WAYLAND_DISPLAY': 'wayland-0'
             }
 
@@ -8544,38 +9473,14 @@ def screen_rotation():
                         cmd = ["wlr-randr", "--output", display, "--transform", wlr_value]
                         subprocess.run(cmd, check=True, timeout=10, env=wayland_env)
 
-                        # Rotate touch input on Wayland
-                        # wlr-randr transform usually auto-remaps touch in wlroots compositors,
-                        # but apply libinput calibration matrix as fallback
-                        touch_matrices = {
-                            0: "1 0 0 0 1 0 0 0 1",
-                            90: "0 1 0 -1 0 1 0 0 1",
-                            180: "-1 0 1 0 -1 1 0 0 1",
-                            270: "0 -1 1 1 0 0 0 0 1"
-                        }
-                        matrix = touch_matrices[rotation]
+                        # labwc does not rotate touch with the output: display-output.sh
+                        # writes the touch mapping + calibration matrix to the desktop
+                        # user's labwc rc.xml (from the rotation saved above) and reloads it.
                         try:
-                            # Write libinput calibration for persistence across reboots
-                            calib_conf = f'''# Auto-generated by Vernis rotation
-Section "InputClass"
-    Identifier "touchscreen-calibration"
-    MatchIsTouchscreen "on"
-    Option "CalibrationMatrix" "{matrix}"
-EndSection
-'''
-                            calib_path = Path("/etc/X11/xorg.conf.d/99-touch-calibration.conf")
-                            calib_path.parent.mkdir(parents=True, exist_ok=True)
-                            calib_path.write_text(calib_conf)
-
-                            # Also try swaymsg for immediate effect on sway/labwc
-                            touch_cmd = f'''
-for DEVICE in $(libinput list-devices 2>/dev/null | grep -B1 -i "touch\\|goodix\\|digitizer" | grep "Device:" | sed 's/Device: *//'); do
-    swaymsg input type:touch calibration_matrix {matrix} 2>/dev/null
-done
-'''
-                            subprocess.run(["bash", "-c", touch_cmd], capture_output=True, timeout=5, env=wayland_env)
+                            subprocess.run(["bash", "/opt/vernis/scripts/display-output.sh", "apply"],
+                                           capture_output=True, timeout=30, env=wayland_env)
                         except Exception as touch_err:
-                            print(f"Wayland touch calibration note: {touch_err}")
+                            print(f"Wayland touch remap note: {touch_err}")
 
                         return jsonify({"success": True, "rotation": rotation, "target": target, "display_server": "wayland"})
 
@@ -11703,7 +12608,7 @@ def _pil_to_thumbnail(img, thumbnail_path):
     img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
     img.save(thumbnail_path, 'JPEG', quality=70)
 
-def _extract_frame(src, out_jpg, is_video):
+def _extract_frame(src, out_jpg, is_video, max_side=400):
     """Grab one frame of a video (or decode an AVIF Pillow can't read) to a
     JPEG using ffmpeg, else mpv (installed on every Vernis). True on success."""
     ffmpeg = shutil.which('ffmpeg')
@@ -11712,7 +12617,7 @@ def _extract_frame(src, out_jpg, is_video):
             try:
                 subprocess.run(['nice', '-n', '10', ffmpeg, '-nostdin', '-v', 'error', *seek,
                                 '-i', str(src), '-frames:v', '1',
-                                '-vf', 'scale=400:400:force_original_aspect_ratio=decrease',
+                                '-vf', f'scale={max_side}:{max_side}:force_original_aspect_ratio=decrease',
                                 '-y', str(out_jpg)],
                                capture_output=True, timeout=60)
             except (OSError, subprocess.TimeoutExpired):
@@ -11724,7 +12629,7 @@ def _extract_frame(src, out_jpg, is_video):
     mpv = shutil.which('mpv')
     if mpv:
         import tempfile
-        with tempfile.TemporaryDirectory(dir=str(THUMBNAIL_DIR)) as tmp:
+        with tempfile.TemporaryDirectory(dir=str(out_jpg.parent)) as tmp:
             for start in (['--start=1'] if is_video else []), []:
                 try:
                     subprocess.run(['nice', '-n', '10', mpv, '--no-config', '--really-quiet',
@@ -11775,6 +12680,24 @@ def _make_thumbnail(original_path, thumbnail_path, wait=True):
             frame.unlink()
         except OSError:
             pass
+
+def _html_preview_image(path):
+    """(bytes, mime) of the image in an HTML generator's
+    <meta name="generator-preview"> data URI, or None. Only raster types:
+    the file is untrusted, so never echo e.g. text/html or SVG back."""
+    import base64 as b64mod
+    try:
+        html_text = path.read_text(encoding='utf-8')
+        match = re.search(r'<meta\s+name="generator-preview"\s+content="([^"]+)"', html_text)
+        if not match:
+            return None
+        header, b64data = match.group(1).split(',', 1)
+        mime = header.split(':')[1].split(';')[0] if ':' in header else 'image/jpeg'
+        if mime not in ('image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'):
+            return None
+        return b64mod.b64decode(b64data), mime
+    except Exception:
+        return None
 
 def _find_nft_original(filename):
     """Locate an NFT file in internal storage, then external storage."""
@@ -11839,22 +12762,11 @@ def get_thumbnail(filename):
 
         # Handle HTML generator files - extract preview from meta tag
         if filename.lower().endswith('.html'):
-            import re
-            import base64 as b64mod
-            try:
-                html_text = original_path.read_text(encoding='utf-8')
-                match = re.search(r'<meta\s+name="generator-preview"\s+content="([^"]+)"', html_text)
-                if match:
-                    data_uri = match.group(1)
-                    header, b64data = data_uri.split(',', 1)
-                    img_bytes = b64mod.b64decode(b64data)
-                    mime = header.split(':')[1].split(';')[0] if ':' in header else 'image/jpeg'
-                    # Untrusted file: never echo e.g. text/html or SVG back
-                    if mime in ('image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'):
-                        return Response(img_bytes, mimetype=mime,
-                                        headers={'X-Content-Type-Options': 'nosniff'})
-            except Exception:
-                pass
+            preview = _html_preview_image(original_path)
+            if preview:
+                img_bytes, mime = preview
+                return Response(img_bytes, mimetype=mime,
+                                headers={'X-Content-Type-Options': 'nosniff'})
             svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
                 <rect width="200" height="200" fill="#1a1a1a"/>
                 <text x="100" y="105" text-anchor="middle" fill="#666" font-size="12">Generator</text>
@@ -13828,6 +14740,864 @@ def preview_file(name):
     resp = send_from_directory(str(PREVIEW_DIR), name)
     resp.headers['Cache-Control'] = 'no-store'
     return resp
+
+# =====================
+# Work Mode — the owner's Claude quota, pushed from their Mac
+# =====================
+# There is no public quota API and the owner's Claude login must never live on
+# the frame, so a LaunchAgent on the Mac (scripts/claude-quota-push.py) reads
+# the numbers and POSTs them here. The Pi stores percentages and reset times
+# only. The push token is the Mac's credential for this one endpoint; it is
+# shown only through a control-class POST so Mode C keeps it behind the PIN.
+
+WORKMODE_CONFIG_FILE = Path("/opt/vernis/workmode.json")
+WORKMODE_USAGE_FILE = Path("/opt/vernis/workmode-usage.json")
+WORKMODE_PUSH_PATH = "/api/workmode/usage"
+_WORKMODE_WINDOW_RE = re.compile(r"^(five_hour|seven_day(_[a-z0-9]{1,24})?)$")
+_WORKMODE_MAX_WINDOWS = 8
+
+
+def load_workmode_config():
+    cfg = {"enabled": False, "push_token": None}
+    try:
+        if WORKMODE_CONFIG_FILE.exists():
+            with open(WORKMODE_CONFIG_FILE) as f:
+                stored = json.load(f)
+            if isinstance(stored, dict):
+                cfg.update(stored)
+    except Exception:
+        pass
+    return cfg
+
+
+def _workmode_write_private(path, data):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, path)
+
+
+def save_workmode_config(cfg):
+    _workmode_write_private(WORKMODE_CONFIG_FILE, cfg)
+
+
+def _workmode_load_usage():
+    try:
+        with open(WORKMODE_USAGE_FILE) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else None
+    except Exception:
+        return None
+
+
+def _workmode_device_url():
+    return request.host_url.rstrip("/")
+
+
+def _workmode_install_command(token):
+    return (f"curl -fsSL {_workmode_device_url()}/api/workmode/installer.sh"
+            f" | bash -s -- {token}")
+
+
+def _workmode_parse_windows(body):
+    """Keep only well-formed quota windows. Returns dict, or None if invalid.
+
+    Windows the plan doesn't have arrive as null and are skipped; anything
+    present but malformed rejects the whole push so a broken Mac script can't
+    overwrite good numbers with garbage."""
+    if not isinstance(body, dict):
+        return None
+    out = {}
+    for name, w in body.items():
+        if not isinstance(name, str) or not _WORKMODE_WINDOW_RE.match(name):
+            continue
+        if w is None:
+            continue
+        if not isinstance(w, dict):
+            return None
+        util = w.get("utilization")
+        if isinstance(util, bool) or not isinstance(util, (int, float)):
+            return None
+        if not (0 <= util <= 100):
+            return None
+        resets = w.get("resets_at")
+        if resets is not None:
+            if not isinstance(resets, str) or len(resets) > 40:
+                return None
+            try:
+                datetime.fromisoformat(resets.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+        out[name] = {"utilization": float(util), "resets_at": resets}
+        if len(out) > _WORKMODE_MAX_WINDOWS:
+            return None
+    return out or None
+
+
+@app.route("/api/workmode/config", methods=["GET", "POST"])
+def workmode_config():
+    cfg = load_workmode_config()
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        if "enabled" in data:
+            cfg["enabled"] = bool(data["enabled"])
+            if cfg["enabled"] and not cfg.get("push_token"):
+                cfg["push_token"] = _secrets.token_urlsafe(24)
+            save_workmode_config(cfg)
+            # Turning it off must also take it off the frame's screen.
+            if not cfg["enabled"] and _workmode_showing():
+                _workmode_hide()
+    usage = _workmode_load_usage()
+    return jsonify({
+        "enabled": bool(cfg.get("enabled")),
+        "has_data": bool(usage),
+        "received_at": usage.get("received_at") if usage else None,
+        "showing": _workmode_showing(),
+    })
+
+
+# --- Showing Work Mode on the frame's own screen ---------------------------
+# The menu's "Work" entry on a phone/PC switches the kiosk to work.html, the
+# way Preview Mode takes over the display, and "Back to art" puts back
+# whatever the frame was showing before.
+
+WORKMODE_KIOSK_URL = "http://127.0.0.1/work.html"
+_workmode_return = {"url": None}
+
+
+def _kiosk_current_url():
+    """URL of the page the kiosk browser is showing, or None."""
+    try:
+        resp = requests.get(f"http://127.0.0.1:{CDP_PORT}/json/list", timeout=2)
+        for page in resp.json():
+            if page.get("type") == "page":
+                return page.get("url")
+    except Exception:
+        pass
+    return None
+
+
+def _workmode_showing():
+    return "/work.html" in (_kiosk_current_url() or "")
+
+
+def _workmode_is_local_url(url):
+    try:
+        u = urlparse(url or "")
+        return u.scheme == "http" and u.hostname in ("127.0.0.1", "localhost")
+    except ValueError:
+        return False
+
+
+def _workmode_hide():
+    url = _workmode_return["url"]
+    _workmode_return["url"] = None
+    if not _workmode_is_local_url(url) or "/work.html" in url:
+        url = _preview_default_return_url()
+    return navigate_browser_cdp(url)
+
+
+@app.route("/api/workmode/show", methods=["POST"])
+def workmode_show():
+    if not load_workmode_config().get("enabled"):
+        return jsonify({"error": "Work Mode is off"}), 403
+    current = _kiosk_current_url()
+    # Remember where to go back to — but not work.html itself, so pressing
+    # Work twice still returns to the art.
+    if current and "/work.html" not in current and _workmode_is_local_url(current):
+        _workmode_return["url"] = current
+    ok, err = navigate_browser_cdp(WORKMODE_KIOSK_URL)
+    if not ok:
+        return jsonify({"error": err or "Could not reach the display"}), 502
+    return jsonify({"success": True, "showing": True})
+
+
+@app.route("/api/workmode/hide", methods=["POST"])
+def workmode_hide():
+    ok, err = _workmode_hide()
+    if not ok:
+        return jsonify({"error": err or "Could not reach the display"}), 502
+    return jsonify({"success": True, "showing": False})
+
+
+@app.route("/api/workmode/push-token", methods=["POST"])
+def workmode_push_token():
+    cfg = load_workmode_config()
+    data = request.get_json(silent=True) or {}
+    if data.get("rotate") or not cfg.get("push_token"):
+        cfg["push_token"] = _secrets.token_urlsafe(24)
+        save_workmode_config(cfg)
+    return jsonify({
+        "push_token": cfg["push_token"],
+        "install_command": _workmode_install_command(cfg["push_token"]),
+        "uninstall_command": (f"curl -fsSL {_workmode_device_url()}"
+                              f"/api/workmode/installer.sh | bash -s -- --uninstall"),
+    })
+
+
+@app.route(WORKMODE_PUSH_PATH, methods=["GET", "POST"])
+def workmode_usage():
+    if request.method == "GET":
+        usage = _workmode_load_usage()
+        if not usage:
+            return jsonify({"has_data": False,
+                            "enabled": bool(load_workmode_config().get("enabled"))})
+        return jsonify({
+            "has_data": True,
+            "enabled": bool(load_workmode_config().get("enabled")),
+            "windows": usage.get("windows", {}),
+            "received_at": usage.get("received_at"),
+            "age_seconds": max(0, int(time.time() - usage.get("received_ts", 0))),
+            "server_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        })
+
+    cfg = load_workmode_config()
+    token = cfg.get("push_token") or ""
+    auth = request.headers.get("Authorization", "")
+    given = auth[7:] if auth.startswith("Bearer ") else ""
+    if (not cfg.get("enabled") or not token or not given
+            or not _secrets.compare_digest(given.encode(), token.encode())):
+        return jsonify({"error": "forbidden"}), 403
+    windows = _workmode_parse_windows(request.get_json(silent=True))
+    if windows is None:
+        return jsonify({"error": "invalid usage data"}), 400
+    now = time.time()
+    _workmode_write_private(WORKMODE_USAGE_FILE, {
+        "windows": windows,
+        "received_ts": now,
+        "received_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+    })
+    return jsonify({"success": True})
+
+
+def _workmode_push_script_text():
+    for p in (SCRIPTS_DIR / "claude-quota-push.py",
+              Path(__file__).resolve().parent.parent / "scripts" / "claude-quota-push.py"):
+        try:
+            return p.read_text()
+        except OSError:
+            continue
+    return None
+
+
+@app.route("/api/workmode/installer.sh")
+def workmode_installer():
+    """A Mac installer with the push script embedded. Holds no secret: the push
+    token is passed by the owner as the first argument."""
+    script = _workmode_push_script_text()
+    if script is None or "VERNIS_PY_EOF" in script:
+        return Response("echo 'Vernis: push script missing on device' >&2; exit 1\n",
+                        mimetype="text/x-shellscript"), 500
+    url = _workmode_device_url()
+    installer = f"""#!/bin/bash
+# Vernis Work Mode — sends your Claude plan usage (numbers only) to {url}
+# After each Claude Code reply, a hook asks Claude Code for its usage with its
+# own `/usage` command and sends the percentages. Your Claude login is never read.
+set -euo pipefail
+DIR="$HOME/Library/Application Support/vernis-quota"
+SETTINGS="$HOME/.claude/settings.json"
+OLD_AGENT="no.vernis.quota-push"
+
+hook_edit() {{  # $1 = add|remove; edits only our own Stop hook entry
+  "$PY" - "$SETTINGS" "$1" "$PY" "$DIR/claude-quota-push.py" <<'VERNIS_HOOK_EOF'
+import json, os, sys, shutil, time
+path, action, py, script = sys.argv[1:5]
+data = {{}}
+if os.path.exists(path):
+    with open(path) as f:
+        data = json.load(f)          # refuse to touch a settings file we can't read
+    shutil.copy2(path, path + ".vernis-backup-" + time.strftime("%Y%m%d%H%M%S"))
+hooks = data.setdefault("hooks", {{}})
+stop = [g for g in hooks.get("Stop", [])
+        if not any("claude-quota-push.py" in h.get("command", "") for h in g.get("hooks", []))]
+if action == "add":
+    stop.append({{"hooks": [{{"type": "command", "async": True, "timeout": 120,
+                             "command": "'%s' '%s' --hook" % (py, script)}}]}})
+if stop:
+    hooks["Stop"] = stop
+else:
+    hooks.pop("Stop", None)
+if not hooks:
+    data.pop("hooks", None)
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\\n")
+VERNIS_HOOK_EOF
+}}
+
+PY="$(command -v python3 || true)"
+if [ -z "$PY" ]; then echo "python3 not found (install Xcode command line tools)." >&2; exit 1; fi
+
+if [ "${{1:-}}" = "--uninstall" ]; then
+  launchctl bootout "gui/$(id -u)/$OLD_AGENT" 2>/dev/null || true
+  rm -f "$HOME/Library/LaunchAgents/$OLD_AGENT.plist"
+  [ -f "$SETTINGS" ] && hook_edit remove
+  rm -rf "$DIR"
+  echo "Vernis Work Mode removed from this Mac."; exit 0
+fi
+TOKEN="${{1:-}}"
+if [ -z "$TOKEN" ]; then echo "Usage: bash -s -- <push-token>" >&2; exit 1; fi
+if [ "$(uname)" != "Darwin" ]; then echo "This installer is for macOS." >&2; exit 1; fi
+CLAUDE_BIN="$(command -v claude || true)"
+if [ -z "$CLAUDE_BIN" ]; then
+  echo "Claude Code (the 'claude' command) was not found. Install it and sign in, then run this again." >&2
+  exit 1
+fi
+
+mkdir -p "$DIR"
+cat > "$DIR/claude-quota-push.py" <<'VERNIS_PY_EOF'
+{script}VERNIS_PY_EOF
+umask 077
+"$PY" - "$DIR/config.json" "{url}" "$TOKEN" "$CLAUDE_BIN" <<'VERNIS_CFG_EOF'
+import json, sys
+json.dump({{"url": sys.argv[2], "push_token": sys.argv[3], "claude": sys.argv[4]}},
+          open(sys.argv[1], "w"), indent=2)
+VERNIS_CFG_EOF
+chmod 600 "$DIR/config.json"
+
+# The old version polled every 5 minutes with a LaunchAgent; the hook replaces it.
+launchctl bootout "gui/$(id -u)/$OLD_AGENT" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/$OLD_AGENT.plist"
+hook_edit add
+
+echo "Installed. Checking once now..."
+"$PY" "$DIR/claude-quota-push.py" --once || true
+echo "Vernis now updates after every Claude Code reply (terminal or the desktop app's Code tab)."
+"""
+    resp = Response(installer, mimetype="text/x-shellscript")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+# =====================
+# HomeView export — art for Apple HomeView's photo frame
+# =====================
+# HomeView's photo frame shows a shared iCloud album, and there is no API for
+# writing to shared albums (docs/homeview-integration.md). So Vernis only
+# serves square JPEGs on the LAN; an iPhone Shortcut, started from the
+# Settings card, fetches a batch and posts it to the owner's shared album.
+# Off by default. Reads the art folders and writes only HOMEVIEW_EXPORT_DIR and
+# its own state file — never the library, the display or IPFS.
+
+HOMEVIEW_CONFIG_FILE = Path("/opt/vernis/homeview-config.json")
+HOMEVIEW_STATE_FILE = Path("/opt/vernis/homeview-state.json")
+HOMEVIEW_EXPORT_DIR = Path("/opt/vernis/homeview-export")
+HIDDEN_NFTS_FILE = Path("/opt/vernis/hidden-nfts.json")
+FAVORITES_FILE = Path("/opt/vernis/favorites.json")
+
+# Shared Albums resize to 2048 px on the long edge; HomeView's panel is 1088.
+HOMEVIEW_SIZE = 2048
+HOMEVIEW_PAD = (0, 0, 0)
+# The Shortcut holds a whole batch in memory on the phone and the Pi renders
+# it one image at a time, so a large collection goes over in several sends.
+HOMEVIEW_BATCH_MAX = 50
+HOMEVIEW_SOURCES = ("gallery", "favorites")
+# Larger images are decoded by ffmpeg in its own process: a full-size decode
+# plus the RGBA/RGB copies would OOM vernis-api on a 416 MB Pi.
+HOMEVIEW_MAX_INPROCESS_PIXELS = 4096 * 4096
+# The Settings button opens the Shortcut by name; the link installs it.
+# Set HOMEVIEW_SHORTCUT_URL once the Shortcut is published (see the doc).
+HOMEVIEW_SHORTCUT_NAME = "Vernis HomeView"
+HOMEVIEW_SHORTCUT_URL = ""
+
+_homeview_lock = threading.Lock()         # state file read-modify-write
+_homeview_render_lock = threading.Lock()  # one export render at a time
+
+
+def load_homeview_config():
+    cfg = {"enabled": False, "source": "gallery"}
+    try:
+        if HOMEVIEW_CONFIG_FILE.exists():
+            stored = json.loads(HOMEVIEW_CONFIG_FILE.read_text())
+            if isinstance(stored, dict):
+                cfg.update(stored)
+    except Exception:
+        pass
+    if cfg.get("source") not in HOMEVIEW_SOURCES:
+        cfg["source"] = "gallery"
+    return cfg
+
+
+def save_homeview_config(cfg):
+    HOMEVIEW_CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
+
+
+def _homeview_enabled():
+    return bool(load_homeview_config().get("enabled"))
+
+
+def _homeview_load_state():
+    """{"sent": {id: filename}, "last_batch": {"id", "items", "created"},
+    "fetched": [ids of the last batch the Shortcut has downloaded]}.
+    Kept when the feature is turned off, so turning it back on doesn't
+    post the whole collection to the album a second time."""
+    state = {"sent": {}, "last_batch": None, "fetched": []}
+    try:
+        if HOMEVIEW_STATE_FILE.exists():
+            stored = json.loads(HOMEVIEW_STATE_FILE.read_text())
+            if isinstance(stored, dict):
+                state.update(stored)
+    except Exception:
+        pass
+    return state
+
+
+def _homeview_save_state(state):
+    tmp = HOMEVIEW_STATE_FILE.with_name(HOMEVIEW_STATE_FILE.name + ".tmp")
+    tmp.write_text(json.dumps(state, indent=2))
+    tmp.replace(HOMEVIEW_STATE_FILE)
+
+
+def _homeview_id(filename):
+    """Stable ID for a piece. Art files are named by CID, so the name is the
+    identity, and it survives a move to external storage."""
+    import hashlib
+    return hashlib.sha256(filename.encode()).hexdigest()[:16]
+
+
+def _homeview_read_json(path, default):
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return default
+
+
+_HOMEVIEW_HTML_PREVIEW = re.compile(
+    rb'<meta\s+name="generator-preview"\s+content="data:image/(png|jpeg|gif|webp|avif)[;,]')
+
+
+def _homeview_selection():
+    """The predicate for "is this file part of the export": the gallery's
+    filename rule (what glob("*.<ext>") matches — no dotfiles such as macOS
+    ._ resource forks, case-sensitive extension), minus hidden, optionally
+    favorites only. HTML art only exports through its preview image, and only
+    the head is read to check for one: these files can be megabytes."""
+    cfg = load_homeview_config()
+    hidden = set(_homeview_read_json(HIDDEN_NFTS_FILE, []) or [])
+    favorites = None
+    if cfg["source"] == "favorites":
+        fav = _homeview_read_json(FAVORITES_FILE, {}) or {}
+        favorites = set(fav.keys() if isinstance(fav, dict) else fav)
+
+    def selected(name, path):
+        if name.startswith('.') or '.' not in name:
+            return False
+        if name.rsplit('.', 1)[1] not in LIST_EXTS or name in hidden:
+            return False
+        if favorites is not None and name not in favorites:
+            return False
+        if name.endswith('.html'):
+            try:
+                with open(path, 'rb') as f:
+                    return bool(_HOMEVIEW_HTML_PREVIEW.search(f.read(4096)))
+            except OSError:
+                return False
+        return True
+    return selected
+
+
+def _homeview_candidates():
+    """{id: (filename, path)} of the art to export. Oldest first, so capped
+    batches send the collection in the order it was built."""
+    selected = _homeview_selection()
+    found, seen = [], set()
+    for base_dir, _ in _art_listing_dirs():
+        try:
+            with os.scandir(base_dir) as it:
+                entries = list(it)
+        except OSError:
+            continue
+        for e in entries:
+            name = e.name
+            # Internal storage wins on a filename clash with external.
+            if name in seen:
+                continue
+            try:
+                if not e.is_file() or not selected(name, Path(e.path)):
+                    continue
+                mtime = e.stat().st_mtime
+            except OSError:
+                continue
+            seen.add(name)
+            found.append((mtime, name, Path(e.path)))
+    found.sort()
+    return {_homeview_id(name): (name, path) for _, name, path in found}
+
+
+def _homeview_locate(name):
+    """Path of one piece if it is still part of the export, else None —
+    what the image endpoint needs, without scanning the whole collection."""
+    selected = _homeview_selection()
+    for base_dir, _ in _art_listing_dirs():
+        path = base_dir / name
+        if path.is_file():
+            return path if selected(name, path) else None
+    return None
+
+
+def _homeview_storage_offline():
+    """External storage is configured but not mounted. Its pieces are then
+    missing from the scan without having been removed by the owner."""
+    try:
+        cfg = get_storage_config()
+        return bool(cfg.get('use_external') and cfg.get('external_path')
+                    and not external_storage_available(cfg['external_path']))
+    except Exception:
+        return False
+
+
+def _homeview_square(img):
+    """Fit `img` inside a HOMEVIEW_SIZE square on the pad colour — padded,
+    never cropped, because cropping changes the artwork. Small pixel art is
+    scaled by a whole factor with NEAREST so it stays crisp."""
+    from PIL import Image
+    if img.mode in ('RGBA', 'LA', 'P', 'PA'):
+        img = img.convert('RGBA')
+        flat = Image.new('RGB', img.size, HOMEVIEW_PAD)
+        flat.paste(img, mask=img.split()[-1])
+        img = flat
+    elif img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    w, h = img.size
+    longest = max(w, h)
+    if longest * 4 <= HOMEVIEW_SIZE:
+        f = HOMEVIEW_SIZE // longest
+        img = img.resize((w * f, h * f), Image.Resampling.NEAREST)
+    else:
+        scale = HOMEVIEW_SIZE / longest
+        img = img.resize((max(1, round(w * scale)), max(1, round(h * scale))),
+                         Image.Resampling.LANCZOS, reducing_gap=3.0)
+
+    canvas = Image.new('RGB', (HOMEVIEW_SIZE, HOMEVIEW_SIZE), HOMEVIEW_PAD)
+    canvas.paste(img, ((HOMEVIEW_SIZE - img.width) // 2, (HOMEVIEW_SIZE - img.height) // 2))
+    return canvas
+
+
+def _homeview_render(src, out):
+    """Write the square export JPEG for `src` to `out`. True on success.
+    Video, SVG and undecodable AVIF go through the shared external decoder
+    slot, like thumbnails, so a 416 MB Pi never runs two at once."""
+    from PIL import Image
+    name = src.name.lower()
+    frame = out.with_name(out.name + '.frame.jpg')
+    tmp = out.with_name(out.name + '.tmp')
+
+    def external(fn):
+        if not _external_decoder.acquire(timeout=120):
+            return None
+        try:
+            return Image.open(frame) if fn() else None
+        finally:
+            _external_decoder.release()
+
+    def rsvg():
+        conv = shutil.which('rsvg-convert')
+        if not conv:
+            return False
+        try:
+            subprocess.run(['nice', '-n', '10', conv, '-w', str(HOMEVIEW_SIZE),
+                            '-h', str(HOMEVIEW_SIZE), '-a', '-f', 'png',
+                            '-o', str(frame), str(src)],
+                           capture_output=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return frame.exists() and frame.stat().st_size > 0
+
+    try:
+        if name.endswith('.html'):
+            preview = _html_preview_image(src)
+            img = Image.open(io.BytesIO(preview[0])) if preview else None
+        elif name.endswith('.svg'):
+            img = external(rsvg)
+        elif name.endswith(VIDEO_EXTS):
+            img = external(lambda: _extract_frame(src, frame, True, max_side=HOMEVIEW_SIZE))
+        else:
+            ffmpeg_decode = lambda: _extract_frame(src, frame, False, max_side=HOMEVIEW_SIZE)
+            try:
+                img = Image.open(src)  # lazy: reads the header only
+                if img.width * img.height > HOMEVIEW_MAX_INPROCESS_PIXELS:
+                    img.close()
+                    img = external(ffmpeg_decode)
+                else:
+                    img.draft('RGB', (HOMEVIEW_SIZE, HOMEVIEW_SIZE))  # JPEG: decode smaller
+                    img.load()
+            except Exception:
+                if not name.endswith('.avif'):  # Pillow without AVIF support
+                    return False
+                img = external(ffmpeg_decode)
+        if img is None:
+            return False
+        with img:
+            from PIL import ImageOps
+            square = _homeview_square(ImageOps.exif_transpose(img))
+        square.save(tmp, 'JPEG', quality=90, subsampling=0)
+        tmp.replace(out)
+        return True
+    except Exception as e:
+        print(f"[homeview] could not render {src.name}: {e}", flush=True)
+        return False
+    finally:
+        for p in (frame, tmp):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
+def _homeview_ensure_rendered(hv_id, src):
+    """Path of the export JPEG for `src`, rendering it if missing or stale."""
+    out = HOMEVIEW_EXPORT_DIR / f"{hv_id}.jpg"
+    with _homeview_render_lock:
+        if out.exists() and _thumbnail_is_current(out, src):
+            return out
+        # Checked under the lock: turning the feature off empties the export
+        # dir under the same lock, and must not be undone by a late render.
+        if not _homeview_enabled():
+            return None
+        HOMEVIEW_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        if not _homeview_render(src, out):
+            return None
+        _stamp_thumbnail(out, src)
+        return out
+
+
+def _homeview_prune_exports(keep_ids):
+    """Delete export JPEGs outside `keep_ids` — only the last batch is kept,
+    which bounds the disk used to one batch."""
+    with _homeview_render_lock:
+        try:
+            entries = list(HOMEVIEW_EXPORT_DIR.iterdir())
+        except OSError:
+            return
+        for p in entries:
+            if p.stem in keep_ids:
+                continue
+            try:
+                # A killed mpv fallback can leave its temp dir behind here.
+                if p.is_dir():
+                    shutil.rmtree(p, ignore_errors=True)
+                else:
+                    p.unlink()
+            except OSError:
+                pass
+
+
+def _homeview_start_prerender(ids):
+    """Render a batch in the background while the phone is still opening
+    Shortcuts, so most images are ready by the time it asks for them."""
+    def run():
+        cands = _homeview_candidates()
+        for hv_id in ids:
+            if not _homeview_enabled():
+                return
+            if hv_id in cands:
+                _homeview_ensure_rendered(hv_id, cands[hv_id][1])
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _homeview_base_url():
+    """Absolute base for the image URLs the Shortcut fetches. Caddy passes the
+    Host through and sets X-Forwarded-Proto when HTTPS is on."""
+    proto = request.headers.get("X-Forwarded-Proto", "").lower()
+    if proto not in ("http", "https"):
+        proto = request.scheme
+    return f"{proto}://{request.host}"
+
+
+def _homeview_off():
+    return jsonify({"error": "HomeView export is turned off"}), 403
+
+
+def _homeview_pending(state, cands):
+    """IDs to send next, in order: pieces from the last batch the Shortcut
+    never downloaded (the Shortcut wasn't installed yet, or failed), then
+    pieces never sent at all."""
+    last = state.get("last_batch") or {}
+    fetched = set(state.get("fetched") or [])
+    retry = [i for i in last.get("items", []) if i not in fetched and i in cands]
+    retry_set = set(retry)
+    return retry + [i for i in cands if i not in state["sent"] and i not in retry_set]
+
+
+def _homeview_never_delivered(state):
+    """IDs of the last batch the Shortcut never downloaded."""
+    last = state.get("last_batch") or {}
+    fetched = set(state.get("fetched") or [])
+    return {i for i in last.get("items", []) if i not in fetched}
+
+
+@app.route("/api/homeview/config", methods=["GET", "POST"])
+def homeview_config():
+    """Get or set the HomeView export. Off by default."""
+    cfg = load_homeview_config()
+    if request.method == "POST":
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "expected a JSON object"}), 400
+        if "enabled" in data:
+            cfg["enabled"] = bool(data["enabled"])
+        if data.get("source") in HOMEVIEW_SOURCES:
+            cfg["source"] = data["source"]
+        save_homeview_config(cfg)
+        if not cfg["enabled"]:
+            # Under the render lock so a render in flight can't recreate the
+            # dir — in the background, because that render can take a while.
+            def wipe():
+                with _homeview_render_lock:
+                    shutil.rmtree(HOMEVIEW_EXPORT_DIR, ignore_errors=True)
+            threading.Thread(target=wipe, daemon=True).start()
+    return jsonify({
+        **cfg,
+        "size": HOMEVIEW_SIZE,
+        "shortcut_name": HOMEVIEW_SHORTCUT_NAME,
+        "shortcut_url": HOMEVIEW_SHORTCUT_URL,
+    })
+
+
+@app.route("/api/homeview/status")
+def homeview_status():
+    """What the Settings card shows: how many pieces are waiting to be sent,
+    and which sent pieces have left Vernis since (the album can't be cleaned
+    up automatically, so the owner deletes those by hand)."""
+    if not _homeview_enabled():
+        return _homeview_off()
+    cands = _homeview_candidates()
+    state = _homeview_load_state()
+    offline = _homeview_storage_offline()
+    removed = []
+    if not offline:
+        undelivered = _homeview_never_delivered(state)
+        removed = sorted(name for i, name in state["sent"].items()
+                         if i not in cands and i not in undelivered)
+    last = state.get("last_batch")
+    return jsonify({
+        "not_sent": len(_homeview_pending(state, cands)),
+        "removed": removed,
+        "storage_offline": offline,
+        "last_batch": ({"id": last["id"], "count": len(last["items"]),
+                        "created": last["created"]} if last else None),
+        "batch_max": HOMEVIEW_BATCH_MAX,
+    })
+
+
+@app.route("/api/homeview/batch", methods=["POST"])
+def homeview_batch():
+    """Start a send: take the pending pieces (up to HOMEVIEW_BATCH_MAX), mark
+    them sent and return a batch ID for the Shortcut. Marked up front because
+    Vernis can't know whether the owner tapped Post; {"resend": true} hands
+    out the last batch again for when they didn't."""
+    if not _homeview_enabled():
+        return _homeview_off()
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
+    with _homeview_lock:
+        state = _homeview_load_state()
+        cands = _homeview_candidates()
+        pending = _homeview_pending(state, cands)
+        if data.get("resend"):
+            batch = state.get("last_batch")
+        else:
+            new = pending[:HOMEVIEW_BATCH_MAX]
+            batch = None
+            if new:
+                # Pieces that never reached the phone and have left Vernis
+                # since were never in the album: forget them.
+                for i in _homeview_never_delivered(state):
+                    if i not in cands:
+                        state["sent"].pop(i, None)
+                batch = {"id": _secrets.token_hex(8), "items": new, "created": int(time.time())}
+                for i in new:
+                    state["sent"][i] = cands[i][0]
+                state["last_batch"] = batch
+                state["fetched"] = []
+                _homeview_save_state(state)
+                pending = pending[len(new):]
+        remaining = len(pending)
+    if not batch:
+        return jsonify({"batch": None, "count": 0, "remaining": remaining})
+    _homeview_prune_exports(set(batch["items"]))
+    _homeview_start_prerender(batch["items"])
+    return jsonify({"batch": batch["id"], "count": len(batch["items"]), "remaining": remaining})
+
+
+@app.route("/api/homeview/manifest")
+def homeview_manifest():
+    """The Shortcut's input: absolute image URLs for one batch. Read-only, so
+    it works in every security mode without a PIN."""
+    if not _homeview_enabled():
+        return _homeview_off()
+    batch = _homeview_load_state().get("last_batch")
+    if not batch or request.args.get("batch") != batch["id"]:
+        return jsonify({"error": "unknown batch"}), 404
+    cands = _homeview_candidates()
+    meta = load_metadata_cache().get("nfts", {})
+    base = _homeview_base_url()
+    items = []
+    for i in batch["items"]:
+        if i not in cands:  # hidden or deleted since the batch was made
+            continue
+        m = meta.get(cands[i][0]) or {}
+        items.append({
+            "id": i,
+            "url": f"{base}/api/homeview/image/{i}.jpg",
+            "title": m.get("name") or "",
+            "artist": m.get("artist") or "",
+        })
+    return jsonify({"batch": batch["id"], "items": items})
+
+
+@app.route("/api/homeview/image/<name>")
+def homeview_image(name):
+    """One square export JPEG from the last batch, rendered on first request.
+    Serving it records the piece as delivered to the phone."""
+    if not _homeview_enabled():
+        return _homeview_off()
+    m = re.fullmatch(r'([0-9a-f]{16})\.jpg', name)
+    state = _homeview_load_state()
+    batch = state.get("last_batch") or {}
+    if not m or m.group(1) not in batch.get("items", []):
+        return jsonify({"error": "not found"}), 404
+    hv_id = m.group(1)
+    filename = state["sent"].get(hv_id)
+    src = _homeview_locate(filename) if filename else None
+    if not src:
+        return jsonify({"error": "not found"}), 404
+    out = _homeview_ensure_rendered(hv_id, src)
+    if not out:
+        return jsonify({"error": "could not render this piece"}), 500
+    with _homeview_lock:
+        state = _homeview_load_state()
+        if (state.get("last_batch") or {}).get("id") == batch["id"] \
+                and hv_id not in state["fetched"]:
+            state["fetched"].append(hv_id)
+            _homeview_save_state(state)
+    return send_file(out, mimetype='image/jpeg')
+
+
+@app.route("/api/homeview/removed/clear", methods=["POST"])
+def homeview_removed_clear():
+    """The owner has deleted the removed pieces from the album: forget them,
+    so a piece that comes back counts as new."""
+    if not _homeview_enabled():
+        return _homeview_off()
+    if _homeview_storage_offline():
+        # Those pieces are out of reach, not removed; forgetting them now
+        # would post them again as duplicates when the drive is back.
+        return jsonify({"error": "External storage is offline — reconnect it first"}), 409
+    with _homeview_lock:
+        state = _homeview_load_state()
+        cands = _homeview_candidates()
+        undelivered = _homeview_never_delivered(state)
+        state["sent"] = {i: n for i, n in state["sent"].items()
+                         if i in cands or i in undelivered}
+        _homeview_save_state(state)
+    return jsonify({"success": True})
+
 
 @app.route("/api/lab-media")
 def lab_media():

@@ -4,6 +4,14 @@
 # Syncs touch input with display rotation
 ##############################################
 
+# X11 only. Under labwc (Wayland, Raspberry Pi OS Trixie) xrandr/xinput do
+# nothing; display-output.sh maps touch to the rotated screen instead.
+if ls /run/user/*/wayland-0 >/dev/null 2>&1 && ! pgrep -x Xorg >/dev/null; then
+    echo "Wayland session: touch rotation is handled by display-output.sh"
+    echo "Run: /opt/vernis/scripts/display-output.sh apply   (as the desktop user)"
+    exit 0
+fi
+
 sleep 2
 export DISPLAY=:0
 

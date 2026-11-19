@@ -24,6 +24,68 @@ from pathlib import Path
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# ipfs.io and dweb.link stopped serving content in 2026 (HTTP 429 "switching
+# to a service worker gateway"). Without the Pi's own node these are the only
+# public gateways that still answered when tested.
+PUBLIC_GATEWAYS = ["https://gateway.pinata.cloud", "https://ipfs.filebase.io"]
+
+_BARE_CID_RE = re.compile(r'(Qm[a-zA-Z0-9]{44}|baf[a-z0-9]{50,})(/\S*)?', re.I)
+_VIDEO_EXTS = ('.mp4', '.webm', '.mov', '.m4v')
+_NOT_SHOWABLE_EXTS = ('.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac', '.glb', '.gltf', '.usdz')
+
+
+def _uri_ext(uri):
+    return os.path.splitext(urllib.parse.urlparse(uri).path)[1].lower()
+
+
+def _is_ipfs_uri(uri):
+    return bool(uri) and (uri.startswith('ipfs://') or '/ipfs/' in uri)
+
+
+def pick_artwork_uri(metadata):
+    """The URI of the full artwork in token metadata.
+
+    `image` is often only a still: SuperRare puts a frame grab there and the
+    original file in its own `media.uri`; video NFTs put the video in
+    `animation_url`. A non-video animation_url (HTML, often a folder CID) is
+    only used when there is no image, as before. Keep in sync with
+    _pick_artwork_uri() in backend/app.py."""
+    def bare_cid(*keys):
+        # Nifty Gateway stores bare CIDs in image_hash / animation_hash
+        for k in keys:
+            v = metadata.get(k)
+            if isinstance(v, str) and _BARE_CID_RE.fullmatch(v):
+                return 'ipfs://' + v
+        return ''
+
+    image = (bare_cid('image_hash', 'imageHash') or metadata.get('image')
+             or metadata.get('image_url') or '')
+    anim = bare_cid('animation_hash', 'animationHash') or metadata.get('animation_url') or ''
+    if not isinstance(image, str):
+        image = ''
+    if not isinstance(anim, str):
+        anim = ''
+
+    media = metadata.get('media')
+    if isinstance(media, dict) and isinstance(media.get('uri'), str) and media['uri']:
+        mime = str(media.get('mimeType') or '')
+        if not mime.startswith(('audio/', 'model/')) and _uri_ext(media['uri']) not in _NOT_SHOWABLE_EXTS:
+            return media['uri']
+
+    if anim:
+        details = metadata.get('animation_details')
+        fmt = str(details.get('format') or '') if isinstance(details, dict) else ''
+        if _uri_ext(anim) in _VIDEO_EXTS or fmt.upper() in ('MP4', 'WEBM', 'MOV', 'M4V'):
+            return anim
+
+    if image:
+        return image
+    if anim and _uri_ext(anim) not in _NOT_SHOWABLE_EXTS:
+        return anim
+    image_data = metadata.get('image_data')
+    return image_data if isinstance(image_data, str) else ''
+
+
 class IPFSManager:
     """Handles IPFS gateway detection across multiple ports"""
 
@@ -39,11 +101,10 @@ class IPFSManager:
         for port in self.common_ports:
             try:
                 test_url = f"http://127.0.0.1:{port}"
-                # Test with a known small CID
-                response = requests.get(
-                    f"{test_url}/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
-                    timeout=2
-                )
+                # bafkqaaa is the empty identity CID: a running gateway serves
+                # it instantly, with no network fetch (unlike a real CID,
+                # which can miss a 2 s timeout on a freshly started node)
+                response = requests.get(f"{test_url}/ipfs/bafkqaaa", timeout=2)
                 if response.status_code == 200:
                     self.gateway_url = test_url
                     self.gateway_port = port
@@ -52,7 +113,8 @@ class IPFSManager:
             except:
                 continue
 
-        print("⚠ No local IPFS gateway found, will use public gateways")
+        print("⚠ No local IPFS gateway found — is the ipfs service running? "
+              "Falling back to public gateways (slow, may fail)")
         return False
 
     def get_gateway_url(self):
@@ -61,7 +123,7 @@ class IPFSManager:
             return self.gateway_url
 
         # Fallback to public gateways
-        return "https://ipfs.io"
+        return PUBLIC_GATEWAYS[0]
 
 class AdvancedNFTDownloader:
     """Advanced NFT downloader with IPFS support, workers, and nested downloads"""
@@ -115,6 +177,10 @@ class AdvancedNFTDownloader:
             self.ipfs_manager.detect_gateway()
 
         self.gateway_url = self.ipfs_manager.get_gateway_url()
+        # Reported in the progress file so the UI can tell the owner to start
+        # the node instead of showing a wall of unexplained failures.
+        self.local_ipfs = bool(self.ipfs_manager.gateway_url)
+        self.gateway_urls = [self.gateway_url] if self.local_ipfs else list(PUBLIC_GATEWAYS)
 
         # CID pattern for IPFS links (captures optional /path after CID for directory CIDs)
         self.cid_pattern = re.compile(
@@ -375,7 +441,8 @@ class AdvancedNFTDownloader:
                 "total": self.total_items,
                 "bytes_downloaded": self.bytes_downloaded,
                 "speed": speed,
-                "current_file": self.current_file
+                "current_file": self.current_file,
+                "local_ipfs": self.local_ipfs,
             }
             # Include source CSV filename if set
             if self.source_csv:
@@ -446,6 +513,15 @@ class AdvancedNFTDownloader:
             if attempt < retries - 1:
                 time.sleep(2)  # Wait before retry
 
+        return None
+
+    def _fetch_ipfs(self, path):
+        """Fetch '<cid>[/path]' from the local node, or else each public
+        gateway in turn. last_error keeps the final gateway's error."""
+        for gw in self.gateway_urls:
+            data = self._download_with_retry(f"{gw}/ipfs/{path}")
+            if data:
+                return data
         return None
 
     def _detect_file_type(self, data):
@@ -583,8 +659,7 @@ class AdvancedNFTDownloader:
         print(f"  ⬇ Downloading: {cid}")
         with self.lock:
             self.current_file = safe_id[:16] + "..."  # Truncate for display
-        url = f"{self.gateway_url}/ipfs/{cid}"
-        data = self._download_with_retry(url)
+        data = self._fetch_ipfs(cid)
 
         if not data:
             error_msg = getattr(self, 'last_error', 'Download failed')
@@ -758,7 +833,8 @@ class AdvancedNFTDownloader:
         if not uri:
             return None
         if uri.startswith('ipfs://'):
-            return uri[7:]
+            path = uri[7:]
+            return path[5:] if path.startswith('ipfs/') else path  # ipfs://ipfs/<cid>
         match = self.cid_pattern.search(uri)
         if match:
             return match.group(1) or match.group(2)
@@ -843,7 +919,11 @@ class AdvancedNFTDownloader:
                 print(f"  📋 Metadata: {token_uri[:70]}...")
 
                 try:
-                    meta_data = self._download_with_retry(metadata_url)
+                    # IPFS metadata goes through our gateways, also when the
+                    # tokenURI names another one (SuperRare's ipfs.pixura.io)
+                    meta_data = self._fetch_ipfs(metadata_ipfs_cid) if metadata_ipfs_cid else None
+                    if not meta_data and token_uri.startswith(('http://', 'https://')):
+                        meta_data = self._download_with_retry(metadata_url)
                     if meta_data:
                         try:
                             metadata = json.loads(meta_data)
@@ -880,12 +960,7 @@ class AdvancedNFTDownloader:
 
         # === STEP 2: Download image from metadata ===
         if metadata:
-            image_field = (
-                metadata.get('image') or
-                metadata.get('image_url') or
-                metadata.get('animation_url') or
-                metadata.get('image_data') or ''
-            )
+            image_field = pick_artwork_uri(metadata)
 
             # Use token name from metadata for filename
             token_name = (metadata.get('name') or '').strip()

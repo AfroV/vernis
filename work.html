@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="walnut-dark">
+<head>
+  <meta charset="UTF-8">
+  <title>Work Mode - Vernis</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="vernis-themes.css">
+  <script>
+    // Same theme as the rest of Vernis: local first, then the device's setting.
+    (function () {
+      var style = localStorage.getItem('vernis-theme-style') || 'walnut';
+      var mode = localStorage.getItem('vernis-theme-mode') || 'dark';
+      if (mode === 'auto') { var h = new Date().getHours(); mode = (h >= 20 || h < 7) ? 'dark' : 'light'; }
+      document.documentElement.setAttribute('data-theme', style + '-' + mode);
+      // The frame's own screen shows the usage; a phone/PC gets the normal menu.
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+        document.documentElement.classList.add('on-frame');
+    })();
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg-primary); color: var(--text-primary);
+      font-family: var(--font-body);
+      overflow: hidden; -webkit-font-smoothing: antialiased;
+      --u: min(1vw, 1vh);
+    }
+
+    /* Decorative edge frame — same as the kiosk start screen */
+    .frame { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+    .frame-border { position: absolute; inset: 16px; border: 1px solid var(--accent-primary); border-radius: 4px; opacity: 0.45; }
+    .frame-border-inner { position: absolute; inset: 26px; border: 0.5px solid var(--accent-primary); border-radius: 2px; opacity: 0.2; }
+    .corner { position: absolute; width: 50px; height: 50px; }
+    .corner::before, .corner::after { content: ''; position: absolute; background: var(--accent-primary); opacity: 0.6; }
+    .corner::before { width: 50px; height: 1px; }
+    .corner::after { width: 1px; height: 50px; }
+    .c-tl { top: 16px; left: 16px; } .c-tl::before { top: 50px; left: 0; } .c-tl::after { top: 0; left: 50px; }
+    .c-tr { top: 16px; right: 16px; } .c-tr::before { top: 50px; right: 0; } .c-tr::after { top: 0; right: 50px; }
+    .c-bl { bottom: 16px; left: 16px; } .c-bl::before { bottom: 50px; left: 0; } .c-bl::after { bottom: 0; left: 50px; }
+    .c-br { bottom: 16px; right: 16px; } .c-br::before { bottom: 50px; right: 0; } .c-br::after { bottom: 0; right: 50px; }
+    .side { position: absolute; width: 1px; top: 15%; bottom: 15%; opacity: 0.18;
+      background: linear-gradient(180deg, transparent 0%, var(--accent-primary) 20%, var(--accent-primary) 80%, transparent 100%); }
+    .side-l { left: 40px; } .side-r { right: 40px; }
+    .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.25) 100%); }
+    /* Same breakpoint as index.html: the 720 px frame uses the small corners */
+    @media (max-width: 768px) {
+      .frame-border { inset: 8px; } .frame-border-inner { inset: 16px; }
+      .corner { width: 30px; height: 30px; } .corner::before { width: 30px; } .corner::after { height: 30px; }
+      .c-tl, .c-tr { top: 8px; } .c-bl, .c-br { bottom: 8px; }
+      .c-tl, .c-bl { left: 8px; } .c-tr, .c-br { right: 8px; }
+      .c-tl::before, .c-tr::before { top: 30px; } .c-bl::before, .c-br::before { bottom: 30px; }
+      .c-tl::after, .c-bl::after { left: 30px; } .c-tr::after, .c-br::after { right: 30px; }
+      .side-l { left: 24px; } .side-r { right: 24px; }
+    }
+
+    .page {
+      position: relative; z-index: 6;
+      height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: clamp(48px, calc(var(--u) * 8), 64px) clamp(28px, calc(var(--u) * 8), 64px);
+    }
+    .inner { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: clamp(12px, calc(var(--u) * 2.4), 20px); }
+
+    /* Frame only. Same spot as Back on the kiosk's Wi-Fi and Connect screens:
+       inside the edge frame, right of the corner ornament, not over its lines. */
+    .kiosk-back {
+      position: fixed; top: 28px; left: 74px; z-index: 7;
+      display: flex; align-items: center; gap: 6px; padding: 10px 4px;
+      color: #fff; text-decoration: none;
+      font-family: var(--font-body); font-size: 18px; font-weight: 500; opacity: 0.9;
+    }
+    .kiosk-back svg { width: 18px; height: 18px; }
+    @media (max-width: 768px) { .kiosk-back { top: 20px; left: 46px; } }
+    .kiosk-back:active { opacity: 1; }
+    html:not(.on-frame) .kiosk-back { display: none; }
+    /* The site menu is for phones/PCs; the frame has its own Back. */
+    html.on-frame .header, html.on-frame .mobile-menu { display: none !important; }
+    html:not(.on-frame) .page { padding-top: 110px; }
+    /* The site header (z-index 1000, tinted glass) would hide the top of the
+       edge frame; draw the lines over it. They take no clicks. */
+    html:not(.on-frame) .frame { z-index: 1001; }
+    /* …and keep the phone menu button inside the frame, clear of the
+       top-right corner ornament and the inner line. */
+    @media (max-width: 900px) {
+      html:not(.on-frame) .menu-toggle { position: relative; top: 20px; margin-right: 54px; }
+    }
+    @media (max-width: 768px) {
+      html:not(.on-frame) .menu-toggle { top: 10px; margin-right: 28px; }
+    }
+
+    /* Title block — echoes the VERNIS logo, diamond and line */
+    .title { text-align: center; }
+    .title-row { display: inline-flex; align-items: center; gap: clamp(10px, calc(var(--u) * 2), 16px); }
+    h1 {
+      font-family: var(--font-display); font-weight: 900;
+      font-size: clamp(30px, calc(var(--u) * 6.6), 50px); letter-spacing: 0.12em; text-transform: uppercase;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .diamond { width: 8px; height: 8px; margin: 8px auto 8px; background: var(--accent-primary); transform: rotate(45deg); opacity: 0.6; }
+    .line { width: 220px; max-width: 60%; height: 1px; margin: 0 auto;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), transparent); opacity: 0.5; }
+
+    /* Quota cards */
+    #windows { display: flex; flex-direction: column; gap: inherit; }
+    /* Own class, not the theme's card: that one lifts on hover and looks tappable */
+    .quota {
+      position: relative;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-medium); border-radius: 6px;
+      padding: clamp(14px, calc(var(--u) * 3), 24px) clamp(16px, calc(var(--u) * 3.4), 28px);
+      display: flex; flex-direction: column; gap: clamp(8px, calc(var(--u) * 1.6), 14px);
+    }
+    /* Hairline inset, like a passe-partout */
+    .quota::after { content: ''; position: absolute; inset: 5px; border: 0.5px solid var(--accent-primary); border-radius: 3px; opacity: 0.15; pointer-events: none; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .pct { font-family: var(--font-display); font-weight: 700; line-height: 1;
+      font-size: clamp(38px, calc(var(--u) * 9), 70px); font-variant-numeric: lining-nums tabular-nums; }
+    .pct small { font-family: var(--font-accent); font-style: italic; font-weight: 400; font-size: 0.36em; color: var(--text-muted); margin-left: 8px; }
+    .pill {
+      font-family: var(--font-body); font-size: clamp(11px, calc(var(--u) * 1.9), 14px); font-weight: 600;
+      letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap;
+      color: var(--accent-primary); border: 1px solid rgba(var(--accent-primary-rgb, 212,175,55), 0.5);
+      padding: 6px 12px; border-radius: 999px;
+    }
+    .bar { height: clamp(10px, calc(var(--u) * 2), 14px); background: var(--bg-tertiary);
+      border: 1px solid var(--border-medium); border-radius: 999px; overflow: hidden; }
+    .fill { height: 100%; width: 0; border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent-tertiary, var(--accent-primary)), var(--accent-primary), var(--accent-secondary));
+      transition: width 0.9s cubic-bezier(.2,.8,.2,1); }
+    .lvl-mid .fill { background: var(--warning, #f0ad4e); }
+    .lvl-low .fill { background: var(--error, #d9534f); }
+    .lvl-low .pct { color: var(--error, #d9534f); }
+    .resets { font-family: var(--font-body); font-size: clamp(14px, calc(var(--u) * 2.6), 19px); color: var(--text-secondary); }
+    .resets b { font-weight: 700; color: var(--text-primary); }
+
+    .minor { padding-top: 12px; padding-bottom: 12px; gap: 8px; }
+    .minor .name { font-family: var(--font-body); font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-secondary); }
+    .minor .val { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+    .minor .bar { height: 7px; }
+
+    .foot {
+      text-align: center; font-family: var(--font-accent); font-style: italic;
+      font-size: clamp(17px, calc(var(--u) * 3.2), 24px); color: var(--accent-primary); min-height: 1.3em;
+    }
+    .foot.muted { color: var(--text-muted); }
+    .foot .orn { display: inline-block; width: 6px; height: 6px; margin: 0 12px 3px; background: currentColor; transform: rotate(45deg); opacity: 0.6; }
+
+    .empty { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 12px 0; }
+    .empty h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(22px, calc(var(--u) * 4.2), 30px); }
+    .empty p { color: var(--text-secondary); font-size: 16px; line-height: 1.6; max-width: 28em; }
+    .empty a { color: var(--accent-primary); font-weight: 600; text-decoration: none; }
+    [hidden] { display: none !important; }
+
+    body.display { cursor: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    body.display .quota, body.display .pct, body.display .pill { pointer-events: none; }
+
+    /* Remote control (phone/PC): switches the frame's screen */
+    .remote { text-align: center; display: flex; flex-direction: column; gap: 18px; align-items: center; padding: 8px 0; }
+    .remote .status { font-family: var(--font-accent); font-style: italic; font-size: clamp(22px, calc(var(--u) * 5), 30px); color: var(--text-primary); }
+    .remote .hint { color: var(--text-secondary); font-size: 15px; line-height: 1.6; max-width: 26em; }
+    .remote .err { color: var(--error, #d9534f); font-size: 15px; min-height: 1.2em; }
+    .rbtn {
+      min-width: 220px; min-height: 52px; padding: 14px 28px; border-radius: 999px; cursor: pointer;
+      font-family: var(--font-body); font-size: 16px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      background: var(--accent-primary); color: var(--bg-primary); border: 1px solid var(--accent-primary);
+    }
+    .rbtn.ghost { background: transparent; color: var(--accent-primary); }
+    .rbtn:disabled { opacity: 0.5; cursor: default; }
+
+    @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="index.html" class="logo">Vernis</a>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="add.html">Add Art</a>
+      <a href="preview.html">Preview</a>
+      <a href="work.html" class="workmode-nav" style="display:none">Work</a>
+      <a href="library.html">Library</a>
+      <a href="manage.html">Manage Art</a>
+      <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="menu-toggle" onclick="toggleMobileMenu()" aria-label="Menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> Home</a>
+    <a href="add.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg></span> Add Art</a>
+    <a href="preview.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></span> Preview</a>
+    <a href="work.html" class="workmode-nav active-page" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.9 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></svg></span> Work</a>
+    <a href="library.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg></span> Library</a>
+    <a href="manage.html"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg></span> Manage Art</a>
+    <a href="lab.html" class="atelier-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.46 8l.79-1.75L22 5.46c.39-.18.39-.73 0-.91l-1.75-.79L19.46 2c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.8c-.39.18-.39.73 0 .91l1.75.79.79 1.75c.18.39.73.39.92 0zM11.5 9.5L9.91 6c-.35-.78-1.47-.78-1.82 0L6.5 9.5 3 11.09c-.78.36-.78 1.47 0 1.82l3.5 1.59L8.09 18c.36.78 1.47.78 1.82 0l1.59-3.5 3.5-1.59c.78-.36.78-1.47 0-1.82L11.5 9.5zm4.87 8.25l-.79 1.75c-.18.39.13.85.56.85.2 0 .37-.11.46-.28l.79-1.75L19.14 17c.39-.18.39-.73 0-.91l-1.75-.79-.79-1.75c-.18-.39-.73-.39-.91 0l-.79 1.75-1.76.79c-.39.18-.39.73 0 .91l1.75.79z"/></svg></span> Atelier</a>
+    <a href="settings.html" class="settings-parent"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span> Settings</a>
+    <div class="settings-submenu">
+    <div class="menu-divider">Appearance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-theme'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> Theme</div>
+    <div class="menu-divider">Display</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-display'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Display Settings</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-screensaver'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Screen Timeout</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-orientation'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Orientation</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-hue'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z"/></svg> Ambient Light</div>
+    <div class="menu-divider">Content</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-github'" style="display:none;"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg> GitHub Library</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ethereum'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 3 12 12 22 21 12"/></svg> Ethereum RPC</div>
+    <div class="menu-divider">Storage</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-ipfs'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> IPFS Pinning</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-external'"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h4M6 14h2"/></svg> External Drive</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-backup'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Backup</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-storage'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Storage Health</div>
+    <div class="menu-divider">System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-wifi'"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M5 12.55a11 11 0 0114 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> Wi-Fi</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-performance'"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Performance</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-system'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.6 15H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 6.6V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg> System</div>
+    <div class="menu-section-link" onclick="location.href='settings.html#section-about'"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About</div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const toggle = document.querySelector('.menu-toggle');
+      menu.classList.toggle('active');
+      toggle.classList.toggle('active');
+      var isOpen = menu.classList.contains('active');
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+      var mc = document.querySelector('.main');
+      if (mc) mc.style.visibility = isOpen ? 'hidden' : '';
+      if (!isOpen) void document.body.offsetHeight;
+    }
+    // Show Atelier if unlocked
+    (function(){
+      if(localStorage.getItem('vernis-moon-unlocked')==='true'||localStorage.getItem('vernis-pixels-unlocked')==='true'||localStorage.getItem('vernis-doom-unlocked')==='true'||localStorage.getItem('vernis-burner-unlocked')==='true'){
+        document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }
+      fetch('/api/easter-egg').then(function(r){return r.json();}).then(function(s){
+        if(s.moon||s.pixels||s.doom||s.burner) document.querySelectorAll('.atelier-nav').forEach(function(el){el.style.display='';});
+      }).catch(function(){});
+    })();
+  </script>
+
+  <div class="frame" aria-hidden="true">
+    <div class="vignette"></div>
+    <div class="frame-border"></div>
+    <div class="frame-border-inner"></div>
+    <div class="corner c-tl"></div><div class="corner c-tr"></div>
+    <div class="corner c-bl"></div><div class="corner c-br"></div>
+    <div class="side side-l"></div><div class="side side-r"></div>
+  </div>
+
+  <a class="kiosk-back" id="back" href="index.html" aria-label="Back">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Back
+  </a>
+
+  <main class="page" aria-live="polite">
+    <div class="inner">
+      <header class="title">
+        <div class="title-row">
+          <h1 id="h1">Claude</h1>
+        </div>
+        <div class="diamond"></div>
+        <div class="line"></div>
+      </header>
+
+      <!-- On the frame: the usage itself -->
+      <section id="windows" hidden></section>
+
+      <section class="empty" id="empty" hidden>
+        <h2 id="empty-title">Waiting for your Mac</h2>
+        <p id="empty-text">Turn on Work Mode in Settings &rarr; Display and run the install command on your Mac. Your numbers appear here within a few minutes.</p>
+      </section>
+
+      <div class="foot" id="foot"></div>
+
+      <!-- On a phone/PC: a remote control for the frame's screen -->
+      <section class="remote" id="remote" hidden>
+        <div class="status" id="r-status">Switching your frame&hellip;</div>
+        <div class="hint" id="r-hint"></div>
+        <button class="rbtn" id="r-main" type="button" disabled></button>
+        <div class="err" id="r-err"></div>
+      </section>
+    </div>
+  </main>
+
+<script src="vernis-workmode-nav.js" defer></script>
+<script src="vernis-pin-modal.js"></script>
+<script src="vernis-pin-prompt.js"></script>
+<script>
+(function () {
+  var IS_DISPLAY = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  var STALE_SECONDS = 15 * 60;
+  var POLL_MS = 60 * 1000;
+  var TICK_MS = 30 * 1000;
+  var WEEK_MS = 7 * 86400 * 1000;
+  var WORDS = ['Brewing', 'Pondering', 'Tinkering', 'Simmering', 'Sketching', 'Steeping'];
+
+  var state = null;      // last /api/workmode/usage response
+  var fetchedAt = 0;     // local ms when it arrived (age_seconds was true then)
+  var wordIdx = Math.floor(Math.random() * WORDS.length);
+
+  function $(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Shared
+  // ------------------------------------------------------------------
+  function post(path) {
+    var send = function (headers) {
+      return fetch(path, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}), body: '{}' });
+    };
+    // Locked mode (C) needs the PIN for anything that changes the screen.
+    var p = window.VernisPinPrompt ? window.VernisPinPrompt.withPin(send) : send({});
+    return p.then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error(d.error === 'pin_required' ? 'PIN needed' : (d.error || ('HTTP ' + r.status)));
+        return d;
+      });
+    });
+  }
+
+  function syncTheme() {
+    fetch('/api/theme').then(function (r) { return r.json(); }).then(function (t) {
+      if (!t.style) return;
+      var m = t.mode === 'auto' ? ((new Date().getHours() >= 20 || new Date().getHours() < 7) ? 'dark' : 'light') : (t.mode || 'dark');
+      var k = t.style + '-' + m;
+      if (document.documentElement.getAttribute('data-theme') !== k) {
+        document.documentElement.setAttribute('data-theme', k);
+        try { localStorage.setItem('vernis-theme-style', t.style); localStorage.setItem('vernis-theme-mode', t.mode || 'dark'); } catch (e) {}
+      }
+    }).catch(function () {});
+  }
+
+  // ------------------------------------------------------------------
+  // Remote control (phone / PC): put Work Mode on the frame, and back
+  // ------------------------------------------------------------------
+  function remote() {
+    $('h1').textContent = 'Work Mode';
+    $('remote').hidden = false;
+    // The site menu (above) is how you leave this page on a phone/PC.
+    var btn = $('r-main');
+    var showing = false;
+
+    function paint() {
+      $('r-status').textContent = showing ? 'Showing on your frame' : 'Your frame is showing art';
+      $('r-hint').textContent = showing
+        ? 'Your Claude usage is on the frame now. Bring your art back whenever you like.'
+        : 'Put your Claude usage on the frame while you work.';
+      btn.textContent = showing ? 'Back to art' : 'Show on frame';
+      btn.className = 'rbtn' + (showing ? ' ghost' : '');
+      btn.disabled = false;
+    }
+
+    function act(path, nowShowing) {
+      btn.disabled = true; $('r-err').textContent = '';
+      post(path).then(function () {
+        showing = nowShowing; paint();
+        // Leaving Work Mode is done: go back to the dashboard.
+        if (!nowShowing) {
+          $('r-status').textContent = 'Your art is back';
+          setTimeout(function () { location.href = 'index.html'; }, 700);
+        }
+      })
+        .catch(function (e) { $('r-err').textContent = 'Couldn’t switch the frame: ' + e.message; btn.disabled = false; });
+    }
+
+    btn.addEventListener('click', function () { act(showing ? '/api/workmode/hide' : '/api/workmode/show', !showing); });
+
+    fetch('/api/workmode/config', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (c) {
+      if (!c.enabled) {
+        $('r-status').textContent = 'Work Mode is off';
+        $('r-hint').innerHTML = 'Turn it on in <a href="settings.html#section-display" style="color:var(--accent-primary)">Settings &rarr; Display</a>.';
+        btn.hidden = true;
+        return;
+      }
+      // Opening this page from the menu is the "show it on the frame" tap.
+      if (c.showing) { showing = true; paint(); }
+      else act('/api/workmode/show', true);
+    }).catch(function () { $('r-err').textContent = 'Can’t reach Vernis.'; });
+  }
+
+  // ------------------------------------------------------------------
+  // On the frame: the usage
+  // ------------------------------------------------------------------
+  function label(name) {
+    if (name === 'five_hour') return 'Session';
+    if (name === 'seven_day') return 'This week';
+    var rest = name.replace(/^seven_day_/, '').replace(/_/g, ' ');
+    return 'Week · ' + rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
+
+  function fmtSpan(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+    if (d > 0) return d + 'd ' + h + 'h';
+    if (h > 0) return h + 'h ' + m + 'm';
+    if (m > 0) return m + 'm';
+    return 'under a minute';
+  }
+
+  function fmtAgo(sec) { return sec < 90 ? 'just now' : fmtSpan(sec) + ' ago'; }
+
+  function fmtClock(ms) {
+    return new Date(ms).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '');
+  }
+
+  function fmtDate(ms) {
+    return new Date(ms).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }).replace(/^(\d+) (\w+)$/, '$2 $1');
+  }
+
+  // Used right now. A window whose reset time has passed is empty again even
+  // if the Mac hasn't reported since (asleep, lid closed).
+  function view(w) {
+    var resetMs = w.resets_at ? Date.parse(w.resets_at) : NaN;
+    var refilled = !isNaN(resetMs) && resetMs <= Date.now();
+    var used = refilled ? 0 : Math.max(0, Math.min(100, w.utilization));
+    return { used: Math.round(used), refilled: refilled, resetMs: resetMs };
+  }
+
+  function level(used) { return used >= 85 ? 'lvl-low' : used >= 60 ? 'lvl-mid' : 'lvl-ok'; }
+
+  function resetsText(v) {
+    if (v.refilled) return '<b>Fresh</b> · a new window starts when you use Claude';
+    if (isNaN(v.resetMs)) return 'Reset time unknown';
+    return 'Resets <b>' + esc(fmtClock(v.resetMs)) + '</b> · in ' + esc(fmtSpan((v.resetMs - Date.now()) / 1000));
+  }
+
+  // Weekly pace: compare how much is used with how much of the week has gone.
+  function paceText(w) {
+    var v = view(w);
+    if (v.refilled || isNaN(v.resetMs)) return null;
+    var start = v.resetMs - WEEK_MS, now = Date.now();
+    var elapsed = now - start;
+    if (elapsed < WEEK_MS * 0.03) return null;            // too early to tell
+    var used = w.utilization / 100;
+    if (used >= 1) return 'Weekly limit reached · back on ' + fmtDate(v.resetMs);
+    if (used <= 0) return 'On track · room to spare until ' + fmtDate(v.resetMs);
+    var runOut = now + (1 - used) * elapsed / used;
+    if (runOut >= v.resetMs) return 'On track · room to spare until ' + fmtDate(v.resetMs);
+    return 'At this pace you’ll run out ' + fmtClock(runOut);
+  }
+
+  function mainCard(name, w) {
+    var v = view(w), lbl = esc(label(name));
+    return '<div class="quota ' + level(v.used) + '">' +
+      '<div class="row"><div class="pct">' + v.used + '%<small>used</small></div>' +
+      '<div class="pill">' + lbl + '</div></div>' +
+      '<div class="bar" role="progressbar" aria-label="' + lbl + ' used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + v.used + '">' +
+      '<div class="fill" style="width:' + v.used + '%"></div></div>' +
+      '<div class="resets">' + resetsText(v) + '</div></div>';
+  }
+
+  function minorCard(name, w) {
+    var v = view(w);
+    return '<div class="quota minor ' + level(v.used) + '">' +
+      '<div class="row"><div class="name">' + esc(label(name)) + '</div><div class="val">' + v.used + '% used</div></div>' +
+      '<div class="bar"><div class="fill" style="width:' + v.used + '%"></div></div></div>';
+  }
+
+  function footer(text, muted) {
+    var foot = $('foot');
+    foot.className = 'foot' + (muted ? ' muted' : '');
+    foot.innerHTML = muted ? esc(text) : '<span class="orn"></span>' + esc(text) + '<span class="orn"></span>';
+  }
+
+  function render() {
+    var win = $('windows'), empty = $('empty');
+    if (!state || !state.has_data || state.enabled === false) {
+      win.hidden = true; empty.hidden = false;
+      if (state && state.enabled === false) {
+        $('empty-title').textContent = 'Work Mode is off';
+        $('empty-text').textContent = 'Turn it on in Settings → Display.';
+      }
+      footer(state ? '' : 'Connecting…', true);
+      return;
+    }
+    empty.hidden = true; win.hidden = false;
+
+    var ws = {}, raw = state.windows || {};
+    Object.keys(raw).forEach(function (n) {
+      if (/^[a-z0-9_]{1,40}$/.test(n) && raw[n] && typeof raw[n].utilization === 'number') ws[n] = raw[n];
+    });
+    var html = '';
+    ['five_hour', 'seven_day'].forEach(function (n) { if (ws[n]) html += mainCard(n, ws[n]); });
+    Object.keys(ws).filter(function (n) { return n !== 'five_hour' && n !== 'seven_day'; }).sort()
+      .forEach(function (n) { html += minorCard(n, ws[n]); });
+    win.innerHTML = html;
+
+    var age = (state.age_seconds || 0) + (Date.now() - fetchedAt) / 1000;
+    var stale = age > STALE_SECONDS;
+
+    var session = ws.five_hour ? view(ws.five_hour) : null;
+    var high = session && session.used >= 85;
+    var pace = ws.seven_day ? paceText(ws.seven_day) : null;
+    if (stale) footer('Your Mac is quiet · last update ' + fmtAgo(age), true);
+    else if (high) footer('Session almost used · a good time for a break');
+    else if (pace) footer(pace);
+    else footer(WORDS[wordIdx] + '…');
+  }
+
+  function load() {
+    fetch('/api/workmode/usage', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { state = d; fetchedAt = Date.now(); render(); })
+      .catch(function () { if (!state) { render(); footer('Can’t reach Vernis — retrying…', true); } });
+  }
+
+  function display() {
+    document.body.classList.add('display');
+    // Back puts the frame back to what it showed before Work Mode.
+    $('back').addEventListener('click', function (e) {
+      e.preventDefault();
+      fetch('/api/workmode/hide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .catch(function () {});
+      setTimeout(function () { location.href = 'index.html'; }, 2500);  // if the display can't be driven
+    });
+    load();
+    setInterval(load, POLL_MS);
+    setInterval(function () { wordIdx = (wordIdx + 1) % WORDS.length; render(); }, TICK_MS);
+  }
+
+  syncTheme();
+  setInterval(syncTheme, POLL_MS);
+  if (IS_DISPLAY) display(); else remote();
+})();
+</script>
+</body>
+</html>

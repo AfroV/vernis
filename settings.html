@@ -20,6 +20,7 @@
     <script src="vernis-pin-modal.js"></script>
     <script src="vernis-lock-guard.js"></script>
     <script src="vernis-pin-prompt.js"></script>
+    <script src="vernis-backup.js"></script>
     <script src="vernis-notifications.js"></script>
     <script src="vernis-keyboard.js"></script>
     <style>
@@ -1238,6 +1239,7 @@
         <a href="index.html">Home</a>
         <a href="add.html">Add Art</a>
         <a href="preview.html">Preview</a>
+        <a href="work.html" class="workmode-nav" style="display:none">Work</a>
         <a href="library.html">Library</a>
         <a href="manage.html">Manage Art</a>
         <a href="lab.html" class="atelier-nav" style="display:none">Atelier</a>
@@ -1276,6 +1278,7 @@
         >
         Preview</a
       >
+      <a href="work.html" class="workmode-nav" style="display:none"><span class="menu-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.9 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></svg></span> Work</a>
       <a href="library.html"
         ><span class="menu-icon"
           ><svg viewBox="0 0 24 24" fill="currentColor">
@@ -2430,6 +2433,131 @@
                   Wipes the preview and restores the display if the artist walks away.
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div class="settings-card" id="workmode">
+            <h3>Work Mode</h3>
+            <p class="small" style="color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+              Shows how much of your Claude plan is left and when it resets,
+              right on this display while you work. A small helper on your Mac
+              sends only the numbers &mdash; your Claude login never leaves the Mac.
+            </p>
+            <div class="toggle-group">
+              <div class="toggle-label">
+                <div>Enable Work Mode</div>
+                <div class="small">
+                  Adds <strong>Work</strong> to the menu and a Work Mode button on the display.
+                </div>
+              </div>
+              <div
+                class="toggle"
+                id="toggle-workmode"
+                onclick="toggleSwitch(this); saveWorkmodeConfig()"
+              ></div>
+            </div>
+
+            <div id="workmode-details" style="display: none; margin-top: 14px;">
+              <div class="small" style="color: var(--text-muted); line-height: 1.7;">
+                <strong>1.</strong> On your Mac, make sure Claude Code is signed in.
+                Open Terminal and run <code>claude auth login</code> once if it isn't.<br />
+                <strong>2.</strong> Then paste this into Terminal on the same Mac:
+              </div>
+              <div style="display: flex; gap: 8px; margin: 10px 0 6px; align-items: stretch;">
+                <input
+                  id="workmode-cmd"
+                  type="text"
+                  readonly
+                  onclick="this.select()"
+                  style="flex: 1; min-width: 0; font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--border-light); background: var(--bg-tertiary); color: var(--text-primary);"
+                />
+                <button class="btn btn-secondary" id="workmode-copy" onclick="copyWorkmodeCmd()" style="white-space: nowrap;">Copy</button>
+              </div>
+              <div class="small" id="workmode-status" style="color: var(--text-muted); margin-top: 6px;"></div>
+              <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <a class="btn" href="work.html">Show on frame</a>
+              </div>
+              <div class="small" style="color: var(--text-muted); margin-top: 12px; line-height: 1.6;">
+                To remove the helper from your Mac later, run:<br />
+                <code id="workmode-uninstall" style="word-break: break-all;"></code>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card" id="homeview">
+            <h3>Apple HomeView</h3>
+            <p class="small" style="color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+              Show your collection on an Apple HomeView photo frame. Vernis makes
+              square copies of your art, and a Shortcut on your iPhone adds them to
+              a shared album that HomeView displays. Nothing changes on this display.
+            </p>
+            <div class="toggle-group">
+              <div class="toggle-label">
+                <div>Send art to HomeView</div>
+                <div class="small">
+                  Off by default. While this is on, anyone on this network can
+                  download the square copies.
+                </div>
+              </div>
+              <div
+                class="toggle"
+                id="toggle-homeview"
+                onclick="toggleSwitch(this); saveHomeViewConfig()"
+              ></div>
+            </div>
+
+            <div id="homeview-details" style="display: none; margin-top: 14px;">
+              <div class="form-group">
+                <label for="homeview-source">What to send</label>
+                <select class="form-input" id="homeview-source" onchange="saveHomeViewConfig()">
+                  <option value="gallery">Everything shown in the gallery</option>
+                  <option value="favorites">Favorites only</option>
+                </select>
+              </div>
+
+              <div id="homeview-status" class="small" style="color: var(--text-secondary); line-height: 1.7; margin: 10px 0;"></div>
+
+              <div id="homeview-send-ios" style="display: none;">
+                <button class="btn btn-primary" id="homeview-send-btn" onclick="homeViewSend(false)">
+                  Send to HomeView
+                </button>
+                <button class="btn btn-secondary" id="homeview-resend-btn" onclick="homeViewSend(true)" style="display: none;">
+                  Send last batch again
+                </button>
+                <div class="small" style="color: var(--text-muted); margin-top: 8px; line-height: 1.6;">
+                  Opens the Shortcut, which asks you to confirm the shared album &mdash;
+                  tap <strong>Post</strong>. If you cancelled, use &ldquo;Send last batch again&rdquo;.
+                </div>
+              </div>
+
+              <div id="homeview-send-qr" style="display: none;">
+                <div class="small" style="color: var(--text-muted); line-height: 1.7;">
+                  Sending works from your iPhone. Scan to open this page there:
+                </div>
+                <img id="homeview-qr" alt="QR code for this page" style="width: 160px; height: 160px; margin-top: 8px; border-radius: 8px;" />
+              </div>
+
+              <div id="homeview-removed" style="display: none; margin-top: 16px;">
+                <div class="small" style="color: var(--text-secondary); line-height: 1.7;">
+                  These were sent but are no longer in Vernis. Delete them from the
+                  shared album in Photos &mdash; Vernis can&rsquo;t do that for you:
+                </div>
+                <ul id="homeview-removed-list" class="small" style="color: var(--text-muted); margin: 6px 0 10px 18px; word-break: break-all;"></ul>
+                <button class="btn btn-secondary" onclick="homeViewClearRemoved()">
+                  Done, I&rsquo;ve deleted them
+                </button>
+              </div>
+
+              <details style="margin-top: 16px;">
+                <summary class="small" style="cursor: pointer; color: var(--text-secondary);">First-time setup</summary>
+                <ol class="small" style="color: var(--text-muted); line-height: 1.8; margin: 8px 0 0 18px;">
+                  <li id="homeview-install-step"></li>
+                  <li>In Photos on your iPhone, create a shared album, for example &ldquo;Vernis&rdquo;.</li>
+                  <li>Tap <strong>Send to HomeView</strong> above. The first time, allow the
+                    Shortcut to connect to Vernis and pick your shared album.</li>
+                  <li>On HomeView, choose the Photos face and select the same shared album.</li>
+                </ol>
+              </details>
             </div>
           </div>
           <div class="settings-card">
@@ -3768,7 +3896,12 @@
                 margin-bottom: 16px;
               "
             >
-              15% of storage is reserved for SD card wear leveling
+              Why a limit? Every pinned artwork is also kept in the IPFS store,
+              so this is the space pinning should stay within. The highest
+              setting still leaves 15% of the drive unused, so the SD card or
+              SSD can spread its writes and last longer. Raise it as your
+              collection grows: pinned art is never deleted when the limit is
+              reached.
             </div>
 
             <div
@@ -4072,28 +4205,65 @@
               style="margin-top: 15px; display: none"
             ></div>
           </div>
+
+          <div class="settings-card" id="ipfs-location-card">
+            <h3>IPFS Store</h3>
+            <p class="small" style="margin: 0 0 12px 0; line-height: 1.5">
+              Where the IPFS copies of your pinned art are kept. On a large
+              external drive, pinning can grow far past the SD card. The drive
+              must be formatted as ext4 and stay plugged in: while it's
+              unplugged the IPFS node pauses, and your art keeps showing from
+              its files.
+            </p>
+            <div
+              id="ipfs-location-status"
+              style="
+                padding: 16px;
+                background: var(--bg-tertiary);
+                border-radius: 10px;
+                margin-bottom: 16px;
+                color: var(--text-primary);
+              "
+            >
+              Checking…
+            </div>
+            <div class="button-row" id="ipfs-location-actions"></div>
+          </div>
         </section>
 
         <!-- Backup Section -->
         <section class="settings-section" id="section-backup">
           <div class="section-header">
             <h1>Backup & Restore</h1>
-            <p>Create backups of your NFT files and CSV collections</p>
+            <p>Save your whole library to this computer or phone, and restore it on any Vernis</p>
           </div>
 
           <div class="settings-card">
+            <h3>Download Backup</h3>
+            <p class="small" style="margin: 0 0 12px 0; line-height: 1.5">
+              Every original artwork file (named by its IPFS CID), its metadata
+              and your collection lists, streamed straight to this device.
+              Nothing extra is stored on the Vernis while it runs.
+            </p>
+            <div
+              id="backup-summary"
+              style="font-size: 14px; color: var(--text-primary); margin-bottom: 15px"
+            >
+              Counting your library…
+            </div>
             <div class="button-row" style="margin-bottom: 15px">
-              <button class="btn" onclick="createBackup()" style="flex: 1">
-                Create Backup
+              <button class="btn" onclick="downloadStreamBackup()" style="flex: 1">
+                Download Backup
               </button>
               <button
                 class="btn btn-secondary"
                 onclick="document.getElementById('backup-import').click()"
                 style="flex: 1"
               >
-                Import Backup
+                Restore Backup
               </button>
             </div>
+            <div id="backup-drive-buttons" class="button-row" style="margin-bottom: 15px; display: none"></div>
             <p
               style="
                 font-size: 12px;
@@ -4102,14 +4272,16 @@
                 line-height: 1.5;
               "
             >
-              Includes: CSV collections, settings, slideshow presets, metadata
-              cache, and IPFS configuration. Does not include artwork files
-              (those can be re-downloaded from IPFS after restoring).
+              Progress shows in your browser's downloads. If the download stops,
+              press Resume there: it continues where it left off as long as the
+              library hasn't changed. With a USB drive plugged into the Vernis,
+              you can save the backup straight onto it instead. Settings,
+              slideshows and the IPFS store itself are not included.
             </p>
             <input
               type="file"
               id="backup-import"
-              accept=".tar.gz,.tgz"
+              accept=".tar,.zip,.tar.gz,.tgz"
               style="display: none"
               onchange="importBackup(this.files[0])"
             />
@@ -4157,8 +4329,21 @@
             </div>
           </div>
 
-          <div class="settings-card">
-            <h3>Previous Backups</h3>
+          <div class="settings-card" id="usb-backups" style="display: none">
+            <h3>Backups on USB Drives</h3>
+            <p class="small" style="margin: 0 0 12px 0">
+              Found on a drive plugged into this Vernis. Restoring from the
+              drive needs no network and runs at full disk speed.
+            </p>
+            <div id="usb-backup-list"></div>
+          </div>
+
+          <div class="settings-card" id="backup-list-card" style="display: none">
+            <h3>Backups Stored on This Vernis</h3>
+            <p class="small" style="margin: 0 0 12px 0">
+              Made by earlier versions. Download them to keep a copy; deleting
+              one frees space on the Vernis and never touches your library.
+            </p>
             <div id="backup-list">Loading...</div>
           </div>
         </section>
@@ -5574,6 +5759,240 @@
       }
 
       loadPreviewConfig();
+
+      // ========================================
+      // Work Mode — Claude quota from the owner's Mac
+      // ========================================
+      function _workmodeHost() {
+        // On the Pi itself location.host is localhost, which the Mac can't
+        // reach — use the LAN address, same as Preview Mode.
+        const h = window.location.hostname;
+        if ((h === "localhost" || h === "127.0.0.1") && _previewIp) return _previewIp;
+        return window.location.host;
+      }
+
+      function _workmodeAgo(iso) {
+        const t = Date.parse(iso);
+        if (isNaN(t)) return "";
+        const s = Math.max(0, (Date.now() - t) / 1000);
+        if (s < 90) return "just now";
+        if (s < 3600) return Math.round(s / 60) + " min ago";
+        if (s < 86400) return Math.round(s / 3600) + " h ago";
+        return Math.round(s / 86400) + " days ago";
+      }
+
+      function loadWorkmodeDetails(cfg) {
+        const on = !!cfg.enabled;
+        document.getElementById("toggle-workmode").classList.toggle("active", on);
+        document.getElementById("workmode-details").style.display = on ? "block" : "none";
+        if (window.vernisWorkmodeNav) window.vernisWorkmodeNav(on);
+        document.getElementById("workmode-status").textContent = cfg.has_data
+          ? "Last update from your Mac: " + _workmodeAgo(cfg.received_at) + "."
+          : "Nothing received from your Mac yet.";
+        if (!on) return;
+        fetch("/api/workmode/push-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (!d.push_token) return;
+            const base = "http://" + _workmodeHost() + "/api/workmode/installer.sh";
+            document.getElementById("workmode-cmd").value =
+              "curl -fsSL " + base + " | bash -s -- " + d.push_token;
+            document.getElementById("workmode-uninstall").textContent =
+              "curl -fsSL " + base + " | bash -s -- --uninstall";
+          })
+          .catch(() => {});
+      }
+
+      function loadWorkmodeConfig() {
+        fetch("/api/workmode/config", { cache: "no-store" })
+          .then((r) => r.json())
+          .then(loadWorkmodeDetails)
+          .catch(() => {});
+      }
+
+      function saveWorkmodeConfig() {
+        const enabled = document
+          .getElementById("toggle-workmode")
+          .classList.contains("active");
+        fetch("/api/workmode/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled: enabled }),
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.error) { showError(d.error); loadWorkmodeConfig(); return; }
+            loadWorkmodeDetails(d);
+          })
+          .catch((e) => showError("Could not save Work Mode: " + e.message));
+      }
+
+      function copyWorkmodeCmd() {
+        const input = document.getElementById("workmode-cmd");
+        const btn = document.getElementById("workmode-copy");
+        const done = () => {
+          btn.textContent = "Copied";
+          setTimeout(() => (btn.textContent = "Copy"), 1800);
+        };
+        // Clipboard API needs HTTPS; plain-HTTP Vernis falls back to execCommand.
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(input.value).then(done).catch(() => {});
+          return;
+        }
+        input.select();
+        try { if (document.execCommand("copy")) done(); } catch (e) {}
+      }
+
+      fetch("/api/status")
+        .then((r) => r.json())
+        .then((d) => { if (d.ip_address) _previewIp = d.ip_address; })
+        .catch(() => {})
+        .finally(loadWorkmodeConfig);
+
+      // ========================================
+      // Apple HomeView
+      // ========================================
+      let _homeViewCfg = null;
+
+      function _isIOS() {
+        return /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      }
+
+      function _homeViewPost(path, body) {
+        // Control endpoints: Mode C asks for the PIN on 401.
+        return VernisPinPrompt.withPin((headers) =>
+          fetch(path, {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, headers),
+            body: JSON.stringify(body || {}),
+          }),
+        ).then((r) => r.json());
+      }
+
+      function renderHomeView() {
+        const on = !!(_homeViewCfg && _homeViewCfg.enabled);
+        document.getElementById("homeview-details").style.display = on ? "block" : "none";
+        if (!on) return;
+
+        document.getElementById("homeview-source").value = _homeViewCfg.source;
+        const ios = _isIOS();
+        document.getElementById("homeview-send-ios").style.display = ios ? "block" : "none";
+        document.getElementById("homeview-send-qr").style.display = ios ? "none" : "block";
+        if (!ios) {
+          // On the Pi itself location.host is localhost; the QR must carry
+          // an address the phone can reach.
+          fetch("/api/status")
+            .then((r) => r.json())
+            .then((d) => {
+              const host = d.ip_address || window.location.host;
+              const url = "http://" + host + "/settings.html#section-display";
+              document.getElementById("homeview-qr").src =
+                "/api/qrcode?url=" + encodeURIComponent(url);
+            })
+            .catch(() => {});
+        }
+
+        const step = document.getElementById("homeview-install-step");
+        if (_homeViewCfg.shortcut_url) {
+          step.innerHTML = 'On your iPhone, <a href="' + escHTML(_homeViewCfg.shortcut_url) +
+            '" target="_blank" rel="noopener">install the &ldquo;' +
+            escHTML(_homeViewCfg.shortcut_name) + '&rdquo; Shortcut</a>.';
+        } else {
+          step.textContent = 'On your iPhone, install the "' + _homeViewCfg.shortcut_name +
+            '" Shortcut (link coming in a Vernis update).';
+        }
+        loadHomeViewStatus();
+      }
+
+      function loadHomeViewStatus() {
+        fetch("/api/homeview/status")
+          .then((r) => r.json())
+          .then((s) => {
+            if (s.error) return;
+            const status = document.getElementById("homeview-status");
+            if (s.not_sent === 0) {
+              status.textContent = "Everything has been sent.";
+            } else {
+              const n = s.not_sent;
+              status.textContent = n + (n === 1 ? " new piece" : " new pieces") + " not sent yet." +
+                (n > s.batch_max ? " They go " + s.batch_max + " at a time." : "");
+            }
+            if (s.storage_offline) {
+              status.textContent += " External storage is offline, so art on it isn't included right now.";
+            }
+            document.getElementById("homeview-send-btn").disabled = s.not_sent === 0;
+            document.getElementById("homeview-resend-btn").style.display =
+              s.last_batch ? "inline-block" : "none";
+
+            const removed = document.getElementById("homeview-removed");
+            removed.style.display = s.removed.length ? "block" : "none";
+            document.getElementById("homeview-removed-list").innerHTML =
+              s.removed.map((n) => "<li>" + escHTML(n) + "</li>").join("");
+          })
+          .catch(() => {});
+      }
+
+      function loadHomeViewConfig() {
+        fetch("/api/homeview/config")
+          .then((r) => r.json())
+          .then((cfg) => {
+            _homeViewCfg = cfg;
+            document.getElementById("toggle-homeview").classList.toggle("active", !!cfg.enabled);
+            renderHomeView();
+          })
+          .catch(() => {});
+      }
+
+      function saveHomeViewConfig() {
+        const enabled = document.getElementById("toggle-homeview").classList.contains("active");
+        const source = document.getElementById("homeview-source").value;
+        _homeViewPost("/api/homeview/config", { enabled: enabled, source: source })
+          .then((cfg) => {
+            if (cfg.error) return showError(cfg.error);
+            _homeViewCfg = cfg;
+            renderHomeView();
+          })
+          .catch((e) => {
+            if (e.message !== "pin_cancelled") showError("Could not save HomeView: " + e.message);
+            loadHomeViewConfig();
+          });
+      }
+
+      function homeViewSend(resend) {
+        _homeViewPost("/api/homeview/batch", { resend: resend })
+          .then((d) => {
+            if (d.error) return showError(d.error);
+            if (!d.batch) return showSuccess("Nothing new to send.");
+            loadHomeViewStatus();
+            // The Shortcut gets the manifest URL as its input. location.origin
+            // is the address this phone already reaches Vernis on.
+            const manifest = window.location.origin + "/api/homeview/manifest?batch=" + d.batch;
+            window.location.href = "shortcuts://run-shortcut?name=" +
+              encodeURIComponent(_homeViewCfg.shortcut_name) +
+              "&input=text&text=" + encodeURIComponent(manifest);
+          })
+          .catch((e) => {
+            if (e.message !== "pin_cancelled") showError("Could not start sending: " + e.message);
+          });
+      }
+
+      function homeViewClearRemoved() {
+        _homeViewPost("/api/homeview/removed/clear")
+          .then((d) => {
+            if (d.error) return showError(d.error);
+            loadHomeViewStatus();
+          })
+          .catch((e) => {
+            if (e.message !== "pin_cancelled") showError(e.message);
+          });
+      }
+
+      loadHomeViewConfig();
       // Storage Health
       function checkStorageHealth() {
         fetch("/api/health/storage")
@@ -7307,6 +7726,103 @@
           });
       }
 
+      // ---- IPFS store location (SD card or external drive) ----
+      let ipfsMovePoll = null;
+
+      function loadIpfsLocation() {
+        Promise.all([
+          fetch("/api/ipfs/location").then((r) => r.json()),
+          fetch("/api/storage/external/detect").then((r) => r.json()),
+        ])
+          .then(([loc, det]) => {
+            const status = document.getElementById("ipfs-location-status");
+            const actions = document.getElementById("ipfs-location-actions");
+            actions.innerHTML = "";
+            const move = loc.move || {};
+            const moving = ["queued", "copying", "starting"].includes(move.state);
+            const driveName = (p) => (p || "").split("/").pop();
+
+            if (moving) {
+              status.textContent =
+                move.state === "copying"
+                  ? `Moving the IPFS store (${VernisBackup.formatBytes(move.bytes || 0)})… ` +
+                    "the IPFS node is paused until it's done."
+                  : "Restarting the IPFS node in its new place…";
+              clearTimeout(ipfsMovePoll);
+              ipfsMovePoll = setTimeout(loadIpfsLocation, 3000);
+              return;
+            }
+            status.textContent = loc.external
+              ? `On the external drive ${driveName(loc.drive)}`
+              : "On the SD card";
+            if (move.state === "error") {
+              const err = document.createElement("div");
+              err.style.cssText = "margin-top: 8px; color: var(--error); font-size: 13px;";
+              err.textContent = move.error;
+              status.appendChild(err);
+            }
+            if (!loc.helper_installed) {
+              const note = document.createElement("div");
+              note.className = "small";
+              note.textContent = "Install the latest Vernis update to move the IPFS store.";
+              actions.appendChild(note);
+              return;
+            }
+            const addButton = (label, target, secondary) => {
+              const b = document.createElement("button");
+              b.className = secondary ? "btn btn-secondary" : "btn";
+              b.textContent = label;
+              b.onclick = () => moveIpfsStore(target, label);
+              actions.appendChild(b);
+            };
+            if (loc.external) addButton("Move back to SD card", "internal", true);
+            const drives = (det.drives || []).filter((d) => d.path !== loc.drive);
+            drives.filter((d) => d.can_hold_ipfs).forEach((d) =>
+              addButton(
+                `Move to ${d.name} (${VernisBackup.formatBytes(d.free_gb * 1024 ** 3)} free)`,
+                d.path,
+              ),
+            );
+            if (!loc.external && drives.length && !drives.some((d) => d.can_hold_ipfs)) {
+              const note = document.createElement("div");
+              note.className = "small";
+              note.textContent =
+                "Connected drives aren't ext4. Art files can go on them; for the IPFS store, " +
+                "format a drive as ext4 first.";
+              actions.appendChild(note);
+            }
+          })
+          .catch(() => {
+            document.getElementById("ipfs-location-status").textContent =
+              "Could not read the IPFS store location";
+          });
+      }
+
+      async function moveIpfsStore(target, label) {
+        if (
+          !(await vernisConfirm(
+            `${label}? The IPFS node pauses while the store is copied, which can take ` +
+              "a while for a large collection. Your art keeps showing, and nothing changes " +
+              "if the copy fails.",
+          ))
+        )
+          return;
+        VernisPinPrompt.withPin((headers) =>
+          fetch("/api/ipfs/location", {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, headers),
+            body: JSON.stringify({ target }),
+          }),
+        )
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.error) showError(d.error);
+            setTimeout(loadIpfsLocation, 1000);
+          })
+          .catch(() => showError("Could not start the move"));
+      }
+      loadIpfsLocation();
+
       function loadExternalStorageStatus() {
         fetch("/api/storage/external/status")
           .then((r) => r.json())
@@ -7467,7 +7983,10 @@
           .then((r) => r.json())
           .then((data) => {
             const backupList = document.getElementById("backup-list");
-            if (data.backups && data.backups.length > 0) {
+            const hasBackups = !!(data.backups && data.backups.length);
+            document.getElementById("backup-list-card").style.display =
+              hasBackups ? "" : "none";
+            if (hasBackups) {
               backupList.innerHTML = data.backups
                 .map(
                   (backup) => `
@@ -7495,64 +8014,32 @@
           });
       }
 
-      function createBackup() {
-        const statusEl = document.getElementById("backup-status");
-        const progressEl = document.getElementById("backup-progress");
-        const progressBar = document.getElementById("backup-progress-bar");
-        const progressText = document.getElementById("backup-progress-text");
-
-        statusEl.textContent = "Creating backup...";
-        statusEl.style.display = "block";
-        statusEl.style.background = "var(--bg-tertiary)";
-        statusEl.style.color = "var(--text-primary)";
-
-        // Show progress bar with animation
-        progressEl.style.display = "block";
-        progressBar.style.width = "0%";
-        progressText.textContent = "Preparing backup...";
-
-        // Animate progress while waiting
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-          if (progress < 90) {
-            progress += Math.random() * 15;
-            if (progress > 90) progress = 90;
-            progressBar.style.width = progress + "%";
-            if (progress < 30) progressText.textContent = "Collecting files...";
-            else if (progress < 60) progressText.textContent = "Compressing...";
-            else progressText.textContent = "Finalizing...";
-          }
-        }, 300);
-
-        fetch("/api/backup/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        })
+      function loadBackupSummary() {
+        const el = document.getElementById("backup-summary");
+        fetch("/api/backup/stream/info")
           .then((r) => r.json())
-          .then((result) => {
-            clearInterval(progressInterval);
-            if (result.success) {
-              progressBar.style.width = "100%";
-              progressText.textContent = "Complete!";
-              statusEl.textContent = `Backup created! ${result.size}`;
-              statusEl.style.color = "#32d74b";
-              setTimeout(() => {
-                downloadBackup(result.filename);
-                loadBackupList();
-                progressEl.style.display = "none";
-              }, 1500);
-            } else {
-              progressEl.style.display = "none";
-              statusEl.textContent = result.error || "Backup failed";
-              statusEl.style.color = "#ff3b30";
-            }
+          .then((d) => {
+            if (d.error) throw new Error(d.error);
+            el.textContent =
+              `${d.artworks.toLocaleString()} artwork files and ` +
+              `${d.collection_files.toLocaleString()} collection files · ${VernisBackup.formatBytes(d.bytes)}`;
           })
           .catch(() => {
-            clearInterval(progressInterval);
-            progressEl.style.display = "none";
-            statusEl.textContent = "Backup failed";
-            statusEl.style.color = "#ff3b30";
+            el.textContent = "Could not count the library";
           });
+      }
+      loadBackupSummary();
+
+      // A normal link download: the browser streams it to disk with its own
+      // progress and Resume, which the server supports with byte ranges.
+      function downloadStreamBackup() {
+        const link = document.createElement("a");
+        link.href = "/api/backup/stream";
+        link.download = "";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showSuccess("Backup download started. Follow it in your browser's downloads.");
       }
 
       function downloadBackup(filename) {
@@ -7589,69 +8076,161 @@
           .catch(() => showError("Failed to delete backup"));
       }
 
-      function importBackup(file) {
-        if (!file) return;
-
-        const statusEl = document.getElementById("backup-status");
+      function backupProgress(pct, text) {
         const progressEl = document.getElementById("backup-progress");
-        const progressBar = document.getElementById("backup-progress-bar");
-        const progressText = document.getElementById("backup-progress-text");
-
-        statusEl.style.display = "block";
-        statusEl.style.color = "var(--text-secondary)";
-        statusEl.textContent = `Uploading ${file.name}...`;
-        progressEl.style.display = "block";
-        progressBar.style.width = "0%";
-
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/backup/import", true);
-
-        xhr.upload.onprogress = function (e) {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 50); // Upload is first 50%
-            progressBar.style.width = pct + "%";
-            progressText.textContent = `Uploading: ${pct * 2}%`;
-          }
-        };
-
-        xhr.onload = function () {
-          if (xhr.status === 200) {
-            const result = JSON.parse(xhr.responseText);
-            if (result.success) {
-              progressBar.style.width = "100%";
-              progressText.textContent = "Complete!";
-              statusEl.style.color = "var(--success)";
-              statusEl.textContent =
-                result.message || "Backup imported successfully!";
-              showSuccess("Backup imported!");
-              loadBackupList();
-              setTimeout(() => {
-                progressEl.style.display = "none";
-              }, 2000);
-            } else {
-              statusEl.style.color = "#ff3b30";
-              statusEl.textContent = result.error || "Import failed";
-              progressEl.style.display = "none";
-            }
-          } else {
-            statusEl.style.color = "#ff3b30";
-            statusEl.textContent = "Import failed";
-            progressEl.style.display = "none";
-          }
-        };
-
-        xhr.onerror = function () {
-          statusEl.style.color = "#ff3b30";
-          statusEl.textContent = "Upload failed";
-          progressEl.style.display = "none";
-        };
-
-        xhr.send(formData);
-        document.getElementById("backup-import").value = "";
+        progressEl.style.display = pct == null ? "none" : "block";
+        if (pct != null) {
+          document.getElementById("backup-progress-bar").style.width = pct + "%";
+          document.getElementById("backup-progress-text").textContent = text || "";
+        }
       }
+
+      function backupStatus(text, kind) {
+        const el = document.getElementById("backup-status");
+        el.style.display = text ? "block" : "none";
+        el.style.background = "var(--bg-tertiary)";
+        el.style.color =
+          kind === "error" ? "var(--error)" : kind === "ok" ? "var(--success)" : "var(--text-secondary)";
+        el.textContent = text || "";
+      }
+
+      // After a restore: art goes back on IPFS in the background
+      function showRepin(result) {
+        loadBackupSummary();
+        backupProgress(null);
+        backupStatus(result.message, "ok");
+        if (!result.repinning) return;
+        VernisBackup.watchRepin((p) => {
+          backupStatus(
+            result.message +
+              (p.running
+                ? ` · Pinning restored art to IPFS: ${p.done} of ${p.total}`
+                : ` · ${p.pinned} artworks pinned to IPFS again` +
+                  (p.failed ? `, ${p.failed} need internet (they'll be fetched later)` : "")),
+            "ok",
+          );
+        });
+      }
+
+      function importBackup(file) {
+        document.getElementById("backup-import").value = "";
+        if (!file) return;
+        backupStatus(`Restoring ${file.name}…`);
+        backupProgress(0, "Uploading: 0%");
+        VernisBackup.upload(file, {
+          onProgress: (pct) => backupProgress(Math.round(pct * 0.95), `Uploading and restoring: ${pct}%`),
+          onUploaded: () => backupProgress(95, "Finishing…"),
+        })
+          .then((result) => {
+            showSuccess("Backup restored");
+            showRepin(result);
+          })
+          .catch((e) => {
+            backupProgress(null);
+            backupStatus(e.message, "error");
+          });
+      }
+
+      // "Save to <drive>" for each USB drive plugged into the Vernis
+      function loadBackupDrives() {
+        fetch("/api/storage/external/detect")
+          .then((r) => r.json())
+          .then((d) => {
+            const box = document.getElementById("backup-drive-buttons");
+            box.innerHTML = "";
+            const drives = (d.drives || []).filter((x) => x.writable);
+            box.style.display = drives.length ? "" : "none";
+            drives.forEach((drive) => {
+              const b = document.createElement("button");
+              b.className = "btn btn-secondary";
+              b.style.flex = "1";
+              b.textContent = `Save to ${drive.name}`;
+              b.onclick = () => saveBackupToDrive(drive);
+              box.appendChild(b);
+            });
+          })
+          .catch(() => {});
+      }
+
+      function saveBackupToDrive(drive) {
+        backupStatus(`Saving the backup to ${drive.name}…`);
+        backupProgress(0, "Saving: 0%");
+        VernisBackup.saveToDrive(drive.path, {
+          onProgress: (pct) => backupProgress(pct, `Saving to ${drive.name}: ${pct}%`),
+        })
+          .then((s) => {
+            backupProgress(null);
+            backupStatus(
+              `Saved ${s.name} to ${drive.name} (${VernisBackup.formatBytes(s.bytes)}). ` +
+                "It's safe to unplug the drive.",
+              "ok",
+            );
+            showSuccess("Backup saved to " + drive.name);
+            loadUsbBackups();
+          })
+          .catch((e) => {
+            backupProgress(null);
+            backupStatus(e.message, "error");
+          });
+      }
+      loadBackupDrives();
+
+      function loadUsbBackups() {
+        const card = document.getElementById("usb-backups");
+        VernisBackup.listLocal()
+          .then((list) => {
+            card.style.display = list.length ? "" : "none";
+            const box = document.getElementById("usb-backup-list");
+            box.innerHTML = "";
+            list.forEach((b) => {
+              const row = document.createElement("div");
+              row.style.cssText =
+                "padding: 12px; margin-bottom: 10px; background: var(--bg-tertiary); border-radius: 8px; " +
+                "display: flex; justify-content: space-between; align-items: center; gap: 12px;";
+              const info = document.createElement("div");
+              const title = document.createElement("div");
+              title.style.cssText = "font-weight: 500; color: var(--text-primary); word-break: break-all;";
+              title.textContent = b.name;
+              const sub = document.createElement("div");
+              sub.style.cssText = "font-size: 13px; color: var(--text-muted);";
+              sub.textContent = `${b.drive} · ${b.modified} · ${VernisBackup.formatBytes(b.bytes)}`;
+              info.append(title, sub);
+              const btn = document.createElement("button");
+              btn.className = "btn btn-secondary";
+              btn.style.cssText = "padding: 12px 16px; font-size: 13px; flex-shrink: 0;";
+              btn.textContent = "Restore";
+              btn.onclick = () => restoreUsbBackup(b);
+              row.append(info, btn);
+              box.appendChild(row);
+            });
+          })
+          .catch(() => {
+            card.style.display = "none";
+          });
+      }
+
+      async function restoreUsbBackup(b) {
+        if (
+          !(await vernisConfirm(
+            `Restore ${b.name} from ${b.drive}? Artworks already on this Vernis are kept.`,
+          ))
+        )
+          return;
+        backupStatus(`Restoring ${b.name} from ${b.drive}…`);
+        backupProgress(0, "Restoring: 0%");
+        VernisBackup.restoreLocal(b.path, {
+          onProgress: (pct) => backupProgress(pct, `Restoring: ${pct}%`),
+        })
+          .then((result) => {
+            showSuccess("Backup restored");
+            showRepin(result);
+          })
+          .catch((e) => {
+            backupProgress(null);
+            backupStatus(e.message, "error");
+          });
+      }
+      loadUsbBackups();
 
       // ========================================
       // Board LED Control
@@ -7845,6 +8424,12 @@
             btn.textContent = 'Change Password';
             showSuccess('Password updated');
             return;
+          } else if (data.needs_current && !needsCurrent) {
+            // First password change from here: prove it's the owner with the
+            // current device password (the setup wizard can pair instead)
+            document.getElementById('sys-current-pw-row').style.display = '';
+            document.getElementById('sys-current-password').focus();
+            throw new Error('Enter your current device password first');
           } else {
             throw new Error(data.error || 'Failed');
           }
@@ -10028,13 +10613,91 @@
                 "</div>";
             }
 
-            document.getElementById("ipfs-repo-size").textContent =
-              "Repository size: " + (data.repo_size || "--");
+            showIPFSStorage(data);
           })
           .catch(() => {
             document.getElementById("ipfs-node-status").innerHTML =
               '<span style="color: #ff3b30;">Failed to connect</span>';
           });
+      }
+
+      // Repository size against the IPFS limit, plus a note when the limit
+      // or the drive's wear reserve is nearly used. Vernis preserves art, so
+      // these only ever suggest more room, never removing artworks.
+      const BIGGER_DRIVE_TIP =
+        "Move to a bigger SD card or SSD: download a backup to your computer " +
+        "first, set up the new card, then restore it.";
+      const EXTERNAL_DRIVE_TIP =
+        "Add an external drive in Settings → External Drive: art files can go on any " +
+        "drive, and the IPFS store on an ext4 drive.";
+
+      function storageNote(title, text, tips) {
+        const box = document.createElement("div");
+        box.style.cssText =
+          "margin-top: 12px; padding: 16px; border-radius: 8px; " +
+          "background: rgba(var(--warning-rgb), 0.1); " +
+          "border-left: 3px solid var(--warning); line-height: 1.5;";
+        const head = document.createElement("strong");
+        head.style.color = "var(--warning)";
+        head.textContent = title;
+        const body = document.createElement("div");
+        body.style.cssText = "color: var(--text-secondary); margin-top: 4px;";
+        body.textContent = text;
+        const list = document.createElement("ul");
+        list.style.cssText =
+          "margin: 8px 0 0; padding-left: 18px; color: var(--text-secondary);";
+        tips.forEach((t) => {
+          const li = document.createElement("li");
+          li.textContent = t;
+          list.appendChild(li);
+        });
+        box.append(head, body, list);
+        return box;
+      }
+
+      function showIPFSStorage(data) {
+        const el = document.getElementById("ipfs-repo-size");
+        const GB = 1024 ** 3;
+        const used = data.repo_size_bytes;
+        const limit = data.storage_max_gb;
+        el.textContent =
+          used != null && limit
+            ? `Repository size: ${(used / 1e9).toFixed(1)} of ${limit} GB limit`
+            : "Repository size: " + (data.repo_size || "--");
+
+        // Kubo starts its hourly clean-up at 90% of the limit (StorageGCWatermark)
+        if (used != null && limit && used >= 0.9 * limit * 1e9) {
+          const ceiling = data.storage_limit_ceiling_gb;
+          el.appendChild(
+            storageNote(
+              "IPFS storage limit almost reached",
+              `The IPFS store holds ${(used / 1e9).toFixed(1)} of its ${limit} GB limit. ` +
+                "Nothing is deleted when it is reached: pinned art always stays. Above 90% " +
+                "the node tidies up temporary data every hour, which can briefly pause new downloads.",
+              [
+                ceiling && ceiling > limit
+                  ? `Raise the Storage Limit below: this drive allows up to ${ceiling} GB.`
+                  : "The limit is already at the highest setting that keeps this drive's wear reserve.",
+                EXTERNAL_DRIVE_TIP,
+                BIGGER_DRIVE_TIP,
+              ],
+            ),
+          );
+        }
+        const total = data.disk_total_bytes;
+        const free = data.disk_free_bytes;
+        if (total && free != null && free < 0.15 * total) {
+          el.appendChild(
+            storageNote(
+              "Drive wear reserve in use",
+              `${(free / GB).toFixed(1)} GB of ${(total / GB).toFixed(0)} GB is free. ` +
+                "Vernis keeps about 15% of the drive unused so the SD card or SSD can spread " +
+                "its writes and last longer. Everything keeps working; the drive just wears " +
+                "faster from here.",
+              [EXTERNAL_DRIVE_TIP, BIGGER_DRIVE_TIP],
+            ),
+          );
+        }
       }
 
       async function restartIPFS() {
@@ -10566,5 +11229,6 @@
       })();
     </script>
     <script src="/vernis-logo-longpress.js"></script>
-  </body>
+  <script src="vernis-workmode-nav.js" defer></script>
+</body>
 </html>

@@ -27,7 +27,7 @@ echo "[1/17] Installing dependencies..."
 sudo apt update || echo "⚠ apt update reported errors - continuing with the repositories that work"
 sudo apt install -y python3-pip python3-flask xinput xdotool unclutter \
     curl libssl-dev gcc wayvnc ufw fail2ban wtype mpv wlrctl log2ram \
-    librsvg2-bin imagemagick swaybg ffmpeg \
+    librsvg2-bin imagemagick swaybg ffmpeg device-tree-compiler \
     bluez bluez-tools bridge-utils dnsmasq python3-dbus python3-gi
 # chromium installed separately, guarded: step 11 (setup-auto-updates.sh) pins it
 # to Pin-Priority -1 to hold it from auto-upgrades, which makes a later
@@ -89,8 +89,30 @@ fi
 
 if ! command -v ipfs >/dev/null 2>&1; then
     echo "Downloading Kubo ${KUBO_VERSION} for ${KUBO_ARCH}..."
+    # Official sha512s (published next to each release file). v0.39.0 ships
+    # no 32-bit ARM build, so armhf has none to fetch.
+    case "$KUBO_ARCH" in
+        linux-arm64) KUBO_SHA512=b4f61e3bea7a310e3089eb42da83c92290478d326b56a4c0369913430b1e9e836be55f3f92ba673544af1b8a7904f7a76791cd7f79ec2b9b5fb9e1f671c01f4d ;;
+        linux-amd64) KUBO_SHA512=b23d2a7a3a0a4ee43028866a5259ba4521aa424a6c33b95e4d4e00ac3fa3829d9a49ed70fec6700d514238cc8e2befcb10ab99130ecbf1ff3743edb52a860cc8 ;;
+        *) echo "❌ Kubo ${KUBO_VERSION} has no ${KUBO_ARCH} build - use 64-bit Raspberry Pi OS"; exit 1 ;;
+    esac
     cd /tmp
-    wget -q "https://dist.ipfs.tech/kubo/${KUBO_VERSION}/kubo_${KUBO_VERSION}_${KUBO_ARCH}.tar.gz" -O kubo.tar.gz
+    KUBO_FILE="kubo_${KUBO_VERSION}_${KUBO_ARCH}.tar.gz"
+    # dist.ipfs.tech first, then the same file from GitHub releases. Timeouts:
+    # a bare wget to an unreachable dist.ipfs.tech (Nov 2026) hung the install
+    # silently for hours instead of failing over.
+    KUBO_OK=0
+    for KUBO_URL in "https://dist.ipfs.tech/kubo/${KUBO_VERSION}/${KUBO_FILE}" \
+                    "https://github.com/ipfs/kubo/releases/download/${KUBO_VERSION}/${KUBO_FILE}"; do
+        rm -f kubo.tar.gz
+        if curl -fsSL --connect-timeout 15 --max-time 600 --retry 2 -o kubo.tar.gz "$KUBO_URL" \
+           && echo "$KUBO_SHA512  kubo.tar.gz" | sha512sum -c --quiet - ; then
+            echo "  Downloaded from $KUBO_URL"
+            KUBO_OK=1; break
+        fi
+        echo "  Could not download Kubo from $KUBO_URL - trying the next source"
+    done
+    [ "$KUBO_OK" = 1 ] || { echo "❌ Kubo download failed from every source (check internet access)"; exit 1; }
     sudo tar xzf kubo.tar.gz
     sudo bash kubo/install.sh
     sudo rm -rf kubo kubo.tar.gz
@@ -228,9 +250,17 @@ if [ -n "$DEPLOY_DIR" ]; then
         sudo chmod +x /opt/vernis/scripts/*.sh /opt/vernis/scripts/*.py 2>/dev/null || true
         echo "  Scripts deployed to /opt/vernis/scripts/ (made executable)"
     fi
+    if ls "$DEPLOY_DIR"/csv-library/*.csv >/dev/null 2>&1; then
+        # The curated collections the Library offers. -n: never overwrite a
+        # collection the owner already has (re-runs, existing devices).
+        sudo cp -n "$DEPLOY_DIR"/csv-library/*.csv /opt/vernis/csv-library/
+        sudo chown -R $USER_NAME:$USER_NAME /opt/vernis/csv-library
+        echo "  Curated collections deployed to /opt/vernis/csv-library/"
+    fi
     echo "Application files deployed"
 else
     echo "No staging directory found (web/, backend/, scripts/)"
+    echo "From a git clone, run 'bash install.sh' in the repository root instead - it stages the files for this installer."
     echo "Files can be deployed manually after install completes"
 fi
 
@@ -344,6 +374,14 @@ sudo find /opt/vernis -maxdepth 1 -type f -name '*.json' -user root -exec chown 
 sudo systemctl daemon-reload
 sudo systemctl enable vernis-api
 
+# Root helper that checks/sets the owner's password (setup wizard, Settings).
+# After daemon-reload: it reads vernis-api's User= from systemd.
+sudo bash /opt/vernis/scripts/install-password-helper.sh || \
+    echo "WARN: password helper not installed - the setup wizard can't set the device password"
+# Mounts USB drives on plug-in and lets Settings move the IPFS store to one.
+sudo bash /opt/vernis/scripts/install-storage-helper.sh || \
+    echo "WARN: storage helper not installed - USB drives won't mount by themselves"
+
 # Step 6: Setup kiosk autostart
 echo "[6/17] Setting up kiosk mode..."
 
@@ -382,6 +420,15 @@ RCEOF
 fi
 echo "labwc cursor hiding configured"
 
+# The kiosk starts from the desktop session, so the Pi must boot straight into
+# the desktop logged in as this user (raspi-config B4 = desktop autologin; it
+# takes the user from SUDO_USER). Images whose first boot disabled autologin
+# would otherwise stop at the login screen.
+if command -v raspi-config >/dev/null 2>&1; then
+    sudo raspi-config nonint do_boot_behaviour B4 && echo "Desktop autologin enabled for $USER_NAME" || \
+        echo "WARN: could not enable desktop autologin - set it in raspi-config > System Options > Boot / Auto Login"
+fi
+
 # Also create XDG autostart (for X11 - older Pi OS fallback)
 mkdir -p ~/.config/autostart
 cat > ~/.config/autostart/vernis-kiosk.desktop << 'EOF'
@@ -394,23 +441,16 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 EOF
 
-# Step 7: Setup touch rotation service
-echo "[7/17] Setting up touch rotation service..."
-sudo tee /etc/systemd/system/vernis-touch.service > /dev/null << 'EOF'
-[Unit]
-Description=Vernis Touch Rotation
-After=display-manager.service
-
-[Service]
-Type=oneshot
-ExecStart=/opt/vernis/scripts/touch-rotate.sh
-RemainAfterExit=yes
-
-[Install]
-WantedBy=graphical.target
-EOF
-sudo systemctl daemon-reload
-sudo systemctl enable vernis-touch.service
+# Step 7: Touch rotation
+# Nothing to install: under labwc (Wayland) touch is mapped to the rotated
+# screen by display-output.sh, via labwc's rc.xml. The old vernis-touch.service
+# ran touch-rotate.sh, which only works on X11 - remove it if a previous install left it.
+echo "[7/17] Touch rotation is handled by display-output.sh (labwc)"
+if [ -f /etc/systemd/system/vernis-touch.service ]; then
+    sudo systemctl disable vernis-touch.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/vernis-touch.service
+    sudo systemctl daemon-reload
+fi
 
 # Step 8: Setup watchdog service
 echo "[8/17] Setting up screen watchdog service..."
@@ -620,7 +660,8 @@ if [ -n "$TOUCH_OVERLAY" ] && [ -f /opt/vernis/scripts/waveshare-touch-4dpi-fixe
     if ! dtc -I dtb -O dts "$TOUCH_OVERLAY" 2>/dev/null | grep -q 'interrupts'; then
         echo "Patching waveshare-touch-4dpi overlay (adding touch IRQ support)..."
         sudo cp "$TOUCH_OVERLAY" "${TOUCH_OVERLAY}.bak"
-        dtc -I dts -O dtb -o /tmp/waveshare-touch-4dpi-fixed.dtbo /opt/vernis/scripts/waveshare-touch-4dpi-fixed.dts 2>/dev/null
+        # `|| true`: a failed compile must reach the warning below, not abort the install (set -e)
+        dtc -I dts -O dtb -o /tmp/waveshare-touch-4dpi-fixed.dtbo /opt/vernis/scripts/waveshare-touch-4dpi-fixed.dts 2>/dev/null || true
         if [ -f /tmp/waveshare-touch-4dpi-fixed.dtbo ]; then
             sudo cp /tmp/waveshare-touch-4dpi-fixed.dtbo "$TOUCH_OVERLAY"
             rm -f /tmp/waveshare-touch-4dpi-fixed.dtbo
@@ -845,13 +886,13 @@ cat > /tmp/display-output-config.json << 'DOCFG'
 DOCFG
 sudo mv /tmp/display-output-config.json /opt/vernis/display-output-config.json
 
-## Mark setup wizard as complete (skip welcome screen on gallery)
-cat > /tmp/setup-complete.json << 'SCFG'
-{"completed_at": "pre-configured", "password_changed": true, "pre_configured": true}
-SCFG
-sudo mv /tmp/setup-complete.json /opt/vernis/setup-complete.json
+## Setup wizard: left NOT complete, so the first visit from a phone or computer
+## opens welcome.html (device password, then wallet import with the OpenSea key
+## prompt). The kiosk screen itself never shows the wizard. A re-run keeps an
+## existing /opt/vernis/setup-complete.json. To skip the wizard on a device you
+## hand over pre-configured:  curl -X POST http://localhost/api/setup/complete
 
-echo "Default configs created (blur=12px, fan=silent, cpu=eco, setup=complete)"
+echo "Default configs created (blur=12px, fan=silent, cpu=eco)"
 
 echo ""
 echo "==========================================="
@@ -871,5 +912,5 @@ fi
 echo ""
 echo "Test URLs after reboot:"
 echo "  Web UI: http://$(hostname -I | awk '{print $1}')"
-echo "  API:    http://$(hostname -I | awk '{print $1}')/api/health"
+echo "  API:    http://$(hostname -I | awk '{print $1}')/api/status"
 echo ""

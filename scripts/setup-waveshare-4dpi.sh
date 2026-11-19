@@ -91,45 +91,43 @@ echo "Configuring $CONFIG_FILE..."
 sed -i 's/^dtoverlay=vc4-fkms-v3d/#dtoverlay=vc4-fkms-v3d  # Disabled for DPI LCD/' "$CONFIG_FILE"
 sed -i 's/^display_auto_detect=1/#display_auto_detect=1  # Disabled for DPI LCD/' "$CONFIG_FILE"
 
-# Check if Waveshare config already exists
-if grep -q "waveshare-4dpi" "$CONFIG_FILE"; then
-    echo "Waveshare DPI config already exists in config.txt"
-else
-    # Add Waveshare DPI LCD configuration
+# Working overlay set (DPI-DISPLAY-TROUBLESHOOTING.md, Issue 5). Not
+# `waveshare-4dpi`: it conflicts with vc4-kms-DPI-4inch (backlight on, no image).
+# Each line is added only if missing, so re-runs and old configs converge.
+sed -i 's/^dtoverlay=waveshare-4dpi[[:space:]]*$/#dtoverlay=waveshare-4dpi  # conflicts with vc4-kms-DPI-4inch/' "$CONFIG_FILE"
+if ! grep -q "^dtoverlay=vc4-kms-v3d" "$CONFIG_FILE"; then
+    echo "dtoverlay=vc4-kms-v3d" >> "$CONFIG_FILE"
+fi
+if ! grep -q "Waveshare 4inch DPI LCD (C) Configuration" "$CONFIG_FILE"; then
     cat >> "$CONFIG_FILE" << 'EOF'
 
 # =========================================
 # Waveshare 4inch DPI LCD (C) Configuration
 # Added by Vernis setup script
+# (waveshare-4dpi stays off: it conflicts with vc4-kms-DPI-4inch)
 # =========================================
-dtoverlay=vc4-kms-DPI-4inch
-dtoverlay=waveshare-4dpic-4b
-dtoverlay=waveshare-4dpi
-dtoverlay=waveshare-touch-4dpi
 EOF
-    echo "Added Waveshare DPI LCD configuration to config.txt"
 fi
+for OVERLAY in vc4-kms-DPI-4inch waveshare-4dpic-4b waveshare-touch-4dpi; do
+    if grep -q "^dtoverlay=$OVERLAY\b" "$CONFIG_FILE"; then
+        echo "  $OVERLAY already enabled"
+    else
+        echo "dtoverlay=$OVERLAY" >> "$CONFIG_FILE"
+        echo "  Added dtoverlay=$OVERLAY"
+    fi
+done
 
-# Create backlight service (GPIO18, active LOW)
-echo ""
-echo "Creating backlight service..."
-cat > /etc/systemd/system/dpi-backlight.service << 'EOF'
-[Unit]
-Description=DPI LCD Backlight
-After=multi-user.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/pinctrl set 18 op dl
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable dpi-backlight
-echo "Backlight service enabled (GPIO18, active LOW)"
+# No backlight service. Older versions installed dpi-backlight.service to hold
+# GPIO 18 low at boot; it was linked to a dim, striped picture
+# (DPI-DISPLAY-TROUBLESHOOTING.md, Issue 1) and install-vernis.sh always
+# disabled it. Vernis's Screen off / on controls drive GPIO 18 themselves.
+# Remove one left by an older version.
+if [ -f /etc/systemd/system/dpi-backlight.service ]; then
+    systemctl disable --now dpi-backlight 2>/dev/null || true
+    rm -f /etc/systemd/system/dpi-backlight.service
+    systemctl daemon-reload
+    echo "Removed old dpi-backlight.service"
+fi
 
 echo ""
 echo "Display configuration complete!"
@@ -148,13 +146,8 @@ echo "   - Connect an HDMI monitor to verify Pi boots"
 echo "   - Check backlight (faint glow = config issue, no glow = connection/power)"
 echo "   - Try editing $CONFIG_FILE and enabling additional overlays"
 echo ""
-echo "4. To rotate display (after it works):"
-echo "   - Use Screen Configuration tool: DPI-1 > Orientation"
-echo "   - Or add to config.txt: display_rotate=1 (90°), 2 (180°), 3 (270°)"
-echo ""
-echo "5. If touch is not aligned after rotation:"
-echo "   - The waveshare-touch-4dpi overlay should auto-sync"
-echo "   - Or calibrate with: sudo apt install xinput-calibrator && xinput_calibrator"
+echo "4. Rotation and touch: the Vernis installer sets the built-in screen to 90°."
+echo "   Change it in Vernis Settings > Display; touch is remapped to match."
 echo ""
 echo "Reference: https://www.waveshare.com/wiki/4inch_DPI_LCD_(C)"
 echo ""

@@ -2,7 +2,7 @@
 
 **One Codebase, Two Models: Phone UI + Kiosk Display**
 
-A self-hosted, offline-first NFT gallery system for Raspberry Pi with luxury web UI, automatic Wi-Fi fallback, and OTA updates.
+A self-hosted, offline-first NFT gallery system for Raspberry Pi with luxury web UI, a local IPFS node, and one-click updates.
 
 ---
 
@@ -10,7 +10,7 @@ A self-hosted, offline-first NFT gallery system for Raspberry Pi with luxury web
 
 ✨ **Beautiful Web UI** – Cinematic dark theme with glassmorphism, gradient text, Cinzel + Inter fonts
 📱 **Phone + Screen** – Same codebase serves http://vernis.local on phone AND built-in screen (kiosk mode)
-🔌 **Always Accessible** – Bulletproof Wi-Fi fallback creates recovery AP when internet is down
+🔌 **Always Accessible** – Bluetooth network access (SSH + web UI) when Wi-Fi is down
 🎨 **NFT Gallery** – Upload CSV or single NFTs, automatic download & IPFS pinning
 📚 **CSV Library** – Browse curated collections, download CSV lists, or install & pin directly
 📦 **Device Preload** – Ship devices with CSV collections or full NFT galleries pre-installed
@@ -22,61 +22,60 @@ A self-hosted, offline-first NFT gallery system for Raspberry Pi with luxury web
 
 ## Quick Start
 
-### 1. Flash Raspberry Pi OS Lite (64-bit)
+The full guide, including screen, rotation, touch, NFT import and troubleshooting, is in [INSTALL.md](INSTALL.md). The short version:
 
-Use Raspberry Pi Imager:
-- **OS**: Raspberry Pi OS Lite (64-bit)
-- **Storage**: USB SSD recommended (faster + more space)
-- **Settings**: Enable SSH, set hostname to `vernis`
+### 1. Get the hardware
 
-### 2. Boot and Connect
+See [Hardware Recommendations](#hardware-recommendations). The reference build is a Raspberry Pi 5 with a Waveshare 4inch DPI LCD (C) screen.
+
+### 2. Flash Raspberry Pi OS (64-bit, with desktop)
+
+In Raspberry Pi Imager:
+- **OS:** Raspberry Pi OS (64-bit), the normal desktop version, current (Trixie-based) release.
+  - Not **Lite**: the kiosk runs inside the desktop's Wayland (labwc) session.
+  - Not **Bookworm / Legacy**: the installer needs packages (e.g. `log2ram`) that only exist in the Trixie repositories.
+- **OS customisation:** set a hostname (e.g. `vernis`), a username and password, your Wi-Fi, and enable SSH.
+
+### 3. Clone and install
 
 ```bash
-ssh pi@vernis.local
+ssh <your-user>@vernis.local
+
+sudo apt update && sudo apt install -y git   # git is usually already installed
+git clone https://github.com/AfroV/vernis.git
+cd vernis
+bash install.sh                  # as your normal user - NOT with sudo
+sudo reboot
 ```
 
-### 3. Install Vernis
+`install.sh` stages the files from your clone and runs the real installer, `scripts/install-vernis.sh`. Do not run `scripts/install-vernis.sh` directly from a clone: it would not find the app files to deploy. The installer uses `sudo` itself where needed, needs internet access, and takes a while. It does **not** reboot on its own.
 
-```bash
-# Upload the entire vernis v3 folder to /home/pi/vernis
-cd /home/pi/vernis
-sudo bash install.sh
-```
+It installs Caddy, the Flask API, an IPFS node (Kubo), Chromium in kiosk mode, the Waveshare screen drivers with a touch fix, and sets the built-in screen to 90° rotation. Details in [INSTALL.md](INSTALL.md#what-the-installer-does).
 
-The installer will ask:
-> **Is this Vernis v2 with a built-in screen? (y/n)**
+### 4. After the reboot
 
-- **y** = Kiosk mode (boots to fullscreen gallery)
-- **n** = Headless (phone access only)
-
-After 5-10 minutes, the Pi will reboot automatically.
-
-### 4. Access Vernis
-
-**Normal Mode:**
-Open http://vernis.local on your phone or laptop
-
-**Fallback Mode (no internet):**
-Connect to Wi-Fi AP:
-- SSID: `Vernis-XXXXXXXX` (XXXXXXXX = CPU serial)
-- Password: `<ap-password>`
-- Visit: http://vernis.local or http://192.168.50.1
+- The screen shows Vernis full-screen. On the Waveshare screen it comes up rotated 90° with touch mapped to match. If an HDMI display is plugged in, Vernis uses that instead.
+- On your phone or laptop, open `http://vernis.local` (your hostname) or `http://<pi-ip-address>`.
+- The frame shows a QR code: scan it with your phone to open the setup wizard (or open the address shown and type the 6-digit code). Set a device password, then import your wallet (needs a free OpenSea API key, see [Importing your NFTs](INSTALL.md#importing-your-nfts)) or skip to **Library → Add Collection** to upload a CSV.
 
 ---
 
 ## Architecture
 
 ```
-Raspberry Pi OS Lite (64-bit) + SSD
-├── Caddy → http://vernis.local (auto mDNS)
-├── Flask API (/api/*)
-├── Static web UI in /var/www/vernis/
+Raspberry Pi OS (64-bit, desktop) on microSD or USB SSD
+├── Caddy (:80) → static web UI in /var/www/vernis/, proxies /api/* and /nfts/* to Flask
+├── Flask API on localhost:5000 (/opt/vernis/app.py)
+├── IPFS node (Kubo), gateway on 127.0.0.1:8080, repo in ~/.ipfs
+├── Chromium kiosk, started by the labwc desktop session
 ├── Systemd services:
 │   ├─ vernis-api.service (Flask backend)
-│   ├─ vernis-ap-check.timer (Wi-Fi fallback monitor)
-│   ├─ vernis-watchdog.service (screen watchdog, kiosk only)
-│   └─ caddy.service (web server)
-└── IPFS + NFT downloader scripts
+│   ├─ ipfs.service (IPFS daemon)
+│   ├─ caddy.service (web server)
+│   ├─ vernis-watchdog.service (restarts Chromium if it dies)
+│   ├─ vernis-touch-wake.service (touch to wake the screen)
+│   └─ bt-agent.service + bt-pan.service (Bluetooth network access)
+└── NFT downloader scripts in /opt/vernis/scripts/
 ```
 
 ---
@@ -90,18 +89,16 @@ Raspberry Pi OS Lite (64-bit) + SSD
     ├── nfts/              → Downloaded NFT media
     ├── uploads/           → CSV uploads
     ├── scripts/
-    │   ├── nft_downloader.py         → NFT download script
-    │   ├── enable-setup-ap.sh        → Wi-Fi fallback AP
-    │   ├── disable-setup-ap.sh       → Disable fallback AP
-    │   ├── updater.sh                → OTA update handler
+    │   ├── nft_downloader_advanced.py → NFT download script
+    │   ├── vernis-update.sh          → Updater run by Settings → Install update
+    │   ├── kiosk-launcher.sh         → Starts the Chromium kiosk
     │   ├── watchdog.sh               → Screen monitor (kiosk)
     │   └── create-update-package.sh  → Build update bundle
     └── backup/            → Update backups
 
 /etc/systemd/system/       → Service files
 /etc/caddy/Caddyfile       → Web server config
-/etc/avahi/services/       → mDNS advertisement
-/home/pi/.config/lxsession/LXDE-pi/autostart  → Kiosk autostart (v2 only)
+~/.config/labwc/autostart  → Kiosk autostart (runs kiosk-launcher.sh)
 ```
 
 ---
@@ -137,38 +134,27 @@ Raspberry Pi OS Lite (64-bit) + SSD
 
 ---
 
-## Kiosk Mode (Vernis v2 with Screen)
+## Kiosk Mode (built-in screen)
 
-When installed with kiosk mode:
+The installer always sets up kiosk mode. On boot:
 
-1. **Auto-boots to fullscreen gallery** at startup
-2. **Chromium kiosk mode** loads http://vernis.local/gallery.html
-3. **Screen watchdog** restarts if frozen (every 5 min check)
-4. **No screensaver** or power management
+1. The desktop logs in automatically and labwc runs `~/.config/labwc/autostart`, which hides the desktop panel and starts `/opt/vernis/scripts/kiosk-launcher.sh`
+2. The launcher waits for the web server, applies the saved display output and rotation (`display-output.sh`), and starts Chromium in kiosk mode on `http://127.0.0.1/`
+3. `vernis-watchdog.service` restarts Chromium if it stops or the page crashes
 
-Configured via:
-- `/home/pi/.config/lxsession/LXDE-pi/autostart`
-- `vernis-watchdog.service`
+Screen setup, rotation and touch: see [INSTALL.md](INSTALL.md#screen).
 
 ---
 
-## Wi-Fi Fallback System
+## When Wi-Fi Is Down
 
-The `vernis-ap-check.timer` runs every 5 minutes and:
+The installer does not create a Wi-Fi fallback access point. It sets up Bluetooth networking (`scripts/setup-bluetooth-pan.sh`) so you can still reach the frame:
 
-1. Checks internet connectivity (ping 8.8.8.8)
-2. If offline for 90s+ → starts fallback AP
-3. Creates `Vernis-XXXXXXXX` Wi-Fi network
-4. Serves Vernis at http://vernis.local or http://192.168.50.1
+1. Pair once while Wi-Fi still works: over SSH run `sudo bluetoothctl discoverable on`, pair your phone or laptop with `Vernis-<hostname>`, then run `sudo bluetoothctl discoverable off`
+2. When Wi-Fi is down, connect to the frame's Bluetooth network (PAN) from that paired device
+3. SSH to `<your-user>@10.44.0.1` (same login as usual) or open `http://10.44.0.1`
 
-**To disable fallback AP manually:**
-```bash
-sudo /opt/vernis/scripts/disable-setup-ap.sh
-```
-
-**Fallback AP credentials:**
-- SSID: `Vernis-` + last 8 digits of CPU serial
-- Password: `<ap-password>`
+Wi-Fi itself can be changed in Settings → Wi-Fi.
 
 ---
 
@@ -242,17 +228,14 @@ Current script uses OpenSea API as example. Adapt for:
 
 ## Troubleshooting
 
+More in [INSTALL.md](INSTALL.md#troubleshooting).
+
 ### Can't access http://vernis.local
 
-**Check mDNS:**
+Use your own hostname (`http://<hostname>.local`). If `.local` names don't resolve on your network, use the IP address:
 ```bash
-sudo systemctl status avahi-daemon
-```
-
-**Try IP address:**
-```bash
-ip addr show | grep "inet "
-# Access via http://192.168.x.x
+hostname -I
+# then open http://<first address>
 ```
 
 ### Flask API not running
@@ -265,34 +248,14 @@ sudo journalctl -u vernis-api -f
 ### Kiosk mode not starting
 
 ```bash
-# Check autostart file
-cat /home/pi/.config/lxsession/LXDE-pi/autostart
-
-# Check display manager
-sudo systemctl status lightdm
-
-# Restart X session
-sudo systemctl restart lightdm
+# The kiosk is started by the labwc desktop session
+cat ~/.config/labwc/autostart
 ```
-
-### Fallback AP not working
-
-```bash
-sudo systemctl status hostapd
-sudo systemctl status dnsmasq
-sudo journalctl -u vernis-ap-check -f
-```
+If the Pi stops at a login screen (the installer normally turns on autologin), enable it: `sudo raspi-config` → System Options → Boot / Auto Login → Desktop Autologin, then reboot.
 
 ### No NFTs downloading
 
-```bash
-# Test downloader manually
-cd /opt/vernis
-python3 scripts/nft_downloader.py --contract 0xYOURCONTRACT --token 1 --output ./nfts
-
-# Check logs
-ls -lh /opt/vernis/nfts
-```
+Check that the IPFS node is running (Settings → IPFS Pinning, or `sudo systemctl status ipfs`) and, for wallet imports, that an OpenSea API key is set. See [INSTALL.md](INSTALL.md#ipfs-node).
 
 ---
 
@@ -301,9 +264,10 @@ ls -lh /opt/vernis/nfts
 ⚠️ **This is designed for local/private networks**
 
 - No HTTPS by default (add with Caddy if exposing publicly)
-- No authentication (add if needed)
+- Open by default; optional PIN protection (see [Security](#security) below)
 - Runs Flask in production without WSGI (fine for local use, use Gunicorn if public)
-- `sudo` commands in API require passwordless sudo for `pi` user
+- The installer gives the install user passwordless sudo for a fixed list of commands the API needs (reboot, service restarts, Wi-Fi, firewall, display settings) in `/etc/sudoers.d/vernis-api`
+- The installer enables the `ufw` firewall (SSH, HTTP and IPFS port 4001 only) and `fail2ban`
 
 **For public deployment:**
 1. Enable Caddy automatic HTTPS
@@ -316,18 +280,12 @@ ls -lh /opt/vernis/nfts
 
 ## Hardware Recommendations
 
-### Vernis v1 (Headless)
-- Raspberry Pi 4B (4GB+)
-- 128GB+ USB SSD
-- Official power supply
-- No screen needed
-
-### Vernis v2 (Kiosk with Screen)
-- Raspberry Pi 4B (4GB+)
-- 128GB+ USB SSD
-- Official 7" touchscreen or HDMI monitor
-- Official power supply
-- Case with screen mount
+- **Raspberry Pi 5** (reference build) or **Raspberry Pi 4**. Boards with less than 2 GB RAM: after installing, run `sudo bash /opt/vernis/scripts/setup-swap.sh`.
+- **Screen (reference): Waveshare 4inch DPI LCD (C)**, 720x720, mounted on the 40-pin GPIO header. The installer sets it up automatically, rotated 90°, with touch.
+- **Or any HDMI monitor or TV.** Vernis switches to HDMI automatically when one is connected (Settings → Display Settings → Display Output).
+- **Storage:** microSD card (32 GB minimum) or a USB SSD. Your art and the IPFS store (capped at 50 GB) live on this drive, so pick a size that fits your collection.
+- **Official power supply** for your Pi model.
+- **Fan (optional):** with the DPI screen, GPIO 0-25 are taken by the display. Put a `gpio-fan` on GPIO 26 or 27; the installer disables a `gpio-fan` overlay on any of GPIO 0-25.
 
 ---
 
@@ -387,6 +345,8 @@ Two recovery paths:
 
 1. **Hold the VERNIS logo for 5 seconds** on the home page or PIN entry screen. A modal asks for your device password. Enter it, optionally set a new PIN, and you're back in.
 2. **SSH into the Pi** and run `sudo /opt/vernis/scripts/reset-pin.sh` to wipe the PIN and drop back to Open mode.
+
+The logo recovery only works once the frame knows your device password. On a fresh install that is the case only if you ran the installer with `INSTALL_USER_PASSWORD` set (see [INSTALL.md](INSTALL.md#4-run-the-installer)); otherwise run `sudo /opt/vernis/scripts/update-owner-password.sh` once after installing.
 
 ### Changed your device password via `passwd`?
 

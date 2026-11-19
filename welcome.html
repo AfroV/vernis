@@ -15,6 +15,7 @@
   </script>
   <script src="vernis-notifications.js"></script>
   <script src="vernis-keyboard.js"></script>
+  <script src="vernis-backup.js"></script>
   <script>
     (function() {
       var t = localStorage.getItem('vernis-theme-style') || 'walnut';
@@ -173,6 +174,12 @@
     .skip-link { display: block; text-align: center; margin-top: 16px; color: var(--text-muted); font-size: 13px; cursor: pointer; }
     .skip-link:hover { color: var(--text-secondary); }
 
+    /* OpenSea key / IPFS notices */
+    .wiz-note { font-size: 13px; line-height: 1.5; color: var(--text-secondary); padding: 12px 14px;
+      border-left: 3px solid var(--warning, #f59e0b); background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 12px; text-align: left; }
+    .wiz-note a { color: var(--accent-primary); }
+    .wiz-note strong { color: var(--text-primary); }
+
     /* Resolved address */
     .resolved { font-size: 12px; color: var(--accent-primary); font-family: monospace; word-break: break-all; margin: -4px 0 12px; }
 
@@ -250,7 +257,25 @@
 
       <div id="pw-status"></div>
 
-      <div class="wiz-card">
+      <!-- Pairing: prove you're at the frame before setting its first password -->
+      <div class="wiz-card" id="pair-card" style="display:none; text-align:center;">
+        <div style="font-size:15px; color:var(--text-primary); margin-bottom:6px;">Enter the 6 numbers shown on your Vernis screen</div>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">This shows it's really you setting up your frame.</div>
+        <input type="text" id="pair-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7"
+               placeholder="123 456" style="text-align:center; font-size:26px; letter-spacing:6px;"
+               oninput="if (this.value.replace(/\D/g,'').length === 6) submitPairCode()">
+        <button class="wiz-btn wiz-btn-primary" onclick="submitPairCode()" id="pair-btn">Check code</button>
+        <div class="skip-link" style="margin-top:12px;" onclick="useCurrentPassword()">Can't see a code on the frame?</div>
+      </div>
+
+      <div class="wiz-card" id="pw-card">
+        <div id="current-pw-wrap" style="display:none;">
+          <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">Enter the password you chose when you installed Vernis (or the one on your Vernis card):</div>
+          <div class="pw-wrap">
+            <input type="password" id="current-password" placeholder="Current password">
+            <span class="pw-eye" onclick="togglePwVis(this)"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+          </div>
+        </div>
         <div class="pw-wrap">
           <input type="password" id="new-password" placeholder="New password (min 8 characters)" oninput="updateStrength()">
           <span class="pw-eye" onclick="togglePwVis(this)"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
@@ -318,6 +343,16 @@
           </label>
         </div>
 
+        <div id="opensea-key-box" style="display:none;">
+          <div class="wiz-note" id="opensea-key-msg">
+            <strong>OpenSea API key needed.</strong> Ethereum-family wallets are read through OpenSea,
+            which needs a free key (takes a minute):
+            <a href="https://opensea.io/settings/developer" target="_blank" rel="noopener">opensea.io/settings/developer</a>.
+            Tezos wallets don't need one.
+          </div>
+          <input type="password" id="opensea-key-input" placeholder="Paste your OpenSea API key" autocomplete="off">
+        </div>
+
         <button class="wiz-btn wiz-btn-primary" onclick="quickImport()" id="import-btn">Fetch &amp; Install NFTs</button>
       </div>
 
@@ -327,7 +362,27 @@
           <div id="import-status" style="font-size: 14px; color: var(--text-primary); margin-bottom: 4px;"></div>
           <div class="progress-bar"><div class="progress-fill" id="import-fill"></div></div>
           <div class="progress-text" id="import-detail"></div>
+          <div class="wiz-note" id="ipfs-warning" style="display:none; margin-top: 12px;"></div>
         </div>
+      </div>
+
+      <!-- Moving to a new card or a new Vernis: restore instead of importing -->
+      <div class="wiz-card" id="restore-card">
+        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Have a Vernis backup?</div>
+        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+          Moving to a new SD card or a new Vernis? Restore your whole library instead.
+          Plug the drive holding your backup into the Vernis, or upload the file from this device.
+        </div>
+        <div id="restore-usb-list"></div>
+        <input type="file" id="restore-file" accept=".tar,.zip,.tar.gz,.tgz" style="display:none"
+               onchange="wizardRestoreUpload(this.files[0])">
+        <button class="wiz-btn wiz-btn-secondary" id="restore-upload-btn"
+                onclick="document.getElementById('restore-file').click()">Upload a backup file</button>
+        <div id="restore-progress" style="display:none;">
+          <div class="progress-bar"><div class="progress-fill" id="restore-fill"></div></div>
+          <div class="progress-text" id="restore-text"></div>
+        </div>
+        <div class="wiz-note" id="restore-result" style="display:none; margin-top: 12px;"></div>
       </div>
 
       <div style="text-align: center; margin-top: 12px;">
@@ -401,6 +456,7 @@
         if (line) line.classList.toggle('done', i < idx);
       }
       currentStep = idx;
+      if (stepIds[idx] === 'art') checkOpenseaKey();
     }
 
     function nextStep() {
@@ -536,13 +592,22 @@
       btn.disabled = true;
       btn.textContent = 'Setting password...';
 
+      var body = { password: pw };
+      var current = document.getElementById('current-password').value;
+      if (current) body.current_password = current;
       fetch('/api/setup/change-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw })
+        headers: { 'Content-Type': 'application/json', 'X-Vernis-Setup-Session': _setupSession() },
+        body: JSON.stringify(body)
       })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+          if (data.needs_pairing && !current) {
+            // Session expired (30 min) - pair again
+            sessionStorage.removeItem('vernis-setup-session');
+            showPairCard();
+            throw new Error('Please enter the code on your frame again');
+          }
           if (data.success) {
             document.getElementById('pw-status').textContent = '';
             var banner = document.createElement('div');
@@ -560,6 +625,82 @@
           btn.disabled = false;
           btn.textContent = 'Set Password';
         });
+    }
+
+    // ========= Pairing =========
+    // The first device password can only be set by someone who can see the
+    // frame: they scan its QR code (link carries ?pair=...) or type the code
+    // it shows. Fallback: the current password.
+
+    function _setupSession() {
+      try { return sessionStorage.getItem('vernis-setup-session') || ''; } catch (e) { return ''; }
+    }
+
+    function showPairCard() {
+      document.getElementById('pair-card').style.display = 'block';
+      document.getElementById('pw-card').style.display = 'none';
+      // Makes the code appear on the frame, even while it shows the gallery
+      fetch('/api/setup/pairing/request', { method: 'POST' }).catch(function() {});
+    }
+
+    function showPasswordForm() {
+      document.getElementById('pair-card').style.display = 'none';
+      document.getElementById('pw-card').style.display = 'block';
+    }
+
+    function pairWith(payload) {
+      return fetch('/api/setup/pair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        if (!d.success) throw new Error(d.error || 'Pairing failed');
+        try { sessionStorage.setItem('vernis-setup-session', d.session); } catch (e) {}
+        var banner = document.createElement('div');
+        banner.className = 'status-banner success';
+        banner.textContent = '\u2713 Connected to your Vernis';
+        document.getElementById('pw-status').replaceChildren(banner);
+        showPasswordForm();
+      });
+    }
+
+    function submitPairCode() {
+      var input = document.getElementById('pair-code');
+      var code = input.value.replace(/\D/g, '');
+      if (code.length !== 6) { showError('Enter all 6 numbers'); return; }
+      var btn = document.getElementById('pair-btn');
+      btn.disabled = true;
+      pairWith({ code: code })
+        .catch(function(e) {
+          showError(e.message);
+          input.value = '';
+          input.focus();
+          fetch('/api/setup/pairing/request', { method: 'POST' }).catch(function() {});
+        })
+        .finally(function() { btn.disabled = false; });
+    }
+
+    function useCurrentPassword() {
+      document.getElementById('current-pw-wrap').style.display = 'block';
+      showPasswordForm();
+      document.getElementById('current-password').focus();
+    }
+
+    function initPairing() {
+      var params = new URLSearchParams(location.search);
+      var token = params.get('pair');
+      if (token) {
+        // Scanned the frame's QR code: pair silently, drop the token from the URL
+        history.replaceState(null, '', location.pathname);
+        pairWith({ token: token }).catch(function() {
+          showError('That setup link has expired. Enter the code on your frame instead.');
+          showPairCard();
+        });
+      } else if (_setupSession()) {
+        showPasswordForm();
+      } else {
+        showPairCard();
+      }
     }
 
     // ========= Add Art =========
@@ -585,9 +726,34 @@
       var chains = getSelectedChains();
       if (!chains.length) { showError('Select at least one chain'); return; }
 
+      var keyInput = document.getElementById('opensea-key-input');
+      var newKey = keyInput.value.trim();
+      var needsKey = document.getElementById('opensea-key-box').style.display !== 'none';
+      if (needsKey && !newKey && !(chains.length === 1 && chains[0] === 'tezos')) {
+        showError('Paste your OpenSea API key first');
+        keyInput.focus();
+        return;
+      }
+      if (newKey) {
+        fetch('/api/opensea-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: newKey })
+        }).then(function(r) {
+          if (!r.ok) throw new Error('Could not save the API key');
+          keyInput.value = '';
+          document.getElementById('opensea-key-box').style.display = 'none';
+          quickImport();
+        }).catch(function(err) { showError(err.message); });
+        return;
+      }
+
       var btn = document.getElementById('import-btn');
       btn.disabled = true;
       btn.textContent = 'Fetching...';
+      document.getElementById('ipfs-warning').style.display = 'none';
+      var spinner = document.querySelector('#import-progress .spinner');
+      if (spinner) spinner.style.display = '';
 
       document.getElementById('import-progress').style.display = 'block';
       document.getElementById('import-status').textContent = wallet.endsWith('.eth')
@@ -609,7 +775,15 @@
           return r.json();
         })
         .then(function(data) {
+          if (data.needs_opensea_key) {
+            showOpenseaKeyBox(data.error);
+            document.getElementById('import-progress').style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = 'Fetch & Install NFTs';
+            return;
+          }
           if (data.error) throw new Error(data.error);
+          showIpfsWarning(data.ipfs_warning);
           if (data.throttled) {
             showError('Some chains may be incomplete due to API rate limits. You can try again later from the Library.');
           }
@@ -658,18 +832,27 @@
 
           var pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
           document.getElementById('import-fill').style.width = pct + '%';
-          document.getElementById('import-detail').textContent = completed + ' / ' + total + ' files downloaded';
+          document.getElementById('import-detail').textContent = completed + ' / ' + total + ' files downloaded' +
+            (data.failed ? ' (' + data.failed + ' failed)' : '');
+          showIpfsWarning(data.ipfs_warning);
 
           if ((completed >= total && total > 0 && isActive === false) ||
               (typeof data.status === 'string' && data.status.indexOf('Complete') === 0) ||
               (!isActive && _downloadPollCount >= 10)) {
             _downloadActive = false;
+            var spinner = document.querySelector('#import-progress .spinner');
+            if (spinner) spinner.style.display = 'none';
             var finalCount = data.actual_files || completed;
-            document.getElementById('import-status').textContent = finalCount + ' artworks installed';
+            document.getElementById('import-status').textContent = finalCount + ' artworks installed' +
+              (data.failed ? ', ' + data.failed + ' could not be downloaded' : '');
             document.getElementById('import-fill').style.width = '100%';
             document.getElementById('import-btn').disabled = false;
             document.getElementById('import-btn').textContent = 'Fetch & Install NFTs';
-            showSuccess(finalCount + ' artworks on your device');
+            if (data.failed) {
+              showError(data.failed + ' artworks failed to download. You can retry them later from the Library.');
+            } else {
+              showSuccess(finalCount + ' artworks on your device');
+            }
             return;
           }
           _downloadPollTimer = setTimeout(pollDownloadProgress, 2000);
@@ -679,7 +862,143 @@
         });
     }
 
+    function showOpenseaKeyBox(message) {
+      if (message) {
+        var link = '<a href="https://opensea.io/settings/developer" target="_blank" rel="noopener">opensea.io/settings/developer</a>';
+        var el = document.getElementById('opensea-key-msg');
+        el.textContent = message;
+        el.innerHTML = el.innerHTML.replace('opensea.io/settings/developer', link);
+      }
+      document.getElementById('opensea-key-box').style.display = 'block';
+      document.getElementById('opensea-key-input').focus();
+    }
+
+    function showIpfsWarning(message) {
+      var el = document.getElementById('ipfs-warning');
+      if (!message) { el.style.display = 'none'; return; }
+      if (el.style.display === 'block') return;  // keep the button state between polls
+      el.textContent = message;
+      var btn = document.createElement('button');
+      btn.className = 'wiz-btn wiz-btn-secondary';
+      btn.style.marginTop = '10px';
+      btn.textContent = 'Restart IPFS node';
+      btn.onclick = function() { restartIpfsNode(btn); };
+      el.appendChild(document.createElement('br'));
+      el.appendChild(btn);
+      el.style.display = 'block';
+    }
+
+    function restartIpfsNode(btn) {
+      btn.disabled = true;
+      btn.textContent = 'Restarting... (up to 15 s)';
+      fetch('/api/ipfs/restart', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (!d.success) throw new Error(d.error || 'Restart failed');
+          showSuccess('IPFS node is running. Retry any failed downloads from the Library.');
+          document.getElementById('ipfs-warning').style.display = 'none';
+        })
+        .catch(function(err) {
+          showError(err.message);
+          btn.disabled = false;
+          btn.textContent = 'Restart IPFS node';
+        });
+    }
+
+    // Ask for the key up front rather than after a failed import
+    function checkOpenseaKey() {
+      fetch('/api/opensea-key')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (!d.configured) showOpenseaKeyBox(); })
+        .catch(function() {});
+    }
+
     // ========= Finish =========
+
+    // ========= Restore a backup =========
+    function wizardRestoreProgress(pct, text) {
+      document.getElementById('restore-progress').style.display = pct == null ? 'none' : 'block';
+      if (pct != null) {
+        document.getElementById('restore-fill').style.width = pct + '%';
+        document.getElementById('restore-text').textContent = text;
+      }
+    }
+
+    function wizardRestoreResult(text, isError) {
+      var el = document.getElementById('restore-result');
+      el.style.display = 'block';
+      el.style.color = isError ? 'var(--error)' : 'var(--text-secondary)';
+      el.textContent = text;
+    }
+
+    function wizardRestoreBusy(busy) {
+      document.querySelectorAll('#restore-card button').forEach(function (b) { b.disabled = busy; });
+    }
+
+    function wizardRestoreDone(result) {
+      wizardRestoreBusy(false);
+      wizardRestoreProgress(null);
+      var base = result.message + '. Your art is back on this Vernis.';
+      wizardRestoreResult(base);
+      if (result.repinning) {
+        VernisBackup.watchRepin(function (p) {
+          wizardRestoreResult(base + (p.running
+            ? ' Adding it back to IPFS in the background: ' + p.done + ' of ' + p.total + '.'
+            : ''));
+        });
+      }
+    }
+
+    function wizardRestoreFailed(e) {
+      wizardRestoreBusy(false);
+      wizardRestoreProgress(null);
+      wizardRestoreResult(e.message, true);
+    }
+
+    function wizardRestoreUpload(file) {
+      document.getElementById('restore-file').value = '';
+      if (!file) return;
+      wizardRestoreBusy(true);
+      document.getElementById('restore-result').style.display = 'none';
+      wizardRestoreProgress(0, 'Uploading and restoring: 0%');
+      VernisBackup.upload(file, {
+        onProgress: function (pct) { wizardRestoreProgress(Math.round(pct * 0.95), 'Uploading and restoring: ' + pct + '%'); },
+        onUploaded: function () { wizardRestoreProgress(95, 'Finishing…'); }
+      }).then(wizardRestoreDone, wizardRestoreFailed);
+    }
+
+    function wizardRestoreUsb(b) {
+      wizardRestoreBusy(true);
+      document.getElementById('restore-result').style.display = 'none';
+      wizardRestoreProgress(0, 'Restoring from ' + b.drive + ': 0%');
+      VernisBackup.restoreLocal(b.path, {
+        onProgress: function (pct) { wizardRestoreProgress(pct, 'Restoring from ' + b.drive + ': ' + pct + '%'); }
+      }).then(wizardRestoreDone, wizardRestoreFailed);
+    }
+
+    // Look for backups on plugged-in drives; checks again while the step is
+    // open, so plugging the drive in after opening the page works too.
+    function loadWizardUsbBackups() {
+      if (_isKiosk || !window.VernisBackup) return;
+      VernisBackup.listLocal().then(function (list) {
+        var box = document.getElementById('restore-usb-list');
+        box.innerHTML = '';
+        list.forEach(function (b) {
+          var btn = document.createElement('button');
+          btn.className = 'wiz-btn wiz-btn-primary';
+          btn.style.marginBottom = '10px';
+          btn.textContent = 'Restore ' + b.name + ' (' + VernisBackup.formatBytes(b.bytes) + ', ' + b.drive + ')';
+          btn.onclick = function () { wizardRestoreUsb(b); };
+          box.appendChild(btn);
+        });
+      }).catch(function () {});
+    }
+    loadWizardUsbBackups();
+    setInterval(function () {
+      var step = document.getElementById('step-art');
+      if (step && step.classList.contains('active') &&
+          !document.querySelector('#restore-card button:disabled')) loadWizardUsbBackups();
+    }, 5000);
 
     function finishSetup() {
       if (_downloadPollTimer) clearTimeout(_downloadPollTimer);
@@ -712,6 +1031,7 @@
 
           if (!_isKiosk) {
             // PC/phone: check existing state
+            if (!data.password_changed) initPairing();
             if (data.password_changed) {
               var banner = document.createElement('div');
               banner.className = 'status-banner success';

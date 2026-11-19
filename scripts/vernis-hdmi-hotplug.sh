@@ -38,10 +38,13 @@ if [ -f "$LOCK_FILE" ]; then
 fi
 touch "$LOCK_FILE"
 
-# Find the Vernis user (first non-root user in /home)
-VERNIS_USER=$(ls /home/ 2>/dev/null | head -1)
+# Find the Vernis user: whoever owns the running desktop (Wayland) session,
+# else the install user (install-vernis.sh chowns /var/www/vernis to it).
+# Not "first entry in /home" - that is wrong on a Pi with more than one user.
+VERNIS_USER=$(stat -c %U /run/user/*/wayland-0 2>/dev/null | grep -vx root | head -1)
+[ -z "$VERNIS_USER" ] && VERNIS_USER=$(stat -c %U /var/www/vernis 2>/dev/null | grep -vx root)
 if [ -z "$VERNIS_USER" ]; then
-    echo "[hdmi-hotplug] No user found in /home/" >> "$LOG"
+    echo "[hdmi-hotplug] No desktop user found" >> "$LOG"
     exit 1
 fi
 

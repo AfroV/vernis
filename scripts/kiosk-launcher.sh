@@ -5,6 +5,25 @@
 # Compatible with both X11 and Wayland (labwc)
 ##############################################
 
+# One launcher at a time. Raspberry Pi OS starts labwc with -m, which runs
+# both ~/.config/labwc/autostart and the XDG autostart
+# (~/.config/autostart/vernis-kiosk.desktop), so two copies start together at
+# login. Each shows its own pre-rotated splash; when one copy rotates the
+# screen while the other's splash is still up, that splash shows sideways.
+# The lock is dropped just before Chromium starts, so the watchdog can still
+# relaunch the kiosk later.
+exec 9>/tmp/vernis-kiosk-launcher.lock
+if ! flock -n 9; then
+    echo "[$(date)] Another kiosk-launcher is already running - this copy exits"
+    exit 0
+fi
+
+# Hide the mouse pointer straight away. labwc shows it from the moment the
+# session starts; the autostart's own HideCursor keypress comes a second later.
+if [ -n "$WAYLAND_DISPLAY" ] && command -v wtype >/dev/null 2>&1; then
+    wtype -M alt -M logo -k h -m logo -m alt 2>/dev/null 9>&- &
+fi
+
 # Kill any existing Chromium, panel, desktop icons, and wizards (for clean kiosk mode)
 # Prevents duplicate browser instances if autostart runs more than once
 pkill -f 'chromium.*--kiosk' 2>/dev/null
@@ -33,7 +52,7 @@ if [ -n "$DPI_TRANSFORM_NOW" ] && [ "$DPI_TRANSFORM_NOW" != "normal" ] && [ -f "
     SPLASH_IMG="$SPLASH_UPRIGHT"
 fi
 if [ -n "$WAYLAND_DISPLAY" ] && [ -f "$SPLASH_IMG" ] && [ "$HDMI_AT_BOOT" -eq 0 ] && command -v swaybg >/dev/null 2>&1; then
-    swaybg -i "$SPLASH_IMG" -m fill -c '#0f0d0d' &
+    swaybg -i "$SPLASH_IMG" -m fill -c '#0f0d0d' 9>&- &
     SWAYBG_PID=$!
     echo "[$(date)] Boot splash wallpaper started (PID $SWAYBG_PID)"
 elif [ "$HDMI_AT_BOOT" -gt 0 ]; then
@@ -189,7 +208,7 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     # gallery.html has its own SVG touch cursor for external HDMI mode
     export WLR_NO_HARDWARE_CURSORS=1
     if command -v wtype >/dev/null 2>&1; then
-        (sleep 3 && wtype -M alt -M logo -k h -m logo -m alt) &
+        (sleep 3 && wtype -M alt -M logo -k h -m logo -m alt) 9>&- &
     fi
 else
     # Hide mouse pointer on X11
@@ -242,4 +261,5 @@ for _art_try in 1 2 3 4 5; do
 done
 
 echo "[$(date)] Launching Chromium..."
+exec 9>&-   # release the single-instance lock; Chromium must not hold it
 exec chromium $CHROME_FLAGS http://127.0.0.1/$START_PAGE

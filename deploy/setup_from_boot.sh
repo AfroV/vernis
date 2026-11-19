@@ -47,9 +47,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# install.sh must run as the desktop user (it refuses root and sudo's itself);
+# '+' runs the cleanup steps as root.
+User=pi
 ExecStart=/bin/bash /home/pi/vernis/install.sh
-ExecStartPost=/bin/systemctl disable vernis-firstrun.service
-ExecStartPost=/bin/rm /etc/systemd/system/vernis-firstrun.service
+ExecStartPost=+/bin/systemctl disable vernis-firstrun.service
+ExecStartPost=+/bin/rm /etc/systemd/system/vernis-firstrun.service
 StandardOutput=journal+console
 
 [Install]
