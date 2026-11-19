@@ -332,40 +332,15 @@ NoNewPrivileges=false
 WantedBy=multi-user.target
 APIEOF
 
-# Grant specific sudo permissions the API needs (reboot, systemctl, wlr-randr, etc.)
-# IMPORTANT: the `tee /sys/class/thermal/*` and `tee /boot/firmware/config.txt` rules
-# are required by fan control in backend/app.py (_write_privileged helper). Removing
-# them will break /api/fan/config with permission-denied errors.
-sudo tee /etc/sudoers.d/vernis-api > /dev/null << SUDOEOF
-# Vernis API — limited sudo for specific operations
-$USER_NAME ALL=(ALL) NOPASSWD: /sbin/reboot
-$USER_NAME ALL=(ALL) NOPASSWD: /sbin/shutdown
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart vernis-*
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart caddy
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ipfs
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart hciuart
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart bluetooth
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl start vernis-*
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop vernis-*
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl status *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/apt update
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/apt upgrade -y
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/ufw *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/nmcli *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/thermal/*
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/platform/*
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/firmware/config.txt
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/config.txt
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/firmware/cmdline.txt
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/cmdline.txt
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/badblocks *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/dpkg *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/apt-mark *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/brctl *
-$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/dnsmasq *
-SUDOEOF
-sudo chmod 440 /etc/sudoers.d/vernis-api
+# Sudo rules for the API (reboot, service restarts, fan control's sysfs and
+# config.txt writes, ...): the list lives in install-api-sudo.sh, which every
+# update re-applies. Fan control (backend/app.py _write_privileged) breaks
+# without its tee rules.
+if [ -f /opt/vernis/scripts/install-api-sudo.sh ]; then
+    sudo bash /opt/vernis/scripts/install-api-sudo.sh "$USER_NAME"
+else
+    echo "WARN: install-api-sudo.sh missing - copy scripts, then run: sudo bash /opt/vernis/scripts/vernis-post-update.sh"
+fi
 
 # Migration: fix legacy root-owned JSON state files from pre-USER_NAME installs.
 # Flask (running as $USER_NAME) needs to write these for fan/cpu/brightness/etc. endpoints.
@@ -373,13 +348,6 @@ sudo find /opt/vernis -maxdepth 1 -type f -name '*.json' -user root -exec chown 
 
 sudo systemctl daemon-reload
 sudo systemctl enable vernis-api
-
-# Root setup: the updater behind Settings > Install update, the password
-# helper (setup wizard, Settings) and the storage helper (USB drives, IPFS
-# store), each root-owned with one narrow sudo rule. After daemon-reload:
-# they read vernis-api's User= from systemd.
-sudo bash /opt/vernis/scripts/vernis-post-update.sh || \
-    echo "WARN: root setup incomplete - re-run: sudo bash /opt/vernis/scripts/vernis-post-update.sh"
 
 # Step 6: Setup kiosk autostart
 echo "[6/17] Setting up kiosk mode..."
@@ -502,7 +470,9 @@ else
     echo "  gcc -O2 -o /opt/vernis/scripts/hue-stream /opt/vernis/scripts/hue-stream.c -lssl -lcrypto"
 fi
 
-sudo tee /etc/systemd/system/vernis-hue-stream.service > /dev/null << 'EOF'
+# As the app account, not root: it runs hue-stream, which the API compiles
+# into /opt/vernis/scripts (the API also starts this daemon as that account)
+sudo tee /etc/systemd/system/vernis-hue-stream.service > /dev/null << EOF
 [Unit]
 Description=Vernis Hue Entertainment Streaming Daemon
 After=network-online.target vernis-api.service
@@ -510,6 +480,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=$USER_NAME
 ExecStart=/usr/bin/python3 /opt/vernis/scripts/hue-entertainment-daemon.py
 Restart=on-failure
 RestartSec=10
@@ -596,6 +567,15 @@ else
     echo "Display setup script not found. Copy files first, then run:"
     echo "  sudo bash /opt/vernis/scripts/setup-waveshare-4dpi.sh"
 fi
+
+# Root setup: the updater behind Settings > Install update, the password
+# helper (setup wizard, Settings) and the storage helper (USB drives, IPFS
+# store), each root-owned with one narrow sudo rule; and every root service
+# and udev rule written above moved to root-owned copies of its script
+# (/opt/vernis/scripts can be edited by the app account). After all units
+# exist and after daemon-reload: it reads vernis-api's User= from systemd.
+sudo bash /opt/vernis/scripts/vernis-post-update.sh || \
+    echo "WARN: root setup incomplete - re-run: sudo bash /opt/vernis/scripts/vernis-post-update.sh"
 
 # Disable dpi-backlight service if present (it corrupts DPI display by hijacking GPIO18)
 # See DPI-DISPLAY-TROUBLESHOOTING.md Issue 1 for details

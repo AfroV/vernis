@@ -3,8 +3,9 @@
 # Vernis - Update an ALREADY-INSTALLED device to the latest code.
 #
 # Pushes: web UI, backend/app.py, scripts/, csv-library/, hardened
-# Caddyfile, vernis-api unit + sudoers, then runs the security
-# migration and restarts services.
+# Caddyfile, vernis-api unit, then runs the security
+# migration and the root setup (vernis-post-update.sh: helpers, sudo rules,
+# root services on root-owned scripts) and restarts services.
 #
 # Deliberately does NOT touch (device-specific, set at install time):
 #   - /boot/firmware/config.txt or display overlays
@@ -134,37 +135,6 @@ NoNewPrivileges=false
 WantedBy=multi-user.target
 EOF
 
-# sudoers - keep in sync with install-vernis.sh (fan control needs the tee rules)
-cat > "$STAGE/conf/vernis-api.sudoers" << 'EOF'
-# Vernis API — limited sudo for specific operations
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /sbin/reboot
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /sbin/shutdown
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart vernis-*
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart caddy
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ipfs
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart hciuart
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart bluetooth
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl start vernis-*
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop vernis-*
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/systemctl status *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/apt update
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/apt upgrade -y
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/sbin/ufw *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/nmcli *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/thermal/*
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/platform/*
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/firmware/config.txt
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/config.txt
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/firmware/cmdline.txt
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/tee /boot/cmdline.txt
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/sbin/badblocks *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/dpkg *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/apt-mark *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/bluetoothctl *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/brctl *
-__VERNIS_USER__ ALL=(ALL) NOPASSWD: /usr/bin/dnsmasq *
-EOF
-
 # Remote installer - runs as root on the Pi
 cat > "$STAGE/remote-install.sh" << 'EOF'
 #!/bin/bash
@@ -193,11 +163,8 @@ chown -R "$U:$U" /opt/vernis/scripts /opt/vernis/csv-library
 echo "--- [3/8] Hardened Caddyfile"
 install -m 644 "$SRC/conf/Caddyfile" /etc/caddy/Caddyfile
 
-echo "--- [4/8] vernis-api unit + sudoers"
+echo "--- [4/8] vernis-api unit"
 sed "s/__VERNIS_USER__/$U/g" "$SRC/conf/vernis-api.service" > /etc/systemd/system/vernis-api.service
-sed "s/__VERNIS_USER__/$U/g" "$SRC/conf/vernis-api.sudoers" > "$SRC/sudoers.tmp"
-visudo -c -f "$SRC/sudoers.tmp"
-install -m 440 "$SRC/sudoers.tmp" /etc/sudoers.d/vernis-api
 # Old updater.sh runs copied systemd/vernis-watchdog.service with User=pi,
 # which crash-loops (status=217/USER) on devices without a pi account
 if [ -f /etc/systemd/system/vernis-watchdog.service ]; then
@@ -232,6 +199,12 @@ fi
 echo "--- [7/8] Security migration (idempotent)"
 bash /opt/vernis/scripts/migrate-security-init.sh || \
     echo "WARNING: migration failed - re-run later: INSTALL_USER_PASSWORD='<pwd>' sudo -E bash /opt/vernis/scripts/migrate-security-init.sh"
+
+# Root setup, like the update button: helpers, the vernis-api sudo rules
+# (install-api-sudo.sh), root services moved to root-owned scripts. From the
+# staged copy, not /opt/vernis/scripts (the app account can edit that).
+bash "$SRC/scripts/vernis-post-update.sh" || \
+    echo "WARNING: root setup incomplete - re-run: sudo bash /opt/vernis/scripts/vernis-post-update.sh"
 
 echo "--- [8/8] Restart + verify"
 systemctl reload-or-restart caddy

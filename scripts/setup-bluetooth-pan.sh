@@ -42,49 +42,8 @@ sudo bluetoothctl system-alias "Vernis-${HOSTNAME}" 2>/dev/null || true
 # Step 3: Create the BT PAN helper script
 echo "[3/5] Creating BT PAN bridge service..."
 
-sudo tee /opt/vernis/scripts/bt-pan-helper.sh > /dev/null << 'BTHELPER'
-#!/bin/bash
-# BT PAN helper — manages the network bridge for Bluetooth PAN connections
-# Called by bt-pan systemd service
-
-BT_BRIDGE="bt0"
-BT_IP="10.44.0.1"
-BT_NETMASK="255.255.255.0"
-
-setup_bridge() {
-    # Create bridge if it doesn't exist
-    if ! ip link show "$BT_BRIDGE" &>/dev/null; then
-        sudo brctl addbr "$BT_BRIDGE"
-    fi
-    sudo ip addr flush dev "$BT_BRIDGE" 2>/dev/null
-    sudo ip addr add "${BT_IP}/24" dev "$BT_BRIDGE"
-    sudo ip link set "$BT_BRIDGE" up
-    echo "[bt-pan] Bridge $BT_BRIDGE up at $BT_IP"
-}
-
-cleanup_bridge() {
-    sudo ip link set "$BT_BRIDGE" down 2>/dev/null
-    sudo brctl delbr "$BT_BRIDGE" 2>/dev/null
-    echo "[bt-pan] Bridge $BT_BRIDGE removed"
-}
-
-case "$1" in
-    start)
-        setup_bridge
-        # Start the NAP server (blocks until stopped)
-        sudo /usr/bin/bt-network -s nap "$BT_BRIDGE"
-        ;;
-    stop)
-        cleanup_bridge
-        ;;
-    *)
-        echo "Usage: $0 {start|stop}"
-        exit 1
-        ;;
-esac
-BTHELPER
-
-sudo chmod +x /opt/vernis/scripts/bt-pan-helper.sh
+sudo install -m 755 "$(dirname "$0")/bt-pan-helper.sh" /opt/vernis/scripts/bt-pan-helper.sh 2>/dev/null || \
+    [ -f /opt/vernis/scripts/bt-pan-helper.sh ]
 
 # Copy pairing agent script
 sudo cp -f "$(dirname "$0")/bt-pairing-agent.py" /opt/vernis/scripts/bt-pairing-agent.py 2>/dev/null || true
@@ -163,6 +122,12 @@ sudo systemctl restart dnsmasq 2>/dev/null || sudo systemctl start dnsmasq 2>/de
 
 # Enable and start services
 sudo systemctl daemon-reload
+# The services run as root: point them at root-owned copies of their scripts
+# (/opt/vernis/scripts can be edited by the Vernis app account)
+if [ -f "$(dirname "$0")/install-root-scripts.sh" ]; then
+    sudo bash "$(dirname "$0")/install-root-scripts.sh" || \
+        echo "WARN: root-owned script copies not installed - run: sudo bash /opt/vernis/scripts/vernis-post-update.sh"
+fi
 sudo systemctl enable bt-agent bt-pan
 sudo systemctl start bt-agent bt-pan
 

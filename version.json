@@ -1,21 +1,8 @@
 {
-  "version": "3.6.0",
+  "version": "3.6.1",
   "build_date": "2026-11-19",
   "codename": "Sentinel",
   "changelog": [
-    "Save a backup straight onto a USB drive plugged into your Vernis - no phone or computer needs to stay connected",
-    "Restore from a backup on a USB drive, in Settings or during setup, even without internet",
-    "USB drives are mounted automatically when you plug them in",
-    "Keep the IPFS store on an external drive; the move is checked and rolled back if anything goes wrong",
-    "Backups download as they are built, show real progress and can resume if interrupted",
-    "Restores no longer have a 500 MB limit and skip files you already have",
-    "Fix: backups missed art stored on an external drive, and restores dropped collections",
-    "Restored art is pinned to IPFS again automatically",
-    "New setup: pair your phone with the QR code or 6-digit code shown on the frame",
-    "Wallet import keeps the original media and asks for an OpenSea key when one is needed",
-    "Work Mode (optional): see your Claude plan usage on the frame",
-    "Startup screens are always the right way up, with no mouse pointer",
-    "Installing from a git clone works with 'bash install.sh', even when the IPFS download site is unreachable",
-    "Security and stability improvements"
+    "Security and stability improvements for system services"
   ]
 }

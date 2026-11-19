@@ -98,6 +98,11 @@ Environment=DISPLAY=:0
 WantedBy=graphical.target
 EOF
         systemctl daemon-reload
+        # Runs as root: point it at a root-owned copy of touch-rotate.sh
+        # (/opt/vernis/scripts can be edited by the app account)
+        if [ -f "$(dirname "$0")/install-root-scripts.sh" ]; then
+            bash "$(dirname "$0")/install-root-scripts.sh" || true
+        fi
         systemctl enable vernis-touch.service
         echo "  - Touch rotation service enabled"
     fi
