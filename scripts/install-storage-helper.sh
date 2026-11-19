@@ -1,7 +1,7 @@
 #!/bin/bash
 ##############################################
 # Install the storage helper (run as root).
-# Called by install-vernis.sh and vernis-update.sh.
+# Called by vernis-post-update.sh (fresh install, update, first boot after an update).
 #
 # - /usr/local/sbin/vernis-storage: root-owned copy of vernis-storage-helper.py
 #   (copied OUT of /opt/vernis/scripts, which vernis-api's account can edit)

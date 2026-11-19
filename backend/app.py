@@ -15,6 +15,7 @@ import re
 import time
 from datetime import datetime, timedelta
 import io
+import tempfile
 import threading
 import socket
 import platform
@@ -42,6 +43,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 NFT_DIR = Path("/opt/vernis/nfts")  # Default internal storage
 UPLOAD_DIR = Path("/opt/vernis/uploads")
 SCRIPTS_DIR = Path("/opt/vernis/scripts")
+ROOT_UPDATER = Path("/usr/local/sbin/vernis-update")  # install-updater.sh
 CSV_LIBRARY_DIR = Path("/opt/vernis/csv-library")
 FILES_DIR = Path("/opt/vernis/files")
 TMP_DIR = Path("/opt/vernis/tmp")  # tmpfs RAM disk (setup-tmpfs.sh), fallback to /tmp
@@ -9684,9 +9686,36 @@ def system_update():
         if not script_path.exists():
             return jsonify({"error": "Update script not found"}), 500
 
+        # The root-owned updater and its sudo rule (install-updater.sh) work
+        # on every image. Images without password-free sudo (cloud-init,
+        # Raspberry Pi Imager 2025+) can't run the script from SCRIPTS_DIR.
+        # -n: fail at once instead of waiting for a password nobody can type.
+        if ROOT_UPDATER.exists():
+            cmd = ["sudo", "-n", str(ROOT_UPDATER), repo, branch]
+        else:
+            cmd = ["sudo", "-n", "bash", str(script_path), repo, branch]
+
         started = int(time.time())
         _write_update_status(state="running", step=0, total=7, message="Starting update", started=started)
-        subprocess.Popen(["sudo", "bash", str(script_path), repo, branch])
+        # The updater hands itself to systemd-run and returns within a second
+        # or two. A quick non-zero exit means it never started (usually sudo):
+        # say so, instead of leaving Settings on "Starting update" for good.
+        errlog = tempfile.TemporaryFile()
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=errlog)
+        try:
+            rc = proc.wait(timeout=8)
+        except subprocess.TimeoutExpired:
+            rc = None  # still running in the foreground - fine
+        if rc not in (None, 0):
+            errlog.seek(0)
+            detail = errlog.read().decode("utf-8", "replace").strip()[-300:]
+            errlog.close()
+            print(f"[update] updater did not start (exit {rc}): {detail}", flush=True)
+            msg = ("The update could not start on this frame (missing permission). "
+                   "Restart the frame and try again. Nothing was changed.")
+            _write_update_status(state="failed", step=0, total=7, message=msg, started=started)
+            return jsonify({"error": msg}), 500
+        errlog.close()
 
         return jsonify({
             "success": True,
@@ -9706,7 +9735,8 @@ def check_updates():
 
     # --- System package check ---
     try:
-        subprocess.run(["sudo", "apt-get", "update"], capture_output=True, timeout=60)
+        # `apt update` (not apt-get) is what the vernis-api sudo rule allows
+        subprocess.run(["sudo", "-n", "apt", "update"], capture_output=True, timeout=60)
         apt_result = subprocess.run(
             ["apt", "list", "--upgradable"],
             capture_output=True, text=True, timeout=30

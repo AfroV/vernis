@@ -8,6 +8,16 @@
 
 ACTIVITY_FILE="/opt/vernis/last-activity"
 
+# Finish the root setup of a newly installed version (sudo rules, helpers).
+# An update is run by the updater already on the frame, and updaters before
+# 3.6 don't do this; this root boot service is the first code of the new
+# version to run as root. Cheap after the first time (version marker).
+# In the foreground: on frames without a touchscreen this script exits right
+# below, and systemd would kill a background job with it.
+if [ "$EUID" -eq 0 ] && [ -f /opt/vernis/scripts/vernis-post-update.sh ]; then
+    timeout 300 bash /opt/vernis/scripts/vernis-post-update.sh --if-needed || true
+fi
+
 # Find the Goodix touchscreen event device dynamically
 find_touch_device() {
     for f in /sys/class/input/event*/device/name; do

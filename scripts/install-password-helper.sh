@@ -1,7 +1,7 @@
 #!/bin/bash
 ##############################################
 # Install the device-password helper (run as root).
-# Called by install-vernis.sh and vernis-update.sh.
+# Called by vernis-post-update.sh (fresh install, update, first boot after an update).
 #
 # vernis-api runs as the owner's account and needs root only to check or set
 # that account's password (setup wizard, Settings > Password). The helper is

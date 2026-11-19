@@ -90,6 +90,20 @@ Never change `scripts/github-update.sh`: 3.5.0 devices copy it over themselves
 while it runs, which is only safe while its content is identical. Put updater
 changes in `scripts/vernis-update.sh`.
 
+**Root setup lives in `scripts/vernis-post-update.sh`** (the root-owned updater
+`/usr/local/sbin/vernis-update`, the password and storage helpers, and their
+narrow sudo rules). The installer runs it, and 3.6+ updaters run it from the
+downloaded release. An *older* updater never runs new code as root, so
+`touch-to-wake.sh` (a root boot service) runs it once per version at boot. A
+release that needs new root setup must add it there.
+
+**Test on a device flashed with a current Raspberry Pi Imager image.** Those
+(cloud-init) images don't give the user password-free sudo, and older frames
+have it, so a release can pass on an old frame and fail on new ones. On such
+a frame, 3.5.x's Install update silently does nothing ("Starting update"
+forever). Fix it once over SSH, after the release is on `main`:
+`sudo bash /opt/vernis/scripts/vernis-update.sh AfroV/vernis main`.
+
 ## Key Files
 
 - `backend/app.py` - Flask backend with all API endpoints

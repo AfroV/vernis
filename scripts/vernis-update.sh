@@ -201,6 +201,15 @@ if ! wait_for_api; then
 fi
 echo "✅ Vernis is running"
 
+# Root setup of the new version (updater, helpers, their sudo rules), run from
+# the release just downloaded - root-owned, unlike /opt/vernis/scripts.
+# Optional: never fails the update. If it doesn't finish, touch-to-wake.sh
+# runs it again at the next start.
+if [ -f "$TEMP_DIR/vernis/scripts/vernis-post-update.sh" ]; then
+    bash "$TEMP_DIR/vernis/scripts/vernis-post-update.sh" || \
+        echo "⚠ Root setup of the new version did not finish - it runs again at the next start"
+fi
+
 echo "[6/7] Running system updates..."
 status running 6 "Installing system updates - this can take 5 to 20 minutes. Keep the frame plugged in."
 apt-get update || true
@@ -212,10 +221,6 @@ if ! command -v ffmpeg > /dev/null 2>&1; then
         echo "⚠ ffmpeg not installed - video/AVIF thumbnails use a fallback"
 fi
 echo "✅ System updated"
-# Root helper for the device password (3.6+); optional, never fails the update
-bash "$APP_DIR/scripts/install-password-helper.sh" || true
-# USB automount + IPFS store move (3.6+); optional, never fails the update
-bash "$APP_DIR/scripts/install-storage-helper.sh" || true
 
 echo "[7/7] Cleaning up..."
 status running 7 "Finishing"

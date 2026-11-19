@@ -374,13 +374,12 @@ sudo find /opt/vernis -maxdepth 1 -type f -name '*.json' -user root -exec chown 
 sudo systemctl daemon-reload
 sudo systemctl enable vernis-api
 
-# Root helper that checks/sets the owner's password (setup wizard, Settings).
-# After daemon-reload: it reads vernis-api's User= from systemd.
-sudo bash /opt/vernis/scripts/install-password-helper.sh || \
-    echo "WARN: password helper not installed - the setup wizard can't set the device password"
-# Mounts USB drives on plug-in and lets Settings move the IPFS store to one.
-sudo bash /opt/vernis/scripts/install-storage-helper.sh || \
-    echo "WARN: storage helper not installed - USB drives won't mount by themselves"
+# Root setup: the updater behind Settings > Install update, the password
+# helper (setup wizard, Settings) and the storage helper (USB drives, IPFS
+# store), each root-owned with one narrow sudo rule. After daemon-reload:
+# they read vernis-api's User= from systemd.
+sudo bash /opt/vernis/scripts/vernis-post-update.sh || \
+    echo "WARN: root setup incomplete - re-run: sudo bash /opt/vernis/scripts/vernis-post-update.sh"
 
 # Step 6: Setup kiosk autostart
 echo "[6/17] Setting up kiosk mode..."
