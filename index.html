@@ -452,17 +452,71 @@
       border: 1px solid var(--border-light);
     }
     .kiosk-wifi, .kiosk-screenoff { display: none !important; }
+    /* Screen Off: the label looks as small as ever, but the whole strip under
+       the buttons is the touch area. Tap = screen off, hold = power menu.
+       The script below trims the height so it never reaches the last button. */
     .kiosk-power {
-      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 100;
-      display: none; align-items: center; gap: 8px;
-      padding: 10px 20px; border: none; border-radius: 12px;
+      position: fixed; left: 40px; right: 40px; bottom: 12px; z-index: 100;
+      height: 96px; box-sizing: border-box;
+      display: none; align-items: flex-end; justify-content: center; gap: 8px;
+      padding: 0 20px 30px; border: none; border-radius: 12px;
       background: transparent; color: var(--text-secondary);
       font-size: 15px; font-weight: 500; font-family: var(--font-body);
       cursor: pointer; opacity: 0.4; transition: opacity 0.3s ease;
+      touch-action: none; user-select: none; -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    .kiosk-power:active { opacity: 0.8; }
+    .kiosk-power:active, .kiosk-power.holding { opacity: 0.9; }
     .kiosk .kiosk-power { display: flex; }
     .kiosk-power svg { width: 18px; height: 18px; }
+    .kiosk-power .kp-bar {
+      position: absolute; left: 50%; bottom: 18px; height: 3px; width: 0;
+      transform: translateX(-50%); border-radius: 2px;
+      background: var(--accent-primary); pointer-events: none;
+    }
+    .kiosk-logo { touch-action: none; user-select: none; -webkit-user-select: none; }
+
+    /* Power menu — opened by holding the logo or the Screen Off strip */
+    .kpm {
+      position: fixed; inset: 0; z-index: 10050;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg-primary);
+      opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s;
+    }
+    .kpm.open { opacity: 1; visibility: visible; }
+    .kpm.unarmed { pointer-events: none; }
+    .kpm-panel {
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      width: 100%; max-width: 460px; padding: 0 40px; box-sizing: content-box;
+    }
+    .kpm-title {
+      font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 900;
+      letter-spacing: 0.2em; color: var(--text-muted); margin-bottom: 6px;
+    }
+    .kpm-item {
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; gap: 16px;
+      width: 100%; height: 96px; box-sizing: border-box;
+      border-radius: 20px; border: 1px solid var(--border-medium);
+      background: var(--bg-tertiary); color: var(--text-primary);
+      font-size: 28px; font-weight: 600; font-family: var(--font-body);
+      cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent;
+    }
+    .kpm-item:active { opacity: 0.8; }
+    .kpm-item svg { width: 34px; height: 34px; flex-shrink: 0; position: relative; }
+    .kpm-item span { position: relative; }
+    .kpm-danger {
+      background: transparent; border: 2px solid var(--error, #ef4444); color: var(--error, #ef4444);
+    }
+    .kpm-danger:active { opacity: 1; }
+    .kpm-danger .kpm-fill {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+      background: rgba(var(--error-rgb, 239, 68, 68), 0.3);
+    }
+    .kpm-cancel {
+      border: none; background: transparent; color: var(--text-secondary);
+      font-size: 24px; font-family: var(--font-body); padding: 14px 40px; cursor: pointer;
+    }
 
     /* Connect / Curator flip card */
     .flip-switch {
@@ -667,7 +721,9 @@
 
   <!-- Kiosk start screen (Pi local display only) -->
   <div class="kiosk-start">
-    <div class="kiosk-logo">VERNIS</div>
+    <!-- data-power-menu: holding the logo opens the power menu (Reset PIN is in
+         it), so vernis-logo-longpress.js must not attach its own 5 s hold here -->
+    <div class="kiosk-logo" data-power-menu>VERNIS</div>
     <div class="kiosk-diamond"></div>
     <div class="kiosk-line"></div>
     <div class="kiosk-buttons">
@@ -691,9 +747,11 @@
   </div>
 
   <!-- Kiosk Screen Off button (bottom center) -->
-  <button class="kiosk-power" onclick="kioskScreenOff()">
+  <!-- Tap: screen off. Hold: power menu (wired up by the power-menu script at the end) -->
+  <button class="kiosk-power" aria-label="Screen off. Hold for power menu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
     Screen Off
+    <span class="kp-bar"></span>
   </button>
 
   <!-- Kiosk WiFi overlay -->
@@ -1761,10 +1819,6 @@
     }
 
     // === KIOSK CONNECT OVERLAY ===
-    function kioskScreenOff() {
-      fetch('/api/screen/off', { method: 'POST' }).catch(function(){});
-    }
-
     function openKioskConnect() {
       // Check WiFi first — if not connected, open WiFi overlay instead
       fetch('/api/status').then(function(r) { return r.json(); }).then(function(data) {
@@ -2278,117 +2332,240 @@
   <script src="/vernis-mode-pill.js"></script>
 
   <script>
-  /* Hold the kiosk "Screen Off" button to power off (graceful shutdown).
-   *   tap                -> screen off (unchanged)
-   *   hold: after 1s a RED ring fills over the VERNIS logo ("Powering off…")
-   *   release before 8s  -> cancel
-   *   held to 8s         -> POST /api/shutdown
-   * Distinct from the 5s logo-hold PIN recovery (different element, colour, label).
+  /* Home-screen power controls (Pi kiosk).
+   *   Screen Off strip  tap            -> screen off
+   *                     hold 1.5 s     -> power menu
+   *   VERNIS logo       hold 1.5 s     -> power menu
+   *   Power menu: Screen off · Power off (3 s countdown; tap it again or Cancel to stop) · Reset PIN · Cancel
+   * Reset PIN opens the recovery modal from vernis-logo-longpress.js.
    */
   (function () {
     'use strict';
-    var RING_DELAY_MS = 1000;   // tap grace before the ring appears
-    var HOLD_TOTAL_MS = 8000;   // total hold to trigger shutdown
-    var CIRC = 289.03;          // 2*pi*46 — matches the recovery ring geometry
+    var HOLD_MS = 1500;        // strip / logo hold that opens the menu
+    var TAP_MS = 600;          // strip release before this = tap (screen off)
+    var BAR_DELAY_MS = 250;    // progress only shows once it's clearly a hold
+    var POWER_DELAY_MS = 3000; // countdown after tapping Power off
+    var IDLE_CLOSE_MS = 30000; // menu closes itself if left open
+    var CIRC = 289.03;         // 2*pi*46, the ring geometry used by .vlp-ring
     var SVG = 'http://www.w3.org/2000/svg';
+    var ICON = {
+      moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>',
+      power: '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>',
+      key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2M16 7l3 3M18 5l2 2"/>'
+    };
 
-    function injectStyle() {
-      if (document.getElementById('vpo-style')) return;
-      var s = document.createElement('style');
-      s.id = 'vpo-style';
-      s.textContent =
-        '.vpo-ring{position:absolute;top:50%;left:50%;width:88px;height:88px;' +
-        'transform:translate(-50%,-50%);pointer-events:none;opacity:0;color:#ef4444;' +
-        'transition:opacity 200ms ease;overflow:visible;}' +
-        '.vpo-ring.active{opacity:1;filter:drop-shadow(0 0 8px rgba(239,68,68,.6));}' +
-        '.vpo-ring circle{transition:stroke-dashoffset 80ms linear;}' +
-        '.vpo-label{position:absolute;top:calc(50% + 66px);left:50%;transform:translateX(-50%);' +
-        'color:#ef4444;font-size:15px;font-weight:600;white-space:nowrap;pointer-events:none;' +
-        'opacity:0;transition:opacity 200ms ease;}' +
-        '.vpo-label.active{opacity:1;}';
-      document.head.appendChild(s);
+    function icon(name) {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[name] + '</svg>';
+    }
+    function screenOff() {
+      fetch('/api/screen/off', { method: 'POST' }).catch(function () {});
     }
 
-    function buildRing(host) {
-      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    /* ---------- menu ---------- */
+    var menu, powerBtn, powerFill, powerText, idleTimer = 0;
+
+    function buildMenu() {
+      menu = document.createElement('div');
+      menu.className = 'kpm';
+      menu.setAttribute('role', 'dialog');
+      menu.setAttribute('aria-label', 'Power menu');
+      menu.innerHTML =
+        '<div class="kpm-panel">' +
+          '<div class="kpm-title">VERNIS</div>' +
+          '<button class="kpm-item" data-a="off">' + icon('moon') + '<span>Screen off</span></button>' +
+          '<button class="kpm-item kpm-danger" data-a="power"><span class="kpm-fill"></span>' +
+            icon('power') + '<span class="kpm-text">Power off</span></button>' +
+          '<button class="kpm-item" data-a="pin">' + icon('key') + '<span>Reset PIN</span></button>' +
+          '<button class="kpm-cancel" data-a="close">Cancel</button>' +
+        '</div>';
+      document.body.appendChild(menu);
+      powerBtn = menu.querySelector('[data-a=power]');
+      powerFill = powerBtn.querySelector('.kpm-fill');
+      powerText = powerBtn.querySelector('.kpm-text');
+
+      menu.addEventListener('click', function (e) {
+        if (e.target === menu) { closeMenu(); return; }
+        var b = e.target.closest('[data-a]');
+        if (!b) return;
+        var a = b.dataset.a;
+        if (a === 'off') { closeMenu(); screenOff(); }
+        else if (a === 'close') closeMenu();
+        else if (a === 'pin') {
+          closeMenu();
+          if (window.VernisLogoLongPress) window.VernisLogoLongPress.openRecoveryModal();
+        }
+      });
+      menu.addEventListener('pointerdown', bumpIdle);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu();
+      });
+      wirePowerHold();
+    }
+
+    function bumpIdle() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(closeMenu, IDLE_CLOSE_MS);
+    }
+    // Opened while a finger is still down: stay inert until it lifts, so the
+    // release can't land on a menu item that appeared under it.
+    function openMenu() {
+      menu.classList.add('unarmed', 'open');
+      bumpIdle();
+    }
+    function armMenu() {
+      setTimeout(function () { menu.classList.remove('unarmed'); }, 200);
+    }
+    function closeMenu() {
+      clearTimeout(idleTimer);
+      menu.classList.remove('open', 'unarmed');
+      resetPower();
+    }
+
+    /* ---------- tap to power off, with a short cancel window ---------- */
+    var pTick = 0, pLeft = 0, pFired = false, textTimer = 0;
+
+    function setPowerText(t) { powerText.textContent = t; }
+    function resetPower() {
+      clearInterval(pTick); pTick = 0;
+      clearTimeout(textTimer);
+      powerFill.style.transition = 'width 0.2s ease';
+      powerFill.style.width = '0';
+      if (!pFired) setPowerText('Power off');
+    }
+    function wirePowerHold() {
+      powerBtn.addEventListener('click', function () {
+        if (pFired) return;
+        if (pTick) { resetPower(); bumpIdle(); return; }   // second tap = cancel
+        clearTimeout(textTimer);
+        pLeft = Math.round(POWER_DELAY_MS / 1000);
+        setPowerText('Powering off… ' + pLeft);
+        powerFill.style.transition = 'width ' + POWER_DELAY_MS + 'ms linear';
+        powerFill.style.width = '100%';
+        pTick = setInterval(function () {
+          pLeft -= 1;
+          if (pLeft > 0) { setPowerText('Powering off… ' + pLeft); return; }
+          clearInterval(pTick); pTick = 0;
+          powerOff();
+        }, 1000);
+      });
+    }
+    function powerOff() {
+      pFired = true;
+      clearTimeout(idleTimer);
+      setPowerText('Powering off…');
+      var h = (typeof authHeaders === 'function') ? authHeaders() : {};
+      fetch('/api/shutdown', { method: 'POST', headers: h })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.status);
+          document.body.innerHTML =
+            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:var(--bg-primary);color:var(--text-secondary);text-align:center;padding:0 40px;">' +
+              '<div style="width:60px;height:60px;border:4px solid var(--border-light);border-top-color:var(--accent-primary);border-radius:50%;animation:kpm-spin 1s linear infinite;margin-bottom:30px;"></div>' +
+              '<div style="font-size:30px;font-weight:600;margin-bottom:12px;">Shutting down</div>' +
+              '<div style="font-size:18px;color:var(--text-muted);">It\'s safe to unplug once the screen goes dark</div>' +
+            '</div><style>@keyframes kpm-spin{to{transform:rotate(360deg)}}</style>';
+        })
+        .catch(function () {
+          pFired = false;
+          resetPower();
+          setPowerText('Couldn\'t power off');
+          textTimer = setTimeout(function () { setPowerText('Power off'); }, 2500);
+          bumpIdle();
+        });
+    }
+
+    /* ---------- holds that open the menu ---------- */
+    // onProgress(p) gets 0..1 while held (only after BAR_DELAY_MS), -1 on reset.
+    function holdToOpen(el, onProgress, onTap) {
+      var startTs = 0, raf = 0, fired = false;
+      function tick() {
+        var e = Date.now() - startTs;
+        if (e >= BAR_DELAY_MS) onProgress(Math.min(1, (e - BAR_DELAY_MS) / (HOLD_MS - BAR_DELAY_MS)));
+        if (e >= HOLD_MS) { fired = true; onProgress(-1); openMenu(); return; }
+        raf = requestAnimationFrame(tick);
+      }
+      el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      el.addEventListener('click', function (e) { e.preventDefault(); });
+      el.addEventListener('pointerdown', function (ev) {
+        if (ev.cancelable) ev.preventDefault();
+        fired = false; startTs = Date.now();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(tick);
+        // Capture so finger drift on a real touchscreen doesn't end the hold
+        try { el.setPointerCapture(ev.pointerId); } catch (_) {}
+      });
+      function end(isTap) {
+        cancelAnimationFrame(raf);
+        if (fired) { fired = false; startTs = 0; armMenu(); return; }
+        var e = startTs ? Date.now() - startTs : 0;
+        startTs = 0;
+        onProgress(-1);
+        if (isTap && onTap && e > 0 && e < TAP_MS) onTap();
+        // held past TAP_MS and let go before HOLD_MS = changed their mind
+      }
+      el.addEventListener('pointerup', function () { end(true); });
+      el.addEventListener('pointercancel', function () { end(false); });
+    }
+
+    function attachStrip(btn) {
+      var bar = btn.querySelector('.kp-bar');
+      holdToOpen(btn, function (p) {
+        if (p < 0) { btn.classList.remove('holding'); bar.style.width = '0'; return; }
+        btn.classList.add('holding');
+        bar.style.width = Math.round(160 * p) + 'px';
+      }, screenOff);
+    }
+
+    function attachLogo(logo) {
+      if (getComputedStyle(logo).position === 'static') logo.style.position = 'relative';
       var svg = document.createElementNS(SVG, 'svg');
-      svg.setAttribute('class', 'vpo-ring');
+      svg.setAttribute('class', 'vlp-ring');
       svg.setAttribute('viewBox', '0 0 100 100');
       svg.setAttribute('aria-hidden', 'true');
-      function circle(attrs) {
-        var c = document.createElementNS(SVG, 'circle');
-        Object.keys(attrs).forEach(function (k) { c.setAttribute(k, attrs[k]); });
-        return c;
-      }
-      var track = circle({ cx: 50, cy: 50, r: 46, fill: 'none',
-        stroke: 'rgba(239,68,68,.18)', 'stroke-width': 3 });
-      var fill = circle({ cx: 50, cy: 50, r: 46, fill: 'none', stroke: 'currentColor',
-        'stroke-width': 3, 'stroke-linecap': 'round', transform: 'rotate(-90 50 50)',
-        'stroke-dasharray': CIRC, 'stroke-dashoffset': CIRC });
-      svg.appendChild(track); svg.appendChild(fill);
-      host.appendChild(svg);
-      var label = document.createElement('div');
-      label.className = 'vpo-label';
-      label.textContent = 'Powering off… release to cancel';
-      host.appendChild(label);
-      return { svg: svg, fill: fill, label: label };
+      var c = document.createElementNS(SVG, 'circle');
+      [['cx', 50], ['cy', 50], ['r', 46], ['fill', 'none'], ['stroke', 'currentColor'],
+       ['stroke-width', 2], ['stroke-linecap', 'round'], ['transform', 'rotate(-90 50 50)'],
+       ['stroke-dasharray', CIRC], ['stroke-dashoffset', CIRC]]
+        .forEach(function (kv) { c.setAttribute(kv[0], String(kv[1])); });
+      svg.appendChild(c);
+      logo.appendChild(svg);
+      holdToOpen(logo, function (p) {
+        if (p < 0) { svg.classList.remove('active'); c.setAttribute('stroke-dashoffset', String(CIRC)); return; }
+        svg.classList.add('active');
+        c.setAttribute('stroke-dashoffset', String(CIRC * (1 - p)));
+      }, null);
+    }
+
+    // Make the strip as tall as the space under the last button allows
+    // (10 px clear of it), capped at 120 px, never smaller than the old button.
+    function fitStrip(btn, buttons) {
+      var r = buttons.getBoundingClientRect();
+      if (!r.height) return;
+      var bottomGap = parseFloat(getComputedStyle(btn).bottom) || 0;
+      var room = window.innerHeight - bottomGap - r.bottom - 10;
+      btn.style.height = Math.max(64, Math.min(120, Math.floor(room))) + 'px';
     }
 
     function attach() {
       var btn = document.querySelector('.kiosk-power');
       var logo = document.querySelector('.kiosk-logo');
-      if (!btn || !logo || btn.dataset.vpoAttached) return;
-      btn.dataset.vpoAttached = '1';
-      btn.removeAttribute('onclick');   // we own tap + hold now
-      injectStyle();
-      var R = buildRing(logo);
-      var startTs = 0, raf = 0, ringOn = false, fired = false;
-
-      function reset() {
-        cancelAnimationFrame(raf);
-        R.svg.classList.remove('active');
-        R.label.classList.remove('active');
-        R.label.textContent = 'Powering off… release to cancel';
-        R.fill.setAttribute('stroke-dashoffset', String(CIRC));
-        ringOn = false; startTs = 0;
-      }
-      function tick() {
-        var e = Date.now() - startTs;
-        if (e >= RING_DELAY_MS && !ringOn) {
-          R.svg.classList.add('active'); R.label.classList.add('active'); ringOn = true;
+      var buttons = document.querySelector('.kiosk-buttons');
+      if (!btn || btn.dataset.kpmAttached) return;
+      btn.dataset.kpmAttached = '1';
+      buildMenu();
+      attachStrip(btn);
+      if (logo) attachLogo(logo);
+      if (buttons) {
+        var fit = function () { fitStrip(btn, buttons); };
+        fit();
+        window.addEventListener('resize', fit);
+        if (window.ResizeObserver) {
+          var ro = new ResizeObserver(fit);
+          ro.observe(buttons);
+          if (logo) ro.observe(logo);   // webfont load changes the logo height
         }
-        if (ringOn) {
-          var p = Math.min(1, (e - RING_DELAY_MS) / (HOLD_TOTAL_MS - RING_DELAY_MS));
-          R.fill.setAttribute('stroke-dashoffset', String(CIRC * (1 - p)));
-        }
-        if (e >= HOLD_TOTAL_MS) {
-          if (!fired) {
-            fired = true;
-            R.label.textContent = 'Powering off…';
-            fetch('/api/shutdown', { method: 'POST' }).catch(function () {});
-          }
-          return;   // hold the full ring + label until the device powers down
-        }
-        raf = requestAnimationFrame(tick);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
       }
-      function down(ev) {
-        if (ev.cancelable) ev.preventDefault();
-        fired = false; startTs = Date.now();
-        raf = requestAnimationFrame(tick);
-        try { btn.setPointerCapture(ev.pointerId); } catch (_) {}
-      }
-      function up() {
-        if (fired) return;                       // shutdown already started
-        var e = startTs ? Date.now() - startTs : 0;
-        reset();
-        if (e > 0 && e < RING_DELAY_MS) {         // quick tap -> screen off
-          fetch('/api/screen/off', { method: 'POST' }).catch(function () {});
-        }
-        // held past 1s then released = cancelled -> do nothing
-      }
-      btn.addEventListener('pointerdown', down);
-      btn.addEventListener('pointerup', up);
-      btn.addEventListener('pointercancel', up);
     }
 
     if (document.readyState === 'loading')

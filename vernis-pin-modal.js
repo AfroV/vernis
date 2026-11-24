@@ -482,8 +482,8 @@
     var step1 = el('div', { class: 'vpm-fp-step' }, [
       el('div', { class: 'vpm-fp-num', text: '1' }),
       el('div', { class: 'vpm-fp-text',
-        text: 'On your Vernis device, press and hold the VERNIS logo for '
-              + '5 seconds. You’ll be asked for your device password.' }),
+        text: 'On your Vernis device’s home screen, press and hold the VERNIS '
+              + 'logo, then tap Reset PIN. You’ll be asked for your device password.' }),
     ]);
     var orSep = el('div', { class: 'vpm-fp-or', text: '— or —' });
     var step2 = el('div', { class: 'vpm-fp-step' }, [

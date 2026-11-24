@@ -1,8 +1,9 @@
 {
-  "version": "3.6.1",
-  "build_date": "2026-11-19",
+  "version": "3.6.2",
+  "build_date": "2026-11-25",
   "codename": "Sentinel",
   "changelog": [
-    "Security and stability improvements for system services"
+    "Bigger Screen Off button on the frame's home screen",
+    "New power menu: hold the VERNIS logo or Screen Off for Screen off, Power off and Reset PIN"
   ]
 }

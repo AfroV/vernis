@@ -236,7 +236,7 @@ Three modes in Settings → Security: **A — Open**, **B — Protected** (PIN g
 
 ### Recovery
 - **SSH:** `sudo /opt/vernis/scripts/reset-pin.sh`
-- **Logo long-press:** hold `.kiosk-logo` for 5 s → enter device password.
+- **Logo long-press:** on the kiosk home screen, hold `.kiosk-logo` (or the Screen Off strip) for 1.5 s → power menu → Reset PIN → enter device password.
 
 ### After changing device password via `passwd`
 Run `sudo /opt/vernis/scripts/update-owner-password.sh` to re-sync the recovery hash.

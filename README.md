@@ -343,7 +343,7 @@ The PIN is 6 digits, bcrypt-hashed server-side. Your browser remembers a session
 
 Two recovery paths:
 
-1. **Hold the VERNIS logo for 5 seconds** on the home page or PIN entry screen. A modal asks for your device password. Enter it, optionally set a new PIN, and you're back in.
+1. **Hold the VERNIS logo** on the frame's home screen, then tap **Reset PIN** in the menu that opens. A modal asks for your device password. Enter it, optionally set a new PIN, and you're back in.
 2. **SSH into the Pi** and run `sudo /opt/vernis/scripts/reset-pin.sh` to wipe the PIN and drop back to Open mode.
 
 The logo recovery only works once the frame knows your device password. On a fresh install that is the case only if you ran the installer with `INSTALL_USER_PASSWORD` set (see [INSTALL.md](INSTALL.md#4-run-the-installer)); otherwise run `sudo /opt/vernis/scripts/update-owner-password.sh` once after installing.

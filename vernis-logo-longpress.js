@@ -1,5 +1,6 @@
 /* Vernis Logo Long-Press — 5-second hold opens PIN recovery.
- * Auto-attaches to .kiosk-logo on the current page.
+ * Auto-attaches to .kiosk-logo on the current page, unless the logo has
+ * data-power-menu (index.html: its power menu calls openRecoveryModal()).
  */
 (function () {
   'use strict';
@@ -203,7 +204,9 @@
 
   function autoAttach() {
     var logo = document.querySelector('.kiosk-logo');
-    if (logo) attach(logo);
+    // A logo marked data-power-menu opens the home-screen power menu instead,
+    // which calls openRecoveryModal() from its Reset PIN item.
+    if (logo && !logo.hasAttribute('data-power-menu')) attach(logo);
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', autoAttach);

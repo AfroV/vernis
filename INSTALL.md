@@ -66,7 +66,7 @@ bash install.sh
 - The installer refuses to run as root and calls `sudo` itself where it needs to. If you start it with `sudo bash install.sh`, it switches back to your user.
 - It downloads a lot (packages, Caddy, the IPFS node, Waveshare drivers), so it takes a while.
 - If it stops partway (usually a network hiccup), fix the cause and run `bash install.sh` again. The script is written to be safe to re-run.
-- Optional: to make the PIN recovery described in the README (holding the logo for 5 seconds) work, the frame needs a hash of your device password. Either run the installer as
+- Optional: to make the PIN recovery described in the README (holding the logo, then Reset PIN) work, the frame needs a hash of your device password. Either run the installer as
   `INSTALL_USER_PASSWORD='<your login password>' bash install.sh`
   (the password ends up in your shell history), or after installing run
   `sudo /opt/vernis/scripts/update-owner-password.sh`, which asks for the password.
