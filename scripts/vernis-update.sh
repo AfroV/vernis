@@ -222,6 +222,12 @@ if ! command -v ffmpeg > /dev/null 2>&1; then
 fi
 echo "✅ System updated"
 
+# The OS upgrade can switch the boot splash back to the Pi logo and rebuild
+# the initramfs with it: select the Vernis splash again before the reboot.
+if [ -f "$TEMP_DIR/vernis/scripts/ensure-boot-splash.sh" ]; then
+    bash "$TEMP_DIR/vernis/scripts/ensure-boot-splash.sh" || true
+fi
+
 echo "[7/7] Cleaning up..."
 status running 7 "Finishing"
 cd /

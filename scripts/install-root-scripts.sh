@@ -56,7 +56,7 @@ copy_in() {   # copy_in <name> <path the unit used>
 # The root setup itself, so the boot check (touch-to-wake.sh) can run it
 # without touching /opt/vernis/scripts. Not on a frame without them (copy_in
 # from $LIB only checks).
-for f in vernis-post-update.sh install-root-scripts.sh install-api-sudo.sh; do
+for f in vernis-post-update.sh install-root-scripts.sh install-api-sudo.sh ensure-boot-splash.sh; do
     copy_in "$f" "" || true
 done
 

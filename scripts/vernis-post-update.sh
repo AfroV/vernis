@@ -40,6 +40,12 @@ mkdir -p /var/lib/vernis
 exec 9>/var/lib/vernis/post-update.lock
 flock 9
 
+# Every run, so every boot: keep the Vernis boot splash selected. Instant when
+# it is; an OS update or raspi-config can switch it back to the Pi logo.
+if [ -f "$DIR/ensure-boot-splash.sh" ]; then
+    bash "$DIR/ensure-boot-splash.sh" || true
+fi
+
 # Skip only when this version's setup ran AND the updater's sudo rule is in
 # place (Settings tells the owner to restart if an update can't start). The
 # root-owned copy can't install that rule, so it only checks the version.

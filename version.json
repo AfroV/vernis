@@ -1,9 +1,9 @@
 {
-  "version": "3.6.2",
+  "version": "3.6.3",
   "build_date": "2026-11-25",
   "codename": "Sentinel",
   "changelog": [
-    "Bigger Screen Off button on the frame's home screen",
-    "New power menu: hold the VERNIS logo or Screen Off for Screen off, Power off and Reset PIN"
+    "The frame always starts with the Vernis logo, also after system updates",
+    "Bigger Screen Off button and a power menu on the frame's home screen"
   ]
 }
